@@ -61,4 +61,33 @@ The model was copied from `UHERO/analytics` at commit `00640ace` (branch `gauge-
 | `src/feasibility.ts` | `app/housing/policy/shared/feasibility.ts` (import path only) |
 | `src/parcels.ts` | the Policy Gauge's pathway rules (`gauge/calculations/calc-*.ts`) and default assumptions (`gauge/dashboard.tsx`), rewritten as one module; results identical to the gauge's for every parcel |
 
-**Note:** the two copies must be kept in sync, make any model change in both places.
+**Note: the two copies must be kept in sync, make any model change in both places.**
+
+## Development
+
+```sh
+npm install          # install dev dependencies
+npm test             # run the tests
+npx vitest run -u    # re-record the pinned results after a deliberate change
+npm run build        # build dist
+```
+
+### Tests
+
+All tests are in `test/model.test.ts`:
+
+- **Snapshots** pin every output of the model for each pathway: its defaults,
+  scenarios that exercise its branches (grants, the Bill 7 tax exemption, park
+  dedication, retail, impact fees, financing, envelope), and a spread of real
+  Oʻahu parcels (every zone, with the smallest, median and largest lot and the
+  tallest height) through `calcParcel`. The pinned results live in
+  `test/__snapshots__/model.test.ts.snap`. The first ones matched the
+  dashboard's results exactly.
+- **Behaviour checks** that must hold whatever the numbers: the same inputs give
+  the same outputs, inputs are never modified, unit counts are whole and
+  consistent, and policy rules such as Bill 7's 60 ft cap and park waiver.
+
+Any change that moves a result fails the snapshot tests, on purpose. If the
+change is intended, run `npx vitest run -u`, review the snapshot diff in git
+(it shows exactly which outputs moved, and by how much), and commit it with the
+change.
