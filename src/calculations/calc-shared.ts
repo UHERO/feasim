@@ -2218,7 +2218,9 @@ export function calcPermanentLoan(
     monthly_pmt: Math.round(monthly_pmt),
     annual_debt_svc: Math.round(annual_debt_svc),
     dscr: Math.round(dscr * 1000) / 1000,
-    is_bankable: dscr >= min_dscr,
+    // a DSCR-sized loan is set to exactly min_dscr, so the recomputed DSCR
+    // is different by the 16th decimal place, so use a small threshold
+    is_bankable: dscr >= min_dscr - 1e-9,
     remaining_bal: Math.round(remaining_bal),
     equity_gap: Math.round(equity_gap),
   };

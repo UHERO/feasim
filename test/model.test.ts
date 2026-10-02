@@ -110,6 +110,22 @@ function casesFor(program: ProgramId): { name: string; inputs: SliderInputs }[] 
 }
 
 // ── Pinned results ─────────────────────────────────────────────────────────
+// node versions can differ in the last digit or two of floating-point math
+// so round to 10 sig digits
+const SIGNIFICANT_DIGITS = 10;
+
+function rounded(value: unknown): unknown {
+  if (typeof value === "number")
+    return Number.isFinite(value)
+      ? Number(value.toPrecision(SIGNIFICANT_DIGITS))
+      : value;
+  if (Array.isArray(value)) return value.map(rounded);
+  if (value !== null && typeof value === "object")
+    return Object.fromEntries(
+      Object.entries(value).map(([key, v]) => [key, rounded(v)])
+    );
+  return value;
+}
 
 describe.each(PROGRAMS)("%s", (program) => {
   it("model results match the snapshot", () => {
@@ -117,7 +133,7 @@ describe.each(PROGRAMS)("%s", (program) => {
       const output = calcSingle(inputs);
       return { case: name, inputs, level: overallLevel(output), output };
     });
-    expect(results).toMatchSnapshot();
+    expect(rounded(results)).toMatchSnapshot();
   });
 
   it("parcel results match the snapshot", () => {
@@ -127,7 +143,7 @@ describe.each(PROGRAMS)("%s", (program) => {
         return { setting, parcel, level: overallLevel(output), output };
       })
     );
-    expect(results).toMatchSnapshot();
+    expect(rounded(results)).toMatchSnapshot();
   });
 });
 
@@ -163,6 +179,21 @@ describe.each(PROGRAMS)("%s model", (program) => {
       if (inputs.zone_class !== undefined)
         expect(r.zone_class, name).toBe(inputs.zone_class);
     }
+  });
+});
+
+describe("DSCR-sized loans", () => {
+  it("are bankable: a loan sized to the minimum DSCR meets it", () => {
+    let sized = 0;
+    for (const program of PROGRAMS) {
+      for (const { name, inputs } of casesFor(program)) {
+        const r = calcSingle(inputs);
+        if (r.dev_dscr !== 1.2) continue; // sized to the default 1.2 minimum
+        sized++;
+        expect(r.dev_is_bankable, `${program}: ${name}`).toBe(true);
+      }
+    }
+    expect(sized).toBeGreaterThan(0);
   });
 });
 
