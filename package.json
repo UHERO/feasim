@@ -2,7 +2,7 @@
   "name": "@uhero-data/policy-simulator",
   "version": "0.1.0",
   "description": "UHERO's development feasibility model for Oahu housing policy pathways",
-  "private": true,
+  "private": false,
   "type": "module",
   "main": "./dist/index.cjs",
   "types": "./dist/index.d.ts",
@@ -10,7 +10,12 @@
     "import": "./dist/index.js",
     "require": "./dist/index.cjs"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": "github:UHERO/policy-simulator-package",
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean",
