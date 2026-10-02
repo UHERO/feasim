@@ -19,8 +19,9 @@
   "repository": "github:UHERO/policy-simulator-package",
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "prepare": "npm run build",
     "test": "vitest run",
-    "prepublishOnly": "tsc --noEmit && vitest run && npm run build"
+    "prepublishOnly": "tsc --noEmit && vitest run"
   },
   "devDependencies": {
     "tsup": "^8.5.1",
