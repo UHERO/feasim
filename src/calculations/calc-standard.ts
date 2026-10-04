@@ -564,7 +564,6 @@ export function calcStandardSingle(sliders: SliderInputs): ParcelOutput {
   // pathway pays the in-lieu fee unless the caller says otherwise
   const park = sliders.park ?? "in_lieu";
   const include_retail = sliders.include_retail ?? false;
-  // $/sqft/month; the market runs ~$3 (low end) to ~$12 (Waikiki)
   const retail_rent = sliders.retail_rent ?? 5;
   const affordable_ami = sliders.affordable_ami ?? "ami_50";
   const market_ami = sliders.market_ami ?? "ami_50";

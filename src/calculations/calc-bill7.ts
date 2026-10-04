@@ -77,7 +77,7 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   const permanent_rate = sliders.permanent_rate ?? DEFAULT_PERMANENT_RATE;
   const hold_years = sliders.hold_years ?? DEFAULT_HOLD_YEARS;
   const amort_years = sliders.amort_years ?? HOLD.amort_years;
-  const min_dscr = sliders.min_dscr ?? 1.2;
+  const min_dscr = sliders.min_dscr ?? 1.15;
   const opex_ratio = sliders.opex_ratio ?? EXPENSES.opex_ratio;
   const grant_type = sliders.grant_type ?? DEFAULT_GRANT_TYPE;
   const grant_amount =

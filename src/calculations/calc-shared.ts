@@ -2219,7 +2219,7 @@ export function calcPermanentLoan(
     annual_debt_svc: Math.round(annual_debt_svc),
     dscr: Math.round(dscr * 1000) / 1000,
     // a DSCR-sized loan is set to exactly min_dscr, so the recomputed DSCR
-    // is different by the 16th decimal place, so use a small threshold
+    // is different by the 8~9th decimal place, so use a small tolerance
     is_bankable: dscr >= min_dscr - 1e-9,
     remaining_bal: Math.round(remaining_bal),
     equity_gap: Math.round(equity_gap),

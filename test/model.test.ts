@@ -188,7 +188,10 @@ describe("DSCR-sized loans", () => {
     for (const program of PROGRAMS) {
       for (const { name, inputs } of casesFor(program)) {
         const r = calcSingle(inputs);
-        if (r.dev_dscr !== 1.2) continue; // sized to the default 1.2 minimum
+        // the minimum DSCR the loan was sized to: Bill 7 defaults to 1.15, the
+        // other pathways to 1.2
+        const minDscr = inputs.min_dscr ?? (program === "bill7" ? 1.15 : 1.2);
+        if (r.dev_dscr !== minDscr) continue;
         sized++;
         expect(r.dev_is_bankable, `${program}: ${name}`).toBe(true);
       }
