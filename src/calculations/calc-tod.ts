@@ -15,7 +15,6 @@ import {
   calcConstructionInterest,
   calcDevRLV,
   calcDscrMaxLoan,
-  calcFAR,
   calcLeaseupCarry,
   calcParkArea,
   calcParkingIncome,
@@ -24,6 +23,7 @@ import {
   calcPropertyTax,
   calcSoftCosts,
   calcSurfaceParkingCost,
+  calcFarTod,
   commercialFracByZone,
   DEFAULT_PROFIT_MARGIN,
   DEFAULT_TARGET_RETURN,
@@ -48,6 +48,8 @@ import {
   setbackFootprint,
   sizeConstructionLoan,
   solveIRR,
+  todHeightLimit,
+  todUseZone,
   specialDistrictTotal,
   VACANCY,
   zeroOutput,
@@ -68,9 +70,6 @@ export const TOD_DEFAULT_HOLD_YEARS = 10;
 export const TOD_DEFAULT_RETAIL_RENT = 65;
 export const TOD_DEFAULT_AFFORDABLE_AMI = "ami_80";
 export const TOD_DEFAULT_MARKET_AMI = "ami_80";
-
-// TOD regulatory minimums (affordability housing)
-const TOD_MIN_AFD_RENT_FRAC = 0.15;
 
 // =========================================================
 // MAIN ENTRY: calcTodSingle
@@ -96,7 +95,7 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   const market_ami = sliders.market_ami ?? TOD_DEFAULT_MARKET_AMI;
   const construction_rate =
     sliders.construction_rate ?? FINANCING.construction_rate;
-  const permitting_months = sliders.permitting_months ?? 3;
+  const permitting_months = sliders.permitting_months ?? 18;
   const impact_fee_per_unit = sliders.impact_fee ?? FEES.impact.per_dwelling;
   const waivable_fee_basis = sliders.waivable_fee_basis ?? "market_units";
   // park dedication is only waived under Bill 7 (ROH 43-10.8); every other
@@ -110,15 +109,19 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   // 2. BUILDABLE ENVELOPE (tod_hard)
   const floors = Math.floor(height_limit / floor_height);
 
-  // 2× FAR bonus
-  const base_far = calcFAR(zone_class, lot_sqft);
-  const far = sliders.max_far ?? base_far * 2;
+  const far = sliders.max_far ?? calcFarTod(zone_class, lot_sqft);
   // waikiki precincts must keep 35–50% of the lot open; that and the coverage
   // cap are both measured on the zoning lot, so the stricter one governs
   const far_cap = far * lot_sqft;
+  // § 21-3.120-2(b): the bonus is earned at 5:1, so it consumes ground
+  const open_space_sqft = Math.min(
+    lot_sqft,
+    ((sliders.open_space_bonus ?? 0) * lot_sqft) / 5
+  );
+  const net_lot_sqft = lot_sqft - open_space_sqft;
   const coverage_cap =
     envelopeCoverage(zone_class, far, lotCoverage(zone_class)) *
-    lot_sqft *
+    net_lot_sqft *
     floors;
   const setback_cap = setbackFootprint(lot_sqft, setback) * floors;
   const buildable_sqft = Math.min(far_cap, coverage_cap, setback_cap);
@@ -127,9 +130,13 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   let net_commercial_sqft = 0;
   let gross_residential_sqft = buildable_sqft;
 
-  // commercial use checker, returns 0 if the selected zone isn't compatible
+  // commercial use checker, returns 0 if the selected zone isn't compatible.
+  // IPD-T imports BMX-3 uses into every district but BMX-4 (§ 21-9.100-5(d)(1)),
+  // so ground-floor commercial follows the use district, not the base district.
   {
-    const frac = include_retail ? commercialFracByZone(zone_class) : 0;
+    const frac = include_retail
+      ? commercialFracByZone(todUseZone(zone_class))
+      : 0;
     if (frac > 0) {
       gross_commercial_sqft = frac * lot_sqft;
       gross_residential_sqft = buildable_sqft - gross_commercial_sqft;
@@ -150,9 +157,7 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   if (max_units <= 0)
     return zeroOutput("hypothetical", zone_class, lot_sqft, height_limit);
 
-  // 8/26/26, for-sale units are discarded, 100% rental
-  // now 15% affordable rental at <=80% AMI, 30-year restriction
-  const afd_rent_units = Math.ceil(max_units * TOD_MIN_AFD_RENT_FRAC);
+  const afd_rent_units = 0;
   const afd_sale_units = 0;
   const mkt_rent_units = Math.max(0, max_units - afd_rent_units);
   const mkt_sale_units = 0;
@@ -269,7 +274,6 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   const retail_egi = retail_pgi - retail_vacancy_loss;
   const egi = residential_egi + retail_egi;
 
-  // 8/26/26, for-sale units are discarded, 100% rental
   const afd_sales = 0;
   const mkt_sales = 0;
   const gross_sales = 0;

@@ -1310,6 +1310,10 @@ export interface SliderInputs {
   target_return?: number;
   profit_margin?: number;
   affordable_ami?: string;
+  /** TOD/IPD-T only: § 21-3.120-2(b) open-space FAR bonus taken, in FAR. It
+   *  costs lot_sqft/5 of ground per 1.0 FAR, so it is both an uplift and a
+   *  land cost. */
+  open_space_bonus?: number;
   market_ami?: string;
   construction_rate?: number;
   equity?: number;
@@ -1502,10 +1506,236 @@ export function calcFAR(zone_class: string, lot_sqft: number): number {
     return 1.9;
   }
   if (zone_class === "B-1") return 1.0;
+  // Resort, Table 21-3.4
+  if (zone_class === "Resort" || zone_class === "ResMix" || zone_class === "ResCom") {
+    if (lot_sqft < 10000) return 0.00006 * lot_sqft + 0.4;
+    if (lot_sqft <= 30000) return 0.00002 * lot_sqft + 0.8;
+    return 1.4;
+  }
+  // Industrial, Table 21-3.5
+  if (zone_class === "I-1") return 1.0;
+  if (zone_class === "I-2" || zone_class === "I-3") return 2.5;
+  // IMX-1 § 21-3.140-1(c)(1) scales with the use mix; a residential model
+  // takes the base rung.
+  if (zone_class === "IMX-1") return 1.5;
   // the open-space bonus (3.5 / 3.5 / 7.5 under § 21-3.120-2(c)) is not modeled
   if (zone_class === "B-2" || zone_class === "BMX-3") return 2.5;
   if (zone_class === "BMX-4") return 4.0;
   return 0;
+}
+
+// ── Transit permits — see the model documentation ────────────────────────
+
+// § 21-9.100-5(b)(5)
+export const TOD_ELIGIBLE_DISTRICTS = [
+  "A-1", "A-2", "A-3",
+  "AMX-1", "AMX-2", "AMX-3",
+  "B-1", "B-2",
+  "BMX-2", "BMX-3", "BMX-4",
+  "Resort", "ResCom", "ResMix",
+  "I-1", "I-2", "I-3",
+  "IMX-1",
+];
+
+// § 21-9.100-5(b)(3), single-lot floor
+export const TOD_MIN_LOT_SQFT = 20000;
+
+// § 21-9.100-5(e)
+export const TOD_MAX_FAR = 7.5;
+export const TOD_MAX_HEIGHT_FT = 450;
+
+/** whether the IPD-T bonuses are available at all */
+export function todEligible(zone_class: string, lot_sqft: number): boolean {
+  return (
+    TOD_ELIGIBLE_DISTRICTS.includes(zone_class) && lot_sqft >= TOD_MIN_LOT_SQFT
+  );
+}
+
+// § 21-9.100-5(d)(1). Use-driven only; the envelope keeps the real district.
+export function todUseZone(zone_class: string): string {
+  return zone_class === "BMX-4" ? "BMX-4" : "BMX-3";
+}
+
+// § 21-9.100-5(e)(1). DOUBLE_AFTER_BONUS orders it 2 x (base + bonus).
+const DOUBLE_AFTER_BONUS = ["B-2", "BMX-2", "BMX-3", "BMX-4", "IMX-1"];
+
+// § 21-3.120-2(c) ceilings; the bonus is the gap from base FAR
+export const OPEN_SPACE_FAR_CEILING: Record<string, number> = {
+  "B-2": 3.5,
+  "BMX-2": 3.5,
+  "BMX-3": 3.5,
+  "BMX-4": 7.5,
+};
+
+// Table 21-3.3 districts; calcFAR still holds older lot-scaled formulas other
+// pathways depend on, so calcFarBill6 supplies the current flat figures.
+const TABLE_21_3_3 = ["A-1", "AMX-1", "A-2", "AMX-2", "A-3", "AMX-3"];
+
+/**
+ * Base FAR by district family. calcFarBill6 must NOT be used for the business
+ * districts: it returns 3.0 for B-2 and 4.0 for BMX-3 against the table's 2.5,
+ * and 0 for B-1, industrial and resort.
+ */
+export function baseFar(zone_class: string, lot_sqft = 0): number {
+  if (TABLE_21_3_3.includes(zone_class)) return calcFarBill6(zone_class);
+  return calcFAR(zone_class, lot_sqft);
+}
+
+/** largest open-space bonus the district allows, in FAR */
+export function openSpaceBonus(zone_class: string): number {
+  const ceiling = OPEN_SPACE_FAR_CEILING[zone_class];
+  if (ceiling == null) return 0;
+  return Math.max(0, ceiling - baseFar(zone_class));
+}
+
+export function calcFarTod(
+  zone_class: string,
+  lot_sqft: number,
+  // defaults to the district ceiling; 0 = no public open space provided
+  density_bonus?: number,
+  plan_far?: number
+): number {
+  if (!todEligible(zone_class, lot_sqft)) {
+    return baseFar(zone_class, lot_sqft);
+  }
+  const base = baseFar(zone_class, lot_sqft);
+  const bonus = density_bonus ?? openSpaceBonus(zone_class);
+  const doubled = DOUBLE_AFTER_BONUS.includes(zone_class)
+    ? 2 * (base + bonus)
+    : 2 * base + bonus;
+  const capped = Math.min(doubled, TOD_MAX_FAR);
+  return plan_far != null && plan_far > capped ? plan_far : capped;
+}
+
+// § 21-9.100-8(a)(1)(A). B-1, BMX-4 and resort are absent from the ladder.
+export type TodPermitRoute = "base" | "minor_sd" | "major_sd" | "pdt";
+
+const PDT_SCALED = ["A-1", "A-2", "A-3", "AMX-1", "AMX-2", "AMX-3", "I-1", "I-2", "I-3", "IMX-1"];
+
+export function calcFarPdt(
+  zone_class: string,
+  lot_sqft: number,
+  route: TodPermitRoute = "pdt"
+): number {
+  const base = baseFar(zone_class, lot_sqft);
+  if (route === "base") return base;
+  if (zone_class === "BMX-3" || zone_class === "B-2") {
+    return route === "pdt" ? 7.0 : 3.5;
+  }
+  if (PDT_SCALED.includes(zone_class)) {
+    return route === "pdt" ? 2.0 * base : 1.2 * base;
+  }
+  // B-1, BMX-4, resort: no uplift path
+  return base;
+}
+
+// § 21-9.100-8(a)(1)(D).
+export function todHeightPdt(
+  base_height: number,
+  route: TodPermitRoute = "pdt",
+  map_bonus_height?: number
+): number {
+  switch (route) {
+    case "base":
+      return base_height;
+    case "minor_sd":
+      return Math.min(base_height + 60, 2 * base_height);
+    case "major_sd":
+      return Math.min(base_height + 120, 3 * base_height);
+    case "pdt":
+      return map_bonus_height ?? base_height;
+  }
+}
+
+// Table 21-5.1 bars multi-unit dwelling in industrial districts; IPD-T lifts
+// that via the BMX-3 use import, PD-T only for IMX-1 (§ 21-9.100-9(c)).
+const INDUSTRIAL = ["I-1", "I-2", "I-3", "IMX-1"];
+
+export type ResidentialUse = "permitted" | "discretionary" | "not_permitted";
+
+export function residentialUse(
+  zone_class: string,
+  regime: "pdt" | "ipdt"
+): ResidentialUse {
+  if (!INDUSTRIAL.includes(zone_class)) return "permitted";
+  if (regime === "ipdt") return "permitted"; // BMX-3 uses imported
+  return zone_class === "IMX-1" ? "discretionary" : "not_permitted";
+}
+
+// Community-benefit ceilings by precinct. A null falls back to the
+// § 21-9.100-5(e)(1)(A) formula, correct where a plan is silent.
+export interface TodPlanStandards {
+  /** core TOD Precinct, <= 1/4 mile */
+  core_max_far: number | null;
+
+  core_max_height: number | null;
+  /** TIZ Precinct, 1/4 to 1/2 mile */
+  tiz_max_far: number | null;
+  tiz_max_height: number | null;
+  /** figures came from the quarter-mile proxy, not the plan's own polygons */
+  approximate?: boolean;
+  source: string;
+}
+
+export const TOD_PLAN_STANDARDS: Record<string, TodPlanStandards> = {
+  // Figs. 5-3 / 5-4, quarter-mile proxy
+  "Ala Moana": {
+    core_max_far: 10.0,
+    core_max_height: 400,
+    tiz_max_far: 7.0,
+    tiz_max_height: 350,
+    approximate: true,
+    source:
+      "Ala Moana Neighborhood TOD Plan Figs. 5-3 / 5-4, quarter-mile proxy; corroborated by Res. 20-174 (KCR 10.0/400ft), 17-175 (9.95/400ft), 17-221 (9.215/400ft), 20-315 (7.0/400ft)",
+  },
+  // Figs. 2-6 / 2-7, same proxy.
+  Downtown: {
+    core_max_far: 7.5,
+    core_max_height: 400,
+    tiz_max_far: 4.5,
+    tiz_max_height: 250,
+    approximate: true,
+    source: "Downtown Neighborhood TOD Plan Figs. 2-6 / 2-7, quarter-mile proxy",
+  },
+  // Maps published but not yet read; parcels stay not_modeled.
+  // Fig. 2-7. FAR map not transcribed.
+  Kalihi: { core_max_far: null, core_max_height: 200, tiz_max_far: null, tiz_max_height: 150, approximate: true, source: "Kalihi Neighborhood TOD Plan Fig. 2-7, quarter-mile proxy" },
+  // no plan height map published; base height governs
+  Airport: { core_max_far: null, core_max_height: null, tiz_max_far: null, tiz_max_height: null, source: "no plan height map published; base height governs" },
+  // heights come per parcel from TOD_Zoning - Proposed
+  "East Kapolei": { core_max_far: null, core_max_height: null, tiz_max_far: null, tiz_max_height: null, source: "per-parcel heights from TOD_Zoning - Proposed" },
+  // PD-T: the § 21-9.100-8 ladders apply instead
+  Waipahu: { core_max_far: null, core_max_height: null, tiz_max_far: null, tiz_max_height: null, source: "PD-T; see § 21-9.100-8(a)(1)" },
+  "Aiea-Pearl City": { core_max_far: null, core_max_height: null, tiz_max_far: null, tiz_max_height: null, source: "PD-T; see § 21-9.100-8(a)(1)" },
+  Halawa: { core_max_far: null, core_max_height: null, tiz_max_far: null, tiz_max_height: null, source: "PD-T; see § 21-9.100-8(a)(1)" },
+};
+
+/** nulls where the plan is silent or untranscribed */
+export function todPlanCeiling(
+  station_area: string | null,
+  precinct: "core" | "tiz"
+): { far: number | null; height: number | null; approximate: boolean } {
+  const std = station_area ? TOD_PLAN_STANDARDS[station_area] : undefined;
+  if (!std) return { far: null, height: null, approximate: false };
+  const approximate = std.approximate === true;
+  return precinct === "core"
+    ? { far: std.core_max_far, height: std.core_max_height, approximate }
+    : { far: std.tiz_max_far, height: std.tiz_max_height, approximate };
+}
+
+// § 21-9.100-5(e)(2): where there is no draft neighborhood TOD plan, height may
+// be up to twice the underlying limit or 450 ft, whichever is lower. Where a
+// draft or approved plan exists its maximum governs, except that an existing
+// higher limit prevails.
+export function todHeightLimit(
+  zone_class: string,
+  lot_sqft: number,
+  base_height: number,
+  plan_height?: number
+): number {
+  if (!todEligible(zone_class, lot_sqft)) return base_height;
+  if (plan_height != null) return Math.max(plan_height, base_height);
+  return Math.min(2 * base_height, TOD_MAX_HEIGHT_FT);
 }
 
 // calculate FAR based on bill 6 ordinanace (ONLY USE FOR BILL 6 PATH)

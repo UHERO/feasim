@@ -10,7 +10,25 @@ import {
   BILL7_FAR,
   BILL7_MAX_HEIGHT,
   DEFAULT_INPUTS,
+  baseFar,
   calcFAR,
+  calcFarPdt,
+  calcFarTod,
+  openSpaceBonus,
+  todIneligibleReason,
+  todOpenSpaceCostSqft,
+  todPlanCeiling,
+  todEligible,
+  todHeightLimit,
+  todHeightPdt,
+  todUseZone,
+  residentialUse,
+  OPEN_SPACE_FAR_CEILING,
+  TOD_ELIGIBLE_DISTRICTS,
+  TOD_MAX_FAR,
+  TOD_MAX_HEIGHT_FT,
+  TOD_MIN_LOT_SQFT,
+  TOD_PLAN_STANDARDS,
   calcFarBill6,
   calcParcel,
   calcSingle,
@@ -251,7 +269,8 @@ describe("pathwayEnvelope", () => {
     expect(pathwayEnvelope("bill7", low).max_far).toBe(BILL7_FAR);
     expect(pathwayEnvelope("standard", low).max_far).toBe(calcFAR("A-2", 20000));
     expect(pathwayEnvelope("h201", low).max_far).toBe(calcFAR("A-2", 20000));
-    expect(pathwayEnvelope("tod", low).max_far).toBe(calcFAR("A-2", 20000) * 2);
+    // no TOD regime on this parcel, so it keeps its base FAR (see "TOD pathway")
+    expect(pathwayEnvelope("tod", low).max_far).toBe(baseFar("A-2", 20000));
   });
 
   it("keeps the zoned height, except Bill 7 caps it at 60 ft", () => {
@@ -263,24 +282,34 @@ describe("pathwayEnvelope", () => {
   });
 
   it("falls back to the pathway's default height when none is recorded", () => {
-    const defaults = { bill6: 30, bill7: 30, standard: 30, tod: 60, h201: 60 };
-    for (const program of PROGRAMS) {
+    const defaults = { bill6: 30, bill7: 30, standard: 30, h201: 60 };
+    for (const program of ["bill6", "bill7", "standard", "h201"] as const) {
       expect(pathwayEnvelope(program, unknownHeight).height_limit, program).toBe(
         defaults[program]
       );
     }
+  });
+
+  it("reports TOD parcels with no recorded height as not modeled", () => {
+    const envelope = pathwayEnvelope("tod", { ...unknownHeight, tod_regime: "ipdt" });
+    expect(envelope.status).toBe("not_modeled");
+    expect(envelope.height_limit).toBe(0);
   });
 });
 
 describe("parcelInputs", () => {
   it("is the pathway defaults plus the parcel's envelope", () => {
     for (const program of PROGRAMS) {
+      const { height_limit, max_far } = pathwayEnvelope(program, low);
       expect(parcelInputs(program, low)).toEqual({
         ...DEFAULT_INPUTS[program],
         program,
         lot_sqft: 20000,
         zone_class: "A-2",
-        ...pathwayEnvelope(program, low),
+        height_limit,
+        max_far,
+        // TOD also passes the open-space bonus: none outside IPD-T
+        ...(program === "tod" ? { open_space_bonus: 0 } : {}),
       });
     }
   });
@@ -337,5 +366,274 @@ describe("calcParcel", () => {
   it("builds to the Bill 7 cap, not above it", () => {
     expect(calcParcel("bill7", tall, { height_limit: 75 }).height_limit).toBe(60);
     expect(calcParcel("bill7", tall, { height_limit: 30 }).height_limit).toBe(30);
+  });
+});
+
+// ── TOD pathway (§ 21-9.100-5) ─────────────────────────────────────────────
+
+// Real TOD parcels from analytics' gauge data, one per case, plus synthetic
+// ones for the gates no real parcel hits.
+const TOD = {
+  ipdtCore: { tmk: "15005040", zone_class: "BMX-3", lot_sqft: 20071, height: 200, tod_regime: "ipdt", slu_urban: true, station_area: "Downtown", tod_precinct: "core" },
+  ipdtTiz: { tmk: "12001092", zone_class: "BMX-3", lot_sqft: 20898, height: 200, tod_regime: "ipdt", slu_urban: true, station_area: "Kalihi", tod_precinct: "tiz" },
+  ipdtNoPlanFar: { tmk: "11010009", zone_class: "B-2", lot_sqft: 123676, height: 60, tod_regime: "ipdt", slu_urban: true, station_area: "Airport", tod_precinct: "core" },
+  pdtMapBonus: { tmk: "94010101", zone_class: "BMX-3", lot_sqft: 32588, height: 60, tod_regime: "pdt", slu_urban: true, tod_map_bonus_height: 60, station_area: "Waipahu", tod_precinct: "tiz" },
+  smallLot: { tmk: "12001009", zone_class: "BMX-3", lot_sqft: 9557, height: 200, tod_regime: "ipdt", slu_urban: true, station_area: "Kalihi", tod_precinct: "tiz" },
+  notUrban: { tmk: "91016183", zone_class: "BMX-3", lot_sqft: 68825, height: 90, tod_regime: "ipdt", slu_urban: false, tod_map_bonus_height: 120, station_area: "East Kapolei", tod_precinct: "tiz" },
+  // synthetic
+  pdtNoMapBonus: { lot_sqft: 30000, zone_class: "BMX-3", height: 60, tod_regime: "pdt", slu_urban: true },
+  ineligibleZone: { lot_sqft: 30000, zone_class: "R-5", height: 30, tod_regime: "ipdt", slu_urban: true },
+  pdtIndustrial: { lot_sqft: 30000, zone_class: "I-2", height: 60, tod_regime: "pdt", slu_urban: true },
+  outside: { lot_sqft: 30000, zone_class: "BMX-3", height: 60 },
+} satisfies Record<string, Parcel>;
+
+describe("TOD pathway", () => {
+  it("applies every eligibility gate, with a reason", () => {
+    expect(todIneligibleReason(TOD.ipdtCore)).toBeNull();
+    expect(todIneligibleReason(TOD.pdtMapBonus)).toBeNull();
+    expect(todIneligibleReason(TOD.outside)).toMatch(/outside every TOD special district/);
+    expect(todIneligibleReason(TOD.ineligibleZone)).toMatch(/not an eligible district/);
+    expect(todIneligibleReason(TOD.smallLot)).toMatch(/20,000 sqft minimum/);
+    expect(todIneligibleReason(TOD.notUrban)).toMatch(/urban district/);
+    expect(todIneligibleReason(TOD.pdtIndustrial)).toMatch(/not permitted .* under PD-T/);
+    // the same industrial zone is fine under IPD-T, which imports BMX-3 uses
+    expect(todIneligibleReason({ ...TOD.pdtIndustrial, tod_regime: "ipdt" })).toBeNull();
+  });
+
+  it("keeps an ineligible parcel at its base FAR and zoned height", () => {
+    for (const parcel of [TOD.outside, TOD.smallLot, TOD.notUrban, TOD.ineligibleZone]) {
+      const envelope = pathwayEnvelope("tod", parcel);
+      expect(envelope.status).toBe("ineligible");
+      expect(envelope.max_far).toBe(baseFar(parcel.zone_class, parcel.lot_sqft));
+      expect(envelope.height_limit).toBe(parcel.height);
+    }
+  });
+
+  it("builds PD-T to the minor SD ladder at base and the PD-T ladder with benefits", () => {
+    const p = TOD.pdtNoMapBonus;
+    const base = pathwayEnvelope("tod", p, { tier: "base" });
+    const full = pathwayEnvelope("tod", p, { tier: "with_benefits" });
+    expect(base).toMatchObject({ status: "eligible", far_source: "pdt_ladder", height_source: "base" });
+    expect(base.max_far).toBe(calcFarPdt(p.zone_class, p.lot_sqft, "minor_sd"));
+    expect(full.max_far).toBe(calcFarPdt(p.zone_class, p.lot_sqft, "pdt"));
+    // the map's bonus height only counts with benefits
+    expect(pathwayEnvelope("tod", TOD.pdtMapBonus, { tier: "with_benefits" }).height_source).toBe("pdt_map_bonus");
+    expect(pathwayEnvelope("tod", TOD.pdtMapBonus, { tier: "base" }).height_source).toBe("base");
+  });
+
+  it("builds IPD-T to the formula at base and the plan ceiling with benefits", () => {
+    const p = TOD.ipdtCore;
+    const plan = todPlanCeiling(p.station_area, p.tod_precinct);
+    const base = pathwayEnvelope("tod", p, { tier: "base" });
+    const full = pathwayEnvelope("tod", p, { tier: "with_benefits" });
+    expect(base.far_source).toBe("ipdt_formula");
+    expect(base.max_far).toBe(calcFarTod(p.zone_class, p.lot_sqft, openSpaceBonus(p.zone_class)));
+    expect(plan.far).not.toBeNull();
+    expect(full.far_source).toBe("plan_ceiling");
+    expect(full.max_far).toBe(calcFarTod(p.zone_class, p.lot_sqft, openSpaceBonus(p.zone_class), plan.far!));
+    // where the plan sets no FAR, the formula applies in both tiers
+    expect(pathwayEnvelope("tod", TOD.ipdtNoPlanFar, { tier: "with_benefits" }).far_source).toBe("ipdt_formula");
+  });
+
+  it("never lets a plan's height cap fall below the zoned height", () => {
+    for (const parcel of [TOD.ipdtCore, TOD.ipdtTiz, TOD.ipdtNoPlanFar]) {
+      for (const tier of ["base", "with_benefits"] as const) {
+        expect(pathwayEnvelope("tod", parcel, { tier }).height_limit).toBeGreaterThanOrEqual(parcel.height);
+      }
+    }
+  });
+
+  it("passes the open-space bonus for IPD-T only, and counts the ground it uses", () => {
+    const ipdt = TOD.ipdtTiz;
+    expect(parcelInputs("tod", ipdt).open_space_bonus).toBe(openSpaceBonus(ipdt.zone_class));
+    expect(parcelInputs("tod", ipdt, {}, { density_bonus: 1.5 }).open_space_bonus).toBe(1.5);
+    expect(parcelInputs("tod", TOD.pdtMapBonus).open_space_bonus).toBe(0);
+    expect(todOpenSpaceCostSqft(ipdt, 1.5)).toBe((1.5 * ipdt.lot_sqft) / 5);
+    expect(todOpenSpaceCostSqft(TOD.pdtMapBonus, 1.5)).toBe(0);
+  });
+
+  it("results for every TOD case match the snapshot", () => {
+    const results = Object.entries(TOD).flatMap(([name, parcel]) =>
+      (["base", "with_benefits"] as const).map((tier) => {
+        const output = calcParcel("tod", parcel, {}, { tier });
+        return { case: name, tier, envelope: pathwayEnvelope("tod", parcel, { tier }), level: overallLevel(output), output };
+      })
+    );
+    expect(rounded(results)).toMatchSnapshot();
+  });
+});
+
+// ── TOD rules and the TOD pro forma, tested directly ───────────────────────
+
+describe("TOD rules", () => {
+  it("gates the IPD-T bonuses on district and the 20,000 sqft minimum", () => {
+    expect(TOD_MIN_LOT_SQFT).toBe(20000);
+    expect(todEligible("BMX-3", 20000)).toBe(true);
+    expect(todEligible("BMX-3", 19999)).toBe(false);
+    expect(todEligible("R-5", 50000)).toBe(false);
+    for (const zone of TOD_ELIGIBLE_DISTRICTS) expect(todEligible(zone, 20000)).toBe(true);
+  });
+
+  it("imports BMX-3 uses into every district but BMX-4", () => {
+    expect(todUseZone("BMX-4")).toBe("BMX-4");
+    for (const zone of ["A-2", "B-2", "BMX-3", "I-2", "IMX-1", "Resort"]) expect(todUseZone(zone)).toBe("BMX-3");
+  });
+
+  it("permits housing everywhere except industrial districts under PD-T", () => {
+    expect(residentialUse("A-2", "pdt")).toBe("permitted");
+    expect(residentialUse("BMX-3", "ipdt")).toBe("permitted");
+    expect(residentialUse("I-2", "ipdt")).toBe("permitted");
+    expect(residentialUse("IMX-1", "pdt")).toBe("discretionary");
+    for (const zone of ["I-1", "I-2", "I-3"]) expect(residentialUse(zone, "pdt")).toBe("not_permitted");
+  });
+
+  it("sizes the open-space bonus up to the district's FAR ceiling", () => {
+    for (const [zone, ceiling] of Object.entries(OPEN_SPACE_FAR_CEILING)) {
+      expect(openSpaceBonus(zone)).toBe(Math.max(0, ceiling - baseFar(zone)));
+      expect(baseFar(zone) + openSpaceBonus(zone)).toBeGreaterThanOrEqual(ceiling);
+    }
+    // districts without a ceiling get no bonus
+    for (const zone of ["A-2", "AMX-3", "I-2", "Resort"]) expect(openSpaceBonus(zone)).toBe(0);
+  });
+
+  it("uses the apartment table for A/AMX districts and calcFAR for the rest", () => {
+    for (const zone of ["A-1", "A-2", "A-3", "AMX-1", "AMX-2", "AMX-3"]) {
+      expect(baseFar(zone, 30000)).toBe(calcFarBill6(zone));
+    }
+    for (const zone of ["B-2", "BMX-3", "I-2"]) expect(baseFar(zone, 30000)).toBe(calcFAR(zone, 30000));
+  });
+
+  it("doubles FAR after the bonus in business districts and before it elsewhere, capped at 7.5", () => {
+    const lot = 30000;
+    // too small: no TOD bonus at all
+    expect(calcFarTod("BMX-3", 10000)).toBe(baseFar("BMX-3", 10000));
+    // B/BMX/IMX: 2 x (base + bonus)
+    expect(calcFarTod("B-2", lot, 1)).toBe(Math.min(2 * (baseFar("B-2", lot) + 1), TOD_MAX_FAR));
+    // apartment districts: 2 x base + bonus
+    expect(calcFarTod("A-2", lot, 1)).toBe(Math.min(2 * baseFar("A-2", lot) + 1, TOD_MAX_FAR));
+    // the default bonus is the district's open-space bonus
+    expect(calcFarTod("BMX-3", lot)).toBe(calcFarTod("BMX-3", lot, openSpaceBonus("BMX-3")));
+    // nothing exceeds the cap without a plan
+    for (const zone of TOD_ELIGIBLE_DISTRICTS) {
+      expect(calcFarTod(zone, lot)).toBeLessThanOrEqual(TOD_MAX_FAR);
+      expect(calcFarTod(zone, lot, 5)).toBeLessThanOrEqual(TOD_MAX_FAR);
+    }
+  });
+
+  it("lets a station-area plan raise FAR above the cap but never lower it", () => {
+    const capped = calcFarTod("BMX-4", 30000);
+    expect(calcFarTod("BMX-4", 30000, undefined, 10)).toBe(10);
+    expect(calcFarTod("BMX-4", 30000, undefined, 1)).toBe(capped);
+    // and a plan does nothing for an ineligible lot
+    expect(calcFarTod("BMX-4", 10000, undefined, 10)).toBe(baseFar("BMX-4", 10000));
+  });
+
+  it("follows the PD-T FAR ladder for each district family", () => {
+    const lot = 30000;
+    for (const zone of ["B-2", "BMX-3"]) {
+      expect(calcFarPdt(zone, lot, "minor_sd")).toBe(3.5);
+      expect(calcFarPdt(zone, lot, "major_sd")).toBe(3.5);
+      expect(calcFarPdt(zone, lot, "pdt")).toBe(7.0);
+    }
+    for (const zone of ["A-2", "AMX-3", "I-2", "IMX-1"]) {
+      expect(calcFarPdt(zone, lot, "minor_sd")).toBeCloseTo(1.2 * baseFar(zone, lot), 12);
+      expect(calcFarPdt(zone, lot, "pdt")).toBe(2 * baseFar(zone, lot));
+    }
+    // not on the ladder: base FAR on every route
+    for (const route of ["base", "minor_sd", "major_sd", "pdt"] as const) {
+      expect(calcFarPdt("Resort", lot, route)).toBe(baseFar("Resort", lot));
+    }
+    expect(calcFarPdt("BMX-3", lot)).toBe(7.0); // defaults to the PD-T route
+  });
+
+  it("follows the PD-T height ladder", () => {
+    expect(todHeightPdt(60, "base")).toBe(60);
+    // +60 ft or double, whichever is lower
+    expect(todHeightPdt(40, "minor_sd")).toBe(80);
+    expect(todHeightPdt(200, "minor_sd")).toBe(260);
+    // +120 ft or triple, whichever is lower
+    expect(todHeightPdt(40, "major_sd")).toBe(120);
+    expect(todHeightPdt(200, "major_sd")).toBe(320);
+    // PD-T: the map's bonus height, else the zoned height
+    expect(todHeightPdt(60, "pdt", 150)).toBe(150);
+    expect(todHeightPdt(60, "pdt")).toBe(60);
+    expect(todHeightPdt(60)).toBe(60);
+  });
+
+  it("doubles height to at most 450 ft without a plan, and keeps a higher zoned height under one", () => {
+    expect(TOD_MAX_HEIGHT_FT).toBe(450);
+    expect(todHeightLimit("BMX-3", 30000, 60)).toBe(120);
+    expect(todHeightLimit("BMX-3", 30000, 300)).toBe(450);
+    expect(todHeightLimit("BMX-3", 30000, 60, 250)).toBe(250);
+    expect(todHeightLimit("BMX-3", 30000, 300, 250)).toBe(300);
+    // ineligible: the zoned height, plan or not
+    expect(todHeightLimit("BMX-3", 10000, 60, 250)).toBe(60);
+    expect(todHeightLimit("R-5", 30000, 30)).toBe(30);
+  });
+
+  it("reads plan ceilings by station area and precinct", () => {
+    expect(todPlanCeiling(null, "core")).toEqual({ far: null, height: null, approximate: false });
+    expect(todPlanCeiling("Nowhere", "tiz")).toEqual({ far: null, height: null, approximate: false });
+    const ala = TOD_PLAN_STANDARDS["Ala Moana"];
+    expect(todPlanCeiling("Ala Moana", "core")).toEqual({ far: ala.core_max_far, height: ala.core_max_height, approximate: true });
+    expect(todPlanCeiling("Ala Moana", "tiz")).toEqual({ far: ala.tiz_max_far, height: ala.tiz_max_height, approximate: true });
+  });
+
+  it("has plan standards that make sense", () => {
+    for (const [area, std] of Object.entries(TOD_PLAN_STANDARDS)) {
+      expect(std.source, area).toBeTruthy();
+      for (const value of [std.core_max_far, std.tiz_max_far, std.core_max_height, std.tiz_max_height]) {
+        if (value != null) expect(value, area).toBeGreaterThan(0);
+      }
+      // the core precinct, nearer the station, is never held lower than the TIZ
+      if (std.core_max_far != null && std.tiz_max_far != null) expect(std.core_max_far, area).toBeGreaterThanOrEqual(std.tiz_max_far);
+      if (std.core_max_height != null && std.tiz_max_height != null) expect(std.core_max_height, area).toBeGreaterThanOrEqual(std.tiz_max_height);
+    }
+  });
+});
+
+describe("TOD model", () => {
+  const site: SliderInputs = { program: "tod", zone_class: "BMX-3", lot_sqft: 30000, height_limit: 200 };
+
+  it("assumes 18 months of permitting unless told otherwise", () => {
+    const output = calcSingle(site);
+    expect(output.permitting_months).toBe(18);
+    expect(output).toEqual(calcSingle({ ...site, permitting_months: 18 }));
+    expect(calcSingle({ ...site, permitting_months: 12 }).permitting_months).toBe(12);
+  });
+
+  it("has no affordable-unit requirement", () => {
+    for (const extra of [{}, { zone_class: "A-2" }, { include_retail: true }]) {
+      const output = calcSingle({ ...site, ...extra });
+      expect(output.max_units).toBeGreaterThan(0);
+      expect(output.affordable_units).toBe(0);
+      expect(output.afd_rent_units).toBe(0);
+      expect(output.afd_sale_units).toBe(0);
+    }
+  });
+
+  it("takes its FAR from the TOD formula unless max_far is given", () => {
+    expect(calcSingle(site).buildable_sqft).toBeLessThanOrEqual(calcFarTod("BMX-3", 30000) * 30000);
+    expect(calcSingle({ ...site, max_far: 1 }).buildable_sqft).toBeLessThanOrEqual(30000);
+  });
+
+  it("builds less when the open-space bonus uses ground and coverage binds", () => {
+    // low height so lot coverage, not FAR, sets the building
+    const tight: SliderInputs = { ...site, height_limit: 30, max_far: 7 };
+    const without = calcSingle({ ...tight, open_space_bonus: 0 });
+    const withBonus = calcSingle({ ...tight, open_space_bonus: 1.5 });
+    expect(withBonus.buildable_sqft).toBeLessThan(without.buildable_sqft);
+    // no bonus is the same as leaving it out
+    expect(calcSingle(tight)).toEqual(without);
+    // the bonus can't take more than the whole lot
+    expect(calcSingle({ ...tight, open_space_bonus: 100 }).buildable_sqft).toBe(0);
+  });
+
+  it("puts retail in industrial districts through the imported BMX-3 uses", () => {
+    const industrial = calcSingle({ ...site, zone_class: "I-2", include_retail: true });
+    const bmx3 = calcSingle({ ...site, include_retail: true });
+    expect(industrial.net_commercial_sqft).toBeGreaterThan(0);
+    expect(industrial.net_commercial_sqft).toBe(bmx3.net_commercial_sqft);
+    expect(calcSingle({ ...site, zone_class: "I-2" }).net_commercial_sqft).toBe(0);
   });
 });
