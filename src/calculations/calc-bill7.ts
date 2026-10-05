@@ -34,6 +34,8 @@ import {
   GRANT,
   HOLD,
   INCOME,
+  livingStories,
+  mixFixtureUnits,
   mixRentByAmi,
   mixUnitSize,
   ParcelOutput,
@@ -181,6 +183,12 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   // =========================================================
   // Step 2: Soft costs
   // =========================================================
+  const living_stories = livingStories(
+    gross_residential_sqft,
+    coverage_cap,
+    setback_cap,
+    floors
+  );
   const soft = calcSoftCosts({
     hard_cost,
     lot_sqft,
@@ -197,6 +205,8 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     land_cost_per_sqft: land_cost,
     waivable_fee_basis,
     impact_fee_per_unit: 0,
+    living_stories,
+    fu_per_unit: mixFixtureUnits(unit_type),
   });
   const soft_cost = soft.total;
 

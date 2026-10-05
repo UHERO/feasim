@@ -37,7 +37,9 @@ import {
   FINANCING,
   HOLD,
   INCOME,
+  livingStories,
   lotCoverage,
+  mixFixtureUnits,
   mixRentByAmi,
   mixUnitSize,
   parkingRequiredSpaces,
@@ -178,6 +180,12 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   const hard_cost = hard_cost_base * cost_inflation_multiplier;
 
   // STEP 5. SOFT COSTS
+  const living_stories = livingStories(
+    gross_residential_sqft,
+    coverage_cap,
+    setback_cap,
+    floors
+  );
   const soft = calcSoftCosts({
     hard_cost,
     lot_sqft,
@@ -191,6 +199,8 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
     impact_fee_per_unit,
     zoning_application_fee: FEES.zoning.tod_application,
     special_district_fee: specialDistrictTotal(lot_sqft),
+    living_stories,
+    fu_per_unit: mixFixtureUnits(unit_type),
   });
   const soft_cost = soft.total;
 

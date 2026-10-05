@@ -342,6 +342,116 @@ export const FEES = {
 };
 
 // =========================================================
+// BWS WATER CHARGES (one-time soft costs, paid at building permit)
+// =========================================================
+
+// Water System Facilities Charge, $/fixture unit; flat, never escalated.
+// Multi-family rates only (single-family is not used).
+export const WSFC_PER_FU = {
+  // up to 3 living stories
+  multi_low_rise: 271.27,
+  // higher than 3 living stories
+  multi_high_rise: 204.12,
+} as const;
+
+// per application
+export const WSFC_MIN_FU = 20;
+// affordable-unit waiver cap, applied per project (BWS's is 500/yr islandwide)
+export const WSFC_WAIVER_UNIT_CAP = 500;
+
+// fixture units per dwelling unit, low-flow; no dishwasher or hose bibb,
+// in-unit washer
+export const FU_PER_UNIT = {
+  bath_1: 7.5,
+  bath_1_5: 9.8,
+  bath_2: 11.4,
+} as const;
+
+// baths assumed for each unit type
+export const BATHS_BY_UNIT_TYPE: Record<string, keyof typeof FU_PER_UNIT> = {
+  studio: "bath_1",
+  one_bb: "bath_1",
+  two_bb: "bath_1_5",
+  three_bb: "bath_2",
+  four_bb: "bath_2",
+};
+
+// matches BWS's worked examples
+export const COMMON_AREA_FU = 0;
+
+// new meter cost: fire service connection charge by meter size (inches)
+export const FIRE_METER_CHARGE: Record<string, number> = {
+  "5/8": 500,
+  "3/4": 600,
+  "1": 700,
+  "1.5": 1100,
+  "2": 1700,
+  "4": 5600,
+  "6": 12100,
+  "8": 21100,
+};
+
+export function wsfcCategory(
+  living_stories: number
+): "multi_low_rise" | "multi_high_rise" {
+  return living_stories <= 3 ? "multi_low_rise" : "multi_high_rise";
+}
+
+// blended fixture units per dwelling unit for a mix key
+export function mixFixtureUnits(mix_key: string): number {
+  const mix = UNIT_MIX[mix_key] ?? UNIT_MIX["one_bb_100"];
+  return mix.reduce(
+    (sum, m) =>
+      sum + FU_PER_UNIT[BATHS_BY_UNIT_TYPE[m.type] ?? "bath_1"] * m.weight,
+    0
+  );
+}
+
+// assumed fire meter size by residential stories
+export function fireMeterSize(living_stories: number): string {
+  if (living_stories <= 3) return "4";
+  if (living_stories <= 6) return "6";
+  return "8";
+}
+
+// residential stories built: residential floor area over the floor plate
+export function livingStories(
+  gross_residential_sqft: number,
+  coverage_cap: number,
+  setback_cap: number,
+  floors: number
+): number {
+  const plate = Math.min(coverage_cap, setback_cap) / Math.max(floors, 1);
+  if (plate <= 0 || gross_residential_sqft <= 0) return 0;
+  return Math.ceil(gross_residential_sqft / plate - 1e-9);
+}
+
+// WSFC and new meter cost on the units the Impact Fees toggle doesn't waive
+export function calcWaterFees(i: {
+  max_units: number;
+  water_chargeable_units: number;
+  living_stories: number;
+  fu_per_unit: number;
+}): { wsfc: number; water_meter: number; total_fu: number } {
+  if (i.max_units <= 0) return { wsfc: 0, water_meter: 0, total_fu: 0 };
+  const rate = WSFC_PER_FU[wsfcCategory(i.living_stories)];
+  const total_fu = Math.max(
+    i.max_units * i.fu_per_unit + COMMON_AREA_FU,
+    WSFC_MIN_FU
+  );
+  const waived_units = i.max_units - i.water_chargeable_units;
+  // WSFC is waived on the fixture units of the waived units
+  const wsfc =
+    i.water_chargeable_units > 0
+      ? (total_fu - waived_units * i.fu_per_unit) * rate
+      : 0;
+  // the meter waiver is the waived units' share of all units
+  const meter_gross = FIRE_METER_CHARGE[fireMeterSize(i.living_stories)];
+  const water_meter = (meter_gross * i.water_chargeable_units) / i.max_units;
+  return { wsfc, water_meter, total_fu };
+}
+
+// =========================================================
 // HHFDC AFFORDABLE SALE PRICE TABLES
 // =========================================================
 // 2025 HHFDC Honolulu County income schedule by family size (median $129,300)
@@ -1457,6 +1567,9 @@ export type SoftCostInputs = {
   impact_fee_per_unit: number;
   zoning_application_fee?: number;
   special_district_fee?: number;
+  // BWS water charges
+  living_stories: number;
+  fu_per_unit: number;
 };
 
 // soft cost line items (shared across all pathways)
@@ -1465,6 +1578,8 @@ export type SoftCostBreakdown = {
   building_permit: number;
   plan_review: number;
   wastewater: number;
+  wsfc: number;
+  water_meter: number;
   temp_occupancy: number;
   park_dedication: number;
   escp: number;
@@ -2074,6 +2189,20 @@ export function calcSoftCosts(i: SoftCostInputs): SoftCostBreakdown {
         ? market_units
         : i.max_units;
 
+  // the same toggle sets the BWS water charges, with the waiver capped per project
+  const water_chargeable_units =
+    i.waivable_fee_basis === "none"
+      ? 0
+      : i.waivable_fee_basis === "market_units"
+        ? i.max_units - Math.min(i.affordable_units, WSFC_WAIVER_UNIT_CAP)
+        : i.max_units;
+  const water = calcWaterFees({
+    max_units: i.max_units,
+    water_chargeable_units,
+    living_stories: i.living_stories,
+    fu_per_unit: i.fu_per_unit,
+  });
+
   // permit and plan review scale with construction value per unit.
   const per_unit_cost = i.hard_cost / Math.max(i.max_units, 1);
   const permit_fee = buildingPermitFee(per_unit_cost);
@@ -2094,6 +2223,8 @@ export function calcSoftCosts(i: SoftCostInputs): SoftCostBreakdown {
     building_permit: chargeable_units * permit_fee,
     plan_review: chargeable_units * plan_fee,
     wastewater: wastewaterFee(i.max_units, chargeable_units),
+    wsfc: water.wsfc,
+    water_meter: water.water_meter,
     temp_occupancy: FEES.administrative.temp_occupancy_cert,
     park_dedication,
     escp: FEES.civil.escp,

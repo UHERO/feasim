@@ -40,7 +40,9 @@ import {
   FINANCING,
   HOLD,
   INCOME,
+  livingStories,
   LOT_COVERAGE,
+  mixFixtureUnits,
   mixRentByAmi,
   mixUnitSize,
   ParcelOutput,
@@ -180,6 +182,12 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
   const hard_cost = hard_cost_base * cost_inflation_multiplier;
 
   // STEP 5. SOFT COSTS
+  const living_stories = livingStories(
+    gross_residential_sqft,
+    coverage_cap,
+    setback_cap,
+    floors
+  );
   const soft = calcSoftCosts({
     hard_cost,
     lot_sqft,
@@ -191,6 +199,8 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
     land_cost_per_sqft: land_cost,
     waivable_fee_basis,
     impact_fee_per_unit,
+    living_stories,
+    fu_per_unit: mixFixtureUnits(unit_type),
   });
   const soft_cost = soft.total;
 

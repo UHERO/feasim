@@ -33,6 +33,22 @@ export {
   type TodPlanStandards,
 } from "./calculations/calc-shared";
 
+// BWS water charges: Water System Facilities Charge (WSFC) and new meter cost
+export {
+  BATHS_BY_UNIT_TYPE,
+  calcWaterFees,
+  COMMON_AREA_FU,
+  FIRE_METER_CHARGE,
+  fireMeterSize,
+  FU_PER_UNIT,
+  livingStories,
+  mixFixtureUnits,
+  WSFC_MIN_FU,
+  WSFC_PER_FU,
+  WSFC_WAIVER_UNIT_CAP,
+  wsfcCategory,
+} from "./calculations/calc-shared";
+
 // real parcels: pathway envelope rules and default assumptions
 export * from "./parcels";
 

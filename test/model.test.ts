@@ -29,6 +29,14 @@ import {
   TOD_MAX_HEIGHT_FT,
   TOD_MIN_LOT_SQFT,
   TOD_PLAN_STANDARDS,
+  calcWaterFees,
+  fireMeterSize,
+  FIRE_METER_CHARGE,
+  livingStories,
+  mixFixtureUnits,
+  WSFC_PER_FU,
+  WSFC_WAIVER_UNIT_CAP,
+  wsfcCategory,
   calcFarBill6,
   calcParcel,
   calcSingle,
@@ -39,6 +47,7 @@ import {
   type ProgramId,
   type SliderInputs,
 } from "../src";
+import { calcSoftCosts } from "../src/calculations/calc-shared";
 
 const PROGRAMS: ProgramId[] = ["bill6", "bill7", "standard", "tod", "h201"];
 
@@ -635,5 +644,101 @@ describe("TOD model", () => {
     expect(industrial.net_commercial_sqft).toBeGreaterThan(0);
     expect(industrial.net_commercial_sqft).toBe(bmx3.net_commercial_sqft);
     expect(calcSingle({ ...site, zone_class: "I-2" }).net_commercial_sqft).toBe(0);
+  });
+});
+
+// ── BWS water charges: WSFC and new meter cost ────────────────────────────
+
+describe("BWS water charges", () => {
+  const fees = (max_units: number, water_chargeable_units: number, living_stories: number, fu_per_unit: number) =>
+    calcWaterFees({ max_units, water_chargeable_units, living_stories, fu_per_unit });
+
+  it("prices WSFC at the low-rise rate up to 3 stories and the high-rise rate above", () => {
+    expect(wsfcCategory(1)).toBe("multi_low_rise");
+    expect(wsfcCategory(3)).toBe("multi_low_rise");
+    expect(wsfcCategory(4)).toBe("multi_high_rise");
+    expect(WSFC_PER_FU.multi_low_rise).toBe(271.27);
+    expect(WSFC_PER_FU.multi_high_rise).toBe(204.12);
+  });
+
+  it("matches the spec's charge per dwelling unit", () => {
+    const perUnit = (fu: number, stories: number) => Math.round((fees(100, 100, stories, fu).wsfc / 100) * 100) / 100;
+    expect(perUnit(7.5, 3)).toBe(2034.53);
+    expect(perUnit(7.5, 4)).toBe(1530.9);
+    expect(perUnit(9.8, 3)).toBe(2658.45);
+    expect(perUnit(9.8, 4)).toBe(2000.38);
+    expect(perUnit(11.4, 3)).toBe(3092.48);
+    expect(perUnit(11.4, 4)).toBe(2326.97);
+  });
+
+  it("reproduces BWS's worked examples, with no common-area fixtures", () => {
+    expect(fees(10, 10, 3, 13.8).total_fu).toBeCloseTo(138, 9);
+    expect(fees(30, 30, 3, 13.8).total_fu).toBeCloseTo(414, 9);
+    expect(fees(40, 40, 8, 12.9).total_fu).toBeCloseTo(516, 9);
+    expect(fees(100, 100, 8, 12.9).total_fu).toBeCloseTo(1290, 9);
+  });
+
+  it("charges at least 20 fixture units", () => {
+    expect(fees(2, 2, 2, 7.5).wsfc).toBeCloseTo(20 * 271.27, 9);
+  });
+
+  it("assigns fixture units by baths per unit type, blended over the mix", () => {
+    expect(mixFixtureUnits("studio_100")).toBe(7.5);
+    expect(mixFixtureUnits("one_bb_100")).toBe(7.5);
+    expect(mixFixtureUnits("two_bb_100")).toBe(9.8);
+    expect(mixFixtureUnits("one_br50_2br50")).toBeCloseTo((7.5 + 9.8) / 2, 12);
+  });
+
+  it("sizes the fire meter by residential stories", () => {
+    expect([1, 3, 4, 6, 7, 30].map(fireMeterSize)).toEqual(["4", "4", "6", "6", "8", "8"]);
+    expect(fees(10, 10, 3, 7.5).water_meter).toBe(FIRE_METER_CHARGE["4"]);
+    expect(fees(10, 10, 5, 7.5).water_meter).toBe(FIRE_METER_CHARGE["6"]);
+    expect(fees(10, 10, 12, 7.5).water_meter).toBe(FIRE_METER_CHARGE["8"]);
+  });
+
+  it("waives WSFC on the waived units' fixture units and the meter by their share of units", () => {
+    const some = fees(100, 40, 8, 7.5);
+    expect(some.wsfc).toBeCloseTo(40 * 7.5 * 204.12, 6);
+    expect(some.water_meter).toBeCloseTo(FIRE_METER_CHARGE["8"] * 0.4, 9);
+    // a fully waived project pays nothing, not even the 20 FU minimum
+    expect(fees(50, 0, 3, 9.8)).toMatchObject({ wsfc: 0, water_meter: 0 });
+    expect(fees(0, 0, 0, 7.5)).toEqual({ wsfc: 0, water_meter: 0, total_fu: 0 });
+  });
+
+  it("counts the stories built, not the stories the height allows", () => {
+    // 15 floors allowed, but the floor area fills 3.5 plates
+    expect(livingStories(35000, 10000 * 15, 12000 * 15, 15)).toBe(4);
+    expect(livingStories(30000, 30000, 40000, 3)).toBe(3);
+    expect(livingStories(0, 30000, 40000, 3)).toBe(0);
+  });
+
+  it("follows the Impact Fees toggle", () => {
+    const site: SliderInputs = { program: "h201", zone_class: "A-2", lot_sqft: 40000, height_limit: 60 };
+    const exempt = calcSingle({ ...site, waivable_fee_basis: "none" });
+    const market = calcSingle({ ...site, waivable_fee_basis: "market_units" });
+    const all = calcSingle({ ...site, waivable_fee_basis: "all_units" });
+    expect(exempt.affordable_units).toBeGreaterThan(0);
+    expect(market.soft_cost).toBeGreaterThan(exempt.soft_cost);
+    expect(all.soft_cost).toBeGreaterThan(market.soft_cost);
+    // the envelope never moves with the toggle
+    expect(all.max_units).toBe(exempt.max_units);
+  });
+
+  it("charges Bill 7 only when the toggle is set to all units", () => {
+    const site: SliderInputs = { program: "bill7", zone_class: "A-2", lot_sqft: 10000, height_limit: 40 };
+    const byDefault = calcSingle(site);
+    expect(calcSingle({ ...site, waivable_fee_basis: "none" })).toEqual(byDefault);
+    expect(calcSingle({ ...site, waivable_fee_basis: "all_units" }).soft_cost).toBeGreaterThan(byDefault.soft_cost);
+  });
+
+  it("caps the affordable waiver at 500 units per project", () => {
+    expect(WSFC_WAIVER_UNIT_CAP).toBe(500);
+    // 800 units, 600 affordable, waived on Market Units Only: 500 are waived, 300 pay
+    const soft = (affordable_units: number) =>
+      calcSoftCosts({ hard_cost: 1e8, lot_sqft: 40000, max_units: 800, affordable_units, excavation_depth: 5, park: "none", park_area: 0, land_cost_per_sqft: 0, waivable_fee_basis: "market_units", impact_fee_per_unit: 0, living_stories: 20, fu_per_unit: 7.5 });
+    expect(soft(600).wsfc).toBeCloseTo(300 * 7.5 * 204.12, 6);
+    expect(soft(600).water_meter).toBeCloseTo((FIRE_METER_CHARGE["8"] * 300) / 800, 9);
+    // under the cap, every affordable unit is waived
+    expect(soft(400).wsfc).toBeCloseTo(400 * 7.5 * 204.12, 6);
   });
 });
