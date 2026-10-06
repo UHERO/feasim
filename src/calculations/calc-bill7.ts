@@ -230,7 +230,7 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   const hard_cost_contingency = hard_cost * FINANCING.contingency;
   const total_dev_cost = hard_cost_contingency + soft_cost;
   // pre-construction grant is a source at closing that displaces equity
-  // (equity = cost - loan - grant)
+  // (equity = cost + loan fee - loan - grant)
   const amount_to_finance = total_dev_cost;
   const land_cost_total = land_cost * lot_sqft;
   const closing_grant =
@@ -243,8 +243,12 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     grant = 0
   ) => {
     const base = amount_to_finance + land_in_base;
-    const equity_amount = Math.max(0, base - loan_principal - grant);
     const loan_fee = loan_principal * FINANCING.loan_fee;
+    // the loan fee is due at closing and paid in equity
+    const equity_amount = Math.max(
+      0,
+      base + loan_fee - loan_principal - grant
+    );
 
     // pre-dev equity (no compounding,IRR handles time cost)
     // drawn from the equity left after the land purchase

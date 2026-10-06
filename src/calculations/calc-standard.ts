@@ -189,8 +189,9 @@ function standardLoanSizing(
   const amount_to_finance = total_dev_cost + land_in_base;
   const loan_principal =
     loan_principal_override ?? amount_to_finance * (1 - equity_pct);
-  const equity_amount = amount_to_finance - loan_principal;
   const loan_fee = loan_principal * FINANCING.loan_fee;
+  // the loan fee is due at closing and paid in equity
+  const equity_amount = amount_to_finance + loan_fee - loan_principal;
 
   return {
     total_dev_cost,

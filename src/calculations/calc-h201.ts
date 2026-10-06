@@ -221,8 +221,9 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
   // RLV doesn't include land, the rest do
   const financeAt = (land_in_base: number, loan_principal: number) => {
     const base = amount_to_finance + land_in_base;
-    const equity_amount = Math.max(0, base - loan_principal);
     const loan_fee = loan_principal * FINANCING.loan_fee;
+    // the loan fee is due at closing and paid in equity
+    const equity_amount = Math.max(0, base + loan_fee - loan_principal);
 
     // predev is drawn from the equity left after the land purchase
     const predev = calcPredevEquity(
