@@ -46,8 +46,15 @@ import {
   type Parcel,
   type ProgramId,
   type SliderInputs,
+  calcParkingIncome,
+  floorPlates,
+  PARKING,
+  podiumEnvelope,
+  stepBackOf,
+  yardFootprint,
+  zoneStepBack,
 } from "../src";
-import { calcSoftCosts } from "../src/calculations/calc-shared";
+import { calcSoftCosts, setbackFootprint } from "../src/calculations/calc-shared";
 
 const PROGRAMS: ProgramId[] = ["bill6", "bill7", "standard", "tod", "h201"];
 
@@ -640,9 +647,10 @@ describe("TOD model", () => {
 
   it("puts retail in industrial districts through the imported BMX-3 uses", () => {
     const industrial = calcSingle({ ...site, zone_class: "I-2", include_retail: true });
-    const bmx3 = calcSingle({ ...site, include_retail: true });
     expect(industrial.net_commercial_sqft).toBeGreaterThan(0);
-    expect(industrial.net_commercial_sqft).toBe(bmx3.net_commercial_sqft);
+    // retail is a share of the ground floor: doubling the share doubles it
+    const doubled = calcSingle({ ...site, zone_class: "I-2", include_retail: true, retail_share: 0.2 });
+    expect(doubled.net_commercial_sqft).toBeCloseTo(2 * industrial.net_commercial_sqft, 6);
     expect(calcSingle({ ...site, zone_class: "I-2" }).net_commercial_sqft).toBe(0);
   });
 });
@@ -740,5 +748,127 @@ describe("BWS water charges", () => {
     expect(soft(600).water_meter).toBeCloseTo((FIRE_METER_CHARGE["8"] * 300) / 800, 9);
     // under the cap, every affordable unit is waived
     expect(soft(400).wsfc).toBeCloseTo(400 * 7.5 * 204.12, 6);
+  });
+});
+
+// ── Parking (surface lot, ground floor, podium) and height step-backs ───────
+
+describe("parking", () => {
+  const flat = (floors: number, plate: number) => new Array(floors).fill(plate);
+  const env = (plates: number[], parking_ratio: number, far_cap = 1e9) =>
+    podiumEnvelope({ plates, far_cap, retail_cap: 0, retail_share: 0.1, unit_size: 500, parking_ratio });
+
+  it("uses the documented costs and stall sizes", () => {
+    expect(PARKING.stall_sqft).toBe(330);
+    expect(PARKING.cost_per_sqft).toBe(190);
+    expect(PARKING.surface_stall_sqft).toBe(360);
+    expect(PARKING.surface_cost_per_sqft).toBe(30);
+    expect(calcParkingIncome(10)).toBe(10 * 100 * 12);
+  });
+
+  it("defaults to 0.5 stalls per unit for Standard and Before Ord. 26-7, none elsewhere", () => {
+    expect(DEFAULT_INPUTS.bill6.parking_ratio).toBe(0.5);
+    expect(DEFAULT_INPUTS.standard.parking_ratio).toBe(0.5);
+    expect(DEFAULT_INPUTS.bill7.parking_ratio).toBe(0);
+    expect(DEFAULT_INPUTS.tod.parking_ratio).toBe(0);
+    expect(DEFAULT_INPUTS.h201.parking_ratio).toBe(0);
+  });
+
+  it("builds a surface lot when the stalls fit beside a slimmer building", () => {
+    // 6,000 sf over 3 floors needs a 2,000 sf footprint, leaving 3,000 sf open
+    const e = env(flat(3, 5000), 0.5, 6000);
+    expect(e).toMatchObject({ units: 9, stalls: 5, podium_levels: 0, lobby_sqft: 0 });
+    expect(e.parking_sqft).toBe(5 * 360);
+    expect(e.parking_cost).toBe(5 * 360 * 30);
+  });
+
+  it("puts stalls on the ground floor and housing on the rest of it", () => {
+    const e = env(flat(3, 6000), 0.05, 20000);
+    expect(e).toMatchObject({ units: 27, stalls: 2, podium_levels: 0, lobby_sqft: 0 });
+    // two upper floors plus what the stalls leave on the ground floor
+    expect(e.residential_sqft).toBe(12000 + 6000 - 2 * 330);
+    expect(e.parking_cost).toBe(2 * 330 * 190);
+  });
+
+  it("caps units by stalls rather than adding an empty podium", () => {
+    // the ground floor holds 18 stalls; 19 units would need 19
+    const e = env(flat(3, 6000), 1, 20000);
+    expect(e).toMatchObject({ units: 18, stalls: 18, podium_levels: 0 });
+    expect(env(flat(3, 6000), 1.5, 20000)).toMatchObject({ units: 12, stalls: 18, podium_levels: 0 });
+  });
+
+  it("charges podium floors whole and makes a too-small ground remainder a lobby", () => {
+    const e = env(flat(10, 10000), 0.25);
+    expect(e).toMatchObject({ units: 128, stalls: 32, podium_levels: 1 });
+    // 30 ground stalls leave 100 sf, too small for a 625 sf unit
+    expect(e.lobby_sqft).toBe(100);
+    expect(e.parking_sqft).toBe(30 * 330 + 10000);
+    expect(e.parking_cost).toBe((30 * 330 + 10000) * 190);
+  });
+
+  it("never gives more units for more parking, never exceeds the height limit, and parks every unit", () => {
+    for (const floors of [1, 3, 6, 15])
+      for (const plate of [2000, 6000, 20000])
+        for (const far of [0.5, 2, 100]) {
+          let prev = Infinity;
+          for (const ratio of [0, 0.05, 0.25, 0.5, 1, 1.5]) {
+            const e = env(flat(floors, plate), ratio, plate * far);
+            expect(e.units).toBeLessThanOrEqual(prev);
+            expect(e.stalls).toBeGreaterThanOrEqual(Math.ceil(ratio * e.units - 1e-9));
+            const structured = ratio > 0 && !(e.podium_levels === 0 && e.parking_sqft === e.stalls * 360);
+            const groundHomes = structured && e.podium_levels === 0 && e.lobby_sqft === 0;
+            const storeys = (structured && !groundHomes ? 1 + e.podium_levels : 0) + e.living_stories;
+            if (e.units > 0) expect(storeys).toBeLessThanOrEqual(floors);
+            prev = e.units;
+          }
+        }
+  });
+
+  it("leaves the building unchanged with no parking", () => {
+    const base: SliderInputs = { program: "bill6", zone_class: "A-2", lot_sqft: 12000, height_limit: 60 };
+    const none = calcSingle({ ...base, parking_ratio: 0 });
+    expect(none).toMatchObject({ parking_stalls: 0, podium_levels: 0, parking_sqft: 0, parking_share: 0 });
+    expect(calcSingle({ ...base, parking_ratio: 1 }).max_units).toBeLessThanOrEqual(none.max_units);
+  });
+});
+
+describe("height step-backs", () => {
+  it("applies the LUO rules by zone", () => {
+    for (const zone of ["A-2", "A-3", "AMX-2", "AMX-3", "B-2", "BMX-3", "BMX-4", "IMX-1"])
+      expect(zoneStepBack(zone)).toEqual({ trigger_ft: 40, above_ft: 40, ft_per_10ft: 1 });
+    expect(zoneStepBack("Resort")).toEqual({ trigger_ft: 30, above_ft: 30, ft_per_10ft: 1 });
+    expect(zoneStepBack("Apart")).toEqual({ trigger_ft: 40, above_ft: 40, ft_per_10ft: 1, front: true });
+    for (const zone of ["A-1", "AMX-1", "R-5"]) expect(zoneStepBack(zone)).toBeUndefined();
+  });
+
+  it("widens the side and rear yards 1 ft per 10 ft above 40 ft", () => {
+    const plates = floorPlates({ floors: 15, floor_height: 10, height_limit: 150, lot_sqft: 20000, coverage_plate: 1e9, setback: 10, stepback: zoneStepBack("A-3") });
+    const width = Math.sqrt(10000), depth = 2 * width;
+    plates.forEach((p, k) => {
+      const top = (k + 1) * 10;
+      const extra = top > 40 ? Math.ceil((top - 40) / 10) : 0;
+      expect(p).toBeCloseTo((width - 2 * (10 + extra)) * (depth - 10 - (10 + extra)), 9);
+    });
+  });
+
+  it("steps the front back too in the Waikiki Apartment Precinct", () => {
+    const [, , , , fifth] = floorPlates({ floors: 5, floor_height: 10, height_limit: 50, lot_sqft: 20000, coverage_plate: 1e9, setback: 10, stepback: zoneStepBack("Apart") });
+    expect(fifth).toBeCloseTo(yardFootprint(20000, 11, 11, 11), 9);
+  });
+
+  it("leaves equal yards as before and short buildings untouched", () => {
+    expect(yardFootprint(10000, 10, 10, 10)).toBe(setbackFootprint(10000, 10));
+    const low = floorPlates({ floors: 3, floor_height: 10, height_limit: 30, lot_sqft: 20000, coverage_plate: 1e9, setback: 10, stepback: zoneStepBack("A-2") });
+    expect(new Set(low).size).toBe(1);
+  });
+
+  it("costs units on a tall height-limited lot, and none in Bill 7", () => {
+    const site: SliderInputs = { program: "standard", zone_class: "BMX-3", lot_sqft: 10000, height_limit: 150, max_far: 12, parking_ratio: 0 };
+    const stepped = calcSingle(site).max_units;
+    const flatOut = calcSingle({ ...site, stepback_trigger_ft: Infinity }).max_units;
+    expect(stepped).toBeLessThan(flatOut);
+    // the sliders' own step-back overrides the zone's
+    expect(stepBackOf({ ...site, stepback_trigger_ft: 75 } as SliderInputs, zoneStepBack("BMX-3"))?.trigger_ft).toBe(75);
+    expect(stepBackOf(site, undefined)).toBeUndefined();
   });
 });

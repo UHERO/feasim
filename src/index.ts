@@ -49,6 +49,19 @@ export {
   wsfcCategory,
 } from "./calculations/calc-shared";
 
+// parking (surface lot, ground floor, podium) and height step-backs
+export {
+  calcParkingIncome,
+  DEFAULT_RETAIL_SHARE,
+  floorPlates,
+  PARKING,
+  podiumEnvelope,
+  stepBackOf,
+  yardFootprint,
+  zoneStepBack,
+  type StepBack,
+} from "./calculations/calc-shared";
+
 // real parcels: pathway envelope rules and default assumptions
 export * from "./parcels";
 

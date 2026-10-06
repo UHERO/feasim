@@ -19,9 +19,9 @@ import {
   calcPredevEquity,
   calcPropertyTax,
   calcSoftCosts,
-  calcSurfaceParkingCost,
   commercialFracByZone,
   DEFAULT_PROFIT_MARGIN,
+  DEFAULT_RETAIL_SHARE,
   DEFAULT_TARGET_RETURN,
   DEFAULT_TARGET_SPREAD,
   DEFAULT_UNIT_TYPE,
@@ -32,27 +32,29 @@ import {
   EXPENSES,
   FEES,
   FINANCING,
+  floorPlates,
   HOLD,
   INCOME,
-  livingStories,
   lotCoverageBill6,
   mixAffordablePrice,
   mixFixtureUnits,
   mixRentByAmi,
   mixUnitSize,
   ParcelOutput,
-  parkingRequiredSpaces,
   permittingMonthsByZone,
+  podiumEnvelope,
   resolveCapRate,
   resolveConstMonths,
   RETAIL_CAP_SPREAD,
   RETAIL_PREMIUM,
-  setbackFootprint,
   sizeConstructionLoan,
   SliderInputs,
   solveIRR,
+  StepBack,
+  stepBackOf,
   VACANCY,
   zeroOutput,
+  zoneStepBack,
 } from "./calc-shared";
 
 // =========================================================
@@ -81,7 +83,10 @@ function bill6Hard(
   include_retail: boolean,
   setback: number,
   hard_cost_per_sqft: number,
-  max_far?: number
+  parking_ratio: number,
+  retail_share: number,
+  max_far?: number,
+  stepback?: StepBack
 ) {
   const floors = Math.floor(height_limit / floor_height);
 
@@ -90,36 +95,41 @@ function bill6Hard(
   // waikiki precincts must keep 35–50% of the lot open; that and the coverage
   // cap are both measured on the zoning lot, so the stricter one governs
   const far_cap = far * lot_sqft;
-  const coverage_cap =
-    envelopeCoverage(zone_class, far, coverage) * lot_sqft * floors;
-  const setback_cap = setbackFootprint(lot_sqft, setback) * floors;
-  const buildable_sqft = Math.min(far_cap, coverage_cap, setback_cap);
-
-  let gross_residential_sqft: number;
-  let gross_commercial_sqft = 0;
-  let net_commercial_sqft = 0;
+  // per-storey floor plates
+  const plates = floorPlates({
+    floors,
+    floor_height,
+    height_limit,
+    lot_sqft,
+    coverage_plate: envelopeCoverage(zone_class, far, coverage) * lot_sqft,
+    setback,
+    stepback,
+  });
 
   // commercial use checker, returns 0 if the selected zone isn't compatible
   const commercial_frac = include_retail ? commercialFracByZone(zone_class) : 0;
-
-  if (commercial_frac > 0) {
-    gross_commercial_sqft = commercial_frac * lot_sqft;
-    gross_residential_sqft = buildable_sqft - gross_commercial_sqft;
-    net_commercial_sqft = gross_commercial_sqft * EFFICIENCY;
-  } else {
-    gross_residential_sqft = buildable_sqft;
-  }
-
+  const env = podiumEnvelope({
+    plates,
+    far_cap,
+    retail_cap: commercial_frac * lot_sqft,
+    retail_share,
+    unit_size: mixUnitSize(unit_type),
+    parking_ratio,
+  });
+  const gross_residential_sqft = env.residential_sqft;
+  const gross_commercial_sqft = env.retail_sqft;
+  // floor area counted toward FAR; parking is excluded
+  const buildable_sqft = gross_residential_sqft + gross_commercial_sqft;
   const net_residential_sqft = gross_residential_sqft * EFFICIENCY;
+  const net_commercial_sqft = gross_commercial_sqft * EFFICIENCY;
 
   const residential_rate = hard_cost_per_sqft ?? 450;
   const retail_rate = residential_rate + RETAIL_PREMIUM;
   const building_cost =
-    gross_residential_sqft * residential_rate +
+    (gross_residential_sqft + env.lobby_sqft) * residential_rate +
     gross_commercial_sqft * retail_rate;
 
-  const unit_size = mixUnitSize(unit_type);
-  const max_units = Math.floor(net_residential_sqft / unit_size);
+  const max_units = env.units;
 
   // 8/26/26, for-sale units are discarded, 100% rental & 0% affordable rental
   // const afd_rent_units = Math.ceil(max_units * 0.05);
@@ -129,7 +139,7 @@ function bill6Hard(
   const mkt_sale_units = 0;
   const affordable_units = afd_rent_units;
 
-  const parking_cost = calcSurfaceParkingCost(buildable_sqft);
+  const parking_cost = env.parking_cost;
   // park land is charged only on units NOT exempt under §22-7.3(j)
   const chargeable_units = max_units - affordable_units;
   const park_area = calcParkArea(chargeable_units, buildable_sqft);
@@ -147,12 +157,11 @@ function bill6Hard(
     mkt_sale_units,
     hard_cost,
     park_area,
-    living_stories: livingStories(
-      gross_residential_sqft,
-      coverage_cap,
-      setback_cap,
-      floors
-    ),
+    living_stories: env.living_stories,
+    parking_stalls: env.stalls,
+    podium_levels: env.podium_levels,
+    parking_sqft: env.parking_sqft,
+    parking_share: env.parking_share,
   };
 }
 
@@ -197,7 +206,7 @@ function bill6Rental(
   const_months: number,
   permitting_months: number,
   total_carry_months: number,
-  buildable_sqft: number,
+  parking_stalls: number,
   net_commercial_sqft: number,
   unit_type: string,
   affordable_ami: string,
@@ -217,7 +226,7 @@ function bill6Rental(
   const pri =
     affordable_rent * afd_rent_units * 12 + market_rent * mkt_rent_units * 12;
 
-  const parking_income = calcParkingIncome(buildable_sqft);
+  const parking_income = calcParkingIncome(parking_stalls);
   const admin_income =
     max_units * 0.3 * INCOME.application_fee +
     max_units * 0.7 * INCOME.lease_renewal;
@@ -578,6 +587,8 @@ export function calcbill6Single(sliders: SliderInputs): ParcelOutput {
     sliders.permitting_months ?? permittingMonthsByZone(zone_class);
   const setback = sliders.setback ?? 10;
   const hard_cost_per_sqft = sliders.hard_cost_per_sqft ?? 450;
+  const parking_ratio = sliders.parking_ratio ?? 0.5;
+  const retail_share = sliders.retail_share ?? DEFAULT_RETAIL_SHARE;
 
   // Step 1: Hard costs
   const hard = bill6Hard(
@@ -591,7 +602,10 @@ export function calcbill6Single(sliders: SliderInputs): ParcelOutput {
     include_retail,
     setback,
     hard_cost_per_sqft,
-    max_far
+    parking_ratio,
+    retail_share,
+    max_far,
+    stepBackOf(sliders, zoneStepBack(zone_class))
   );
   if (hard.max_units <= 0)
     return zeroOutput("hypothetical", zone_class, lot_sqft, height_limit);
@@ -680,7 +694,7 @@ export function calcbill6Single(sliders: SliderInputs): ParcelOutput {
     const_months,
     permitting_months_val,
     total_carry_months,
-    hard.buildable_sqft,
+    hard.parking_stalls,
     hard.net_commercial_sqft,
     unit_type,
     affordable_ami,
@@ -812,7 +826,10 @@ export function calcbill6Single(sliders: SliderInputs): ParcelOutput {
     net_residential_sqft: hard.net_residential_sqft,
     net_commercial_sqft: hard.net_commercial_sqft,
     max_units: hard.max_units,
-    parking_stalls: parkingRequiredSpaces(hard.buildable_sqft),
+    parking_stalls: hard.parking_stalls,
+    podium_levels: hard.podium_levels,
+    parking_sqft: hard.parking_sqft,
+    parking_share: hard.parking_share,
     affordable_units: hard.affordable_units,
     afd_rent_units: hard.afd_rent_units,
     mkt_rent_units: hard.mkt_rent_units,

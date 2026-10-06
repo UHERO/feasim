@@ -315,12 +315,20 @@ export const GRANT = {
 
 // parking
 export const PARKING = {
-  parking_ratio: 1.0,
-  stall_sqft: 300,
+  // default stalls per dwelling unit
+  stalls_per_unit: 0,
+  // gross sqft per stall incl. drive aisles (Ulupono 2020)
+  stall_sqft: 330,
   monthly_rent_per_stall: 100,
-  surface_cost_per_sqft: 170,
-  structured_cost_per_sqft: 195,
+  // RLB Q2 2026 Honolulu above-ground parking, low end of $190–245
+  cost_per_sqft: 190,
+  // surface lot: Ulupono 2020 on-grade construction, adjusted to 2026 + margin
+  surface_stall_sqft: 360,
+  surface_cost_per_sqft: 30,
 };
+
+// ground-floor retail share of the floor plate
+export const DEFAULT_RETAIL_SHARE = 0.1;
 
 // bicycle parking
 export const BICYCLE_PARKING = {
@@ -1437,6 +1445,14 @@ export interface SliderInputs {
   min_dscr?: number;
   include_retail?: boolean;
   retail_rent?: number;
+  // ground-floor retail as a share of the floor plate
+  retail_share?: number;
+  // parking stalls per dwelling unit
+  parking_ratio?: number;
+  // height step-back; off unless stepback_trigger_ft is set
+  stepback_trigger_ft?: number;
+  stepback_above_ft?: number;
+  stepback_ft_per_10ft?: number;
   mortgage?: number;
   park?: "exempt" | "in_lieu";
   permitting_months?: number;
@@ -1467,6 +1483,11 @@ export interface ParcelOutput {
   net_commercial_sqft: number;
   max_units: number;
   parking_stalls: number;
+  // parking levels above the ground floor
+  podium_levels: number;
+  parking_sqft: number;
+  // share of the building's gross area used for parking
+  parking_share: number;
   affordable_units: number;
   afd_rent_units: number;
   mkt_rent_units: number;
@@ -1989,6 +2010,19 @@ export function setbackFootprint(
   return usable_width * usable_depth;
 }
 
+// footprint with separate yards, on the same 2:1 lot fronting its short side
+export function yardFootprint(
+  lot_sqft: number,
+  front: number,
+  rear: number,
+  side: number,
+  ratio = 2
+): number {
+  const width = Math.sqrt(lot_sqft / ratio);
+  const depth = ratio * width;
+  return Math.max(0, width - 2 * side) * Math.max(0, depth - front - rear);
+}
+
 // excavation depth by zone class
 export function excavationDepthByZone(zone_class: string): number {
   if (ZONE_GROUPS.lowDensity.includes(zone_class)) return 3;
@@ -2079,21 +2113,297 @@ export function stockpilingPermit(cubic_yards: number): number {
   return 70 + Math.ceil((cubic_yards - 1100) / 1000) * 15;
 }
 
-// parking: calculate required stalls
-export function parkingRequiredSpaces(buildable_sqft: number): number {
-  return Math.floor((buildable_sqft / 1000) * PARKING.parking_ratio);
+// height step-back ("wedding cake"), side and rear yards unless front is set
+export type StepBack = {
+  trigger_ft: number;
+  above_ft: number;
+  ft_per_10ft: number;
+  front?: boolean;
+};
+
+// LUO height setbacks: § 21-3.80-1(c), § 21-3.90-1(c), Ord. 17-55,
+// § 21-3.100-1(c), § 21-9.80-5(c). BMX-4 takes the BMX-3 rule in place of its
+// street-angle plane.
+const STEPBACK_ABOVE_40 = [
+  "A-2",
+  "A-3",
+  "AMX-2",
+  "AMX-3",
+  "B-2",
+  "BMX-3",
+  "BMX-4",
+  "IMX-1",
+];
+
+export function zoneStepBack(zone_class: string): StepBack | undefined {
+  if (STEPBACK_ABOVE_40.includes(zone_class))
+    return { trigger_ft: 40, above_ft: 40, ft_per_10ft: 1 };
+  if (zone_class === "Resort")
+    return { trigger_ft: 30, above_ft: 30, ft_per_10ft: 1 };
+  if (ZONE_GROUPS.waikiki.includes(zone_class))
+    return { trigger_ft: 40, above_ft: 40, ft_per_10ft: 1, front: true };
+  return undefined;
 }
 
-// parking: calculate surface parking cost
-export function calcSurfaceParkingCost(buildable_sqft: number): number {
-  const stalls = parkingRequiredSpaces(buildable_sqft);
-  const total_area = stalls * PARKING.stall_sqft;
-  return PARKING.surface_cost_per_sqft * total_area;
+// the sliders' step-back if set, otherwise the zone's own
+export function stepBackOf(
+  s: SliderInputs,
+  zone_default?: StepBack
+): StepBack | undefined {
+  if (s.stepback_trigger_ft == null) return zone_default;
+  return {
+    trigger_ft: s.stepback_trigger_ft,
+    above_ft: s.stepback_above_ft ?? 40,
+    ft_per_10ft: s.stepback_ft_per_10ft ?? 1,
+  };
+}
+
+// floor plate of each storey, ground first
+export function floorPlates(i: {
+  floors: number;
+  floor_height: number;
+  height_limit: number;
+  lot_sqft: number;
+  coverage_plate: number;
+  setback: number;
+  stepback?: StepBack;
+}): number[] {
+  const plates: number[] = [];
+  for (let k = 1; k <= i.floors; k++) {
+    let extra = 0;
+    if (i.stepback && i.height_limit > i.stepback.trigger_ft) {
+      const above = k * i.floor_height - i.stepback.above_ft;
+      if (above > 0)
+        extra = Math.ceil(above / 10 - 1e-9) * i.stepback.ft_per_10ft;
+    }
+    plates.push(
+      Math.max(
+        0,
+        Math.min(
+          i.coverage_plate,
+          yardFootprint(
+            i.lot_sqft,
+            i.setback + (i.stepback?.front ? extra : 0),
+            i.setback + extra,
+            i.setback + extra
+          )
+        )
+      )
+    );
+  }
+  return plates;
+}
+
+// smallest footprint that fits `area` within each storey's plate
+function slimFootprint(plates: number[], area: number): number {
+  const fits = (f: number) =>
+    plates.reduce((sum, p) => sum + Math.min(f, p), 0) >= area - 1e-6;
+  let lo = 0;
+  let hi = plates[0] ?? 0;
+  if (!fits(hi)) return hi;
+  for (let n = 0; n < 60; n++) {
+    const mid = (lo + hi) / 2;
+    if (fits(mid)) hi = mid;
+    else lo = mid;
+  }
+  return hi;
+}
+
+// building envelope with surface or podium parking; parking counts toward
+// height, not FAR
+export function podiumEnvelope(i: {
+  plates: number[];
+  far_cap: number;
+  // most ground-floor retail the zone allows (sqft); 0 for none
+  retail_cap: number;
+  retail_share: number;
+  unit_size: number;
+  parking_ratio: number;
+  // a legal cap on units (Bill 7)
+  max_units?: number;
+}) {
+  const plates = i.plates;
+  const floors = plates.length;
+  const ground = plates[0] ?? 0;
+  const parking = i.parking_ratio > 0;
+  const retail_sqft = Math.max(
+    0,
+    Math.min(i.retail_cap, i.retail_share * ground, i.far_cap)
+  );
+  const above = new Array<number>(floors + 1).fill(0);
+  for (let j = floors - 1; j >= 0; j--) above[j] = above[j + 1] + plates[j];
+  const stallsOn = (sqft: number) => Math.floor(sqft / PARKING.stall_sqft);
+
+  // surface lot first: if every stall fits on the ground plate a slimmer
+  // building leaves open, no parking is built into the building
+  if (parking) {
+    const residential_sqft = Math.max(
+      0,
+      Math.min(i.far_cap, above[0]) - retail_sqft
+    );
+    const units = Math.min(
+      Math.floor((residential_sqft * EFFICIENCY) / i.unit_size),
+      i.max_units ?? Infinity
+    );
+    const stalls = Math.max(0, Math.ceil(i.parking_ratio * units - 1e-9));
+    const footprint = slimFootprint(plates, residential_sqft + retail_sqft);
+    const open = Math.max(0, ground - footprint);
+    if (stalls <= Math.floor(open / PARKING.surface_stall_sqft)) {
+      const parking_sqft = stalls * PARKING.surface_stall_sqft;
+      const gross_sqft = residential_sqft + retail_sqft + parking_sqft;
+      let living_stories = 0;
+      for (
+        let j = 0, filled = 0;
+        j < floors && filled < residential_sqft - 1e-9;
+        j++
+      ) {
+        filled += Math.min(footprint, plates[j]);
+        living_stories++;
+      }
+      return {
+        residential_sqft,
+        retail_sqft,
+        lobby_sqft: 0,
+        units,
+        stalls,
+        podium_levels: 0,
+        parking_sqft,
+        parking_cost: parking_sqft * PARKING.surface_cost_per_sqft,
+        parking_share: gross_sqft > 0 ? parking_sqft / gross_sqft : 0,
+        living_stories,
+      };
+    }
+  }
+
+  const firstResidential = (podium_levels: number) =>
+    parking ? Math.min(floors, 1 + podium_levels) : 0;
+  const residentialAt = (podium_levels: number) => {
+    const by_height = parking
+      ? above[firstResidential(podium_levels)]
+      : above[0] - retail_sqft;
+    const residential_sqft = Math.max(
+      0,
+      Math.min(i.far_cap - retail_sqft, by_height)
+    );
+    const by_area = Math.floor((residential_sqft * EFFICIENCY) / i.unit_size);
+    const units = Math.min(by_area, i.max_units ?? Infinity);
+    return { residential_sqft, units };
+  };
+
+  // without a podium, the ground floor left after its stalls is housing when
+  // a unit fits there
+  const ground_stalls = parking ? stallsOn(ground - retail_sqft) : 0;
+  const groundLeft = (stalls: number) =>
+    Math.max(0, ground - retail_sqft - stalls * PARKING.stall_sqft);
+  const groundHousing = (stalls: number) =>
+    groundLeft(stalls) >= i.unit_size / EFFICIENCY ? groundLeft(stalls) : 0;
+  const stallsFor = (units: number) =>
+    Math.max(0, Math.ceil(i.parking_ratio * units - 1e-9));
+  const fit = (sqft: number) =>
+    Math.min(
+      Math.floor((sqft * EFFICIENCY) / i.unit_size),
+      i.max_units ?? Infinity
+    );
+
+  // units at a podium height: the fewer of what the floors hold and what
+  // the stalls allow, settled since stalls take ground-floor housing
+  const optionAt = (podium_levels: number, capacity: number) => {
+    const room = (stalls: number) =>
+      Math.max(
+        0,
+        Math.min(
+          i.far_cap - retail_sqft,
+          above[firstResidential(podium_levels)] +
+            (podium_levels === 0 ? groundHousing(stalls) : 0)
+        )
+      );
+    const by_stalls = Math.floor(capacity / i.parking_ratio + 1e-9);
+    let units = Math.min(fit(room(0)), by_stalls);
+    for (let n = 0; n < 100; n++) {
+      const next = Math.min(fit(room(stallsFor(units))), by_stalls);
+      if (next >= units) break;
+      units = next;
+    }
+    const sqft = room(stallsFor(units));
+    const by_area = fit(sqft);
+    return {
+      units,
+      // build only the floor area the parked units need
+      residential_sqft:
+        units < by_area
+          ? Math.min(sqft, (units * i.unit_size) / EFFICIENCY)
+          : sqft,
+      stall_bound: units < by_area,
+    };
+  };
+
+  // keep the podium that yields the most units
+  let podium_levels = 0;
+  let res = residentialAt(0);
+  if (parking) {
+    let capacity = ground_stalls;
+    let best = -1;
+    for (let k = 0; k < Math.max(1, floors); k++) {
+      if (k > 0) capacity += stallsOn(plates[k]);
+      const option = optionAt(k, capacity);
+      if (option.units > best) {
+        best = option.units;
+        podium_levels = k;
+        res = option;
+      }
+      // once stalls stop limiting units, a taller podium only loses floors
+      if (!option.stall_bound) break;
+    }
+  }
+  const stalls = stallsFor(res.units);
+  const ground_housing =
+    parking && podium_levels === 0 ? groundHousing(stalls) : 0;
+
+  const ground_parking_sqft =
+    Math.min(stalls, ground_stalls) * PARKING.stall_sqft;
+  // podium floors are built whole, however full the top one is
+  const podium_sqft = parking
+    ? above[Math.min(1, floors)] - above[firstResidential(podium_levels)]
+    : 0;
+  // ground floor too small for a unit: lobby, loading, circulation
+  const lobby_sqft =
+    parking && ground_housing === 0
+      ? Math.max(0, ground - retail_sqft - ground_parking_sqft)
+      : 0;
+  const parking_sqft = ground_parking_sqft + podium_sqft;
+  const gross_sqft =
+    res.residential_sqft + retail_sqft + lobby_sqft + parking_sqft;
+
+  const storeys = [
+    ...(ground_housing > 0 ? [ground_housing] : []),
+    ...plates.slice(firstResidential(podium_levels)),
+  ];
+  let living_stories = 0;
+  for (
+    let j = 0, filled = 0;
+    j < storeys.length && filled < res.residential_sqft - 1e-9;
+    j++
+  ) {
+    filled += storeys[j];
+    living_stories++;
+  }
+
+  return {
+    residential_sqft: res.residential_sqft,
+    retail_sqft,
+    lobby_sqft,
+    units: res.units,
+    stalls,
+    podium_levels,
+    parking_sqft,
+    parking_cost: parking_sqft * PARKING.cost_per_sqft,
+    parking_share: gross_sqft > 0 ? parking_sqft / gross_sqft : 0,
+    living_stories,
+  };
 }
 
 // parking: calculate annual parking income
-export function calcParkingIncome(buildable_sqft: number): number {
-  const stalls = parkingRequiredSpaces(buildable_sqft);
+export function calcParkingIncome(stalls: number): number {
   return stalls * PARKING.monthly_rent_per_stall * 12;
 }
 
@@ -2604,6 +2914,9 @@ export function zeroOutput(
     net_commercial_sqft: 0,
     max_units: 0,
     parking_stalls: 0,
+    podium_levels: 0,
+    parking_sqft: 0,
+    parking_share: 0,
     affordable_units: 0,
     afd_rent_units: 0,
     mkt_rent_units: 0,

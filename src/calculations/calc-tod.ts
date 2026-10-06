@@ -22,10 +22,10 @@ import {
   calcPredevEquity,
   calcPropertyTax,
   calcSoftCosts,
-  calcSurfaceParkingCost,
   calcFarTod,
   commercialFracByZone,
   DEFAULT_PROFIT_MARGIN,
+  DEFAULT_RETAIL_SHARE,
   DEFAULT_TARGET_RETURN,
   DEFAULT_TARGET_SPREAD,
   EFFICIENCY,
@@ -35,26 +35,28 @@ import {
   EXPENSES,
   FEES,
   FINANCING,
+  floorPlates,
   HOLD,
   INCOME,
-  livingStories,
   lotCoverage,
   mixFixtureUnits,
   mixRentByAmi,
   mixUnitSize,
-  parkingRequiredSpaces,
+  PARKING,
+  podiumEnvelope,
   resolveCapRate,
   resolveConstMonths,
   RETAIL_CAP_SPREAD,
   RETAIL_PREMIUM,
-  setbackFootprint,
   sizeConstructionLoan,
   solveIRR,
+  stepBackOf,
   todHeightLimit,
   todUseZone,
   specialDistrictTotal,
   VACANCY,
   zeroOutput,
+  zoneStepBack,
   type ParcelOutput,
   type SliderInputs,
 } from "./calc-shared";
@@ -106,6 +108,8 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   const const_months = resolveConstMonths(zone_class, sliders.const_months);
   const opex_ratio = sliders.opex_ratio ?? EXPENSES.opex_ratio;
   const hard_cost_per_sqft = sliders.hard_cost_per_sqft ?? 450;
+  const parking_ratio = sliders.parking_ratio ?? PARKING.stalls_per_unit;
+  const retail_share = sliders.retail_share ?? DEFAULT_RETAIL_SHARE;
   const setback = sliders.setback ?? 10;
 
   // 2. BUILDABLE ENVELOPE (tod_hard)
@@ -121,40 +125,48 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
     ((sliders.open_space_bonus ?? 0) * lot_sqft) / 5
   );
   const net_lot_sqft = lot_sqft - open_space_sqft;
-  const coverage_cap =
-    envelopeCoverage(zone_class, far, lotCoverage(zone_class)) *
-    net_lot_sqft *
-    floors;
-  const setback_cap = setbackFootprint(lot_sqft, setback) * floors;
-  const buildable_sqft = Math.min(far_cap, coverage_cap, setback_cap);
-
-  let gross_commercial_sqft = 0;
-  let net_commercial_sqft = 0;
-  let gross_residential_sqft = buildable_sqft;
+  // per-storey floor plates
+  const plates = floorPlates({
+    floors,
+    floor_height,
+    height_limit,
+    lot_sqft,
+    coverage_plate:
+      envelopeCoverage(zone_class, far, lotCoverage(zone_class)) * net_lot_sqft,
+    setback,
+    stepback: stepBackOf(sliders, zoneStepBack(zone_class)),
+  });
 
   // commercial use checker, returns 0 if the selected zone isn't compatible.
   // IPD-T imports BMX-3 uses into every district but BMX-4 (§ 21-9.100-5(d)(1)),
   // so ground-floor commercial follows the use district, not the base district.
-  {
-    const frac = include_retail
-      ? commercialFracByZone(todUseZone(zone_class))
-      : 0;
-    if (frac > 0) {
-      gross_commercial_sqft = frac * lot_sqft;
-      gross_residential_sqft = buildable_sqft - gross_commercial_sqft;
-      net_commercial_sqft = gross_commercial_sqft * EFFICIENCY;
-    }
-  }
+  const frac = include_retail
+    ? commercialFracByZone(todUseZone(zone_class))
+    : 0;
+  const unit_size = mixUnitSize(unit_type);
+  const env = podiumEnvelope({
+    plates,
+    far_cap,
+    retail_cap: frac * lot_sqft,
+    retail_share,
+    unit_size,
+    parking_ratio,
+  });
+  const gross_residential_sqft = env.residential_sqft;
+  const gross_commercial_sqft = env.retail_sqft;
+  // floor area counted toward FAR; parking is excluded
+  const buildable_sqft = gross_residential_sqft + gross_commercial_sqft;
   const net_residential_sqft = gross_residential_sqft * EFFICIENCY;
+  const net_commercial_sqft = gross_commercial_sqft * EFFICIENCY;
+
   const residential_rate = hard_cost_per_sqft ?? 450;
   const retail_rate = residential_rate + RETAIL_PREMIUM;
   const building_cost =
-    gross_residential_sqft * residential_rate +
+    (gross_residential_sqft + env.lobby_sqft) * residential_rate +
     gross_commercial_sqft * retail_rate;
 
   // 3. UNITS + AFFORDABILITY VALIDATION
-  const unit_size = mixUnitSize(unit_type);
-  const max_units = Math.floor(net_residential_sqft / unit_size);
+  const max_units = env.units;
 
   if (max_units <= 0)
     return zeroOutput("hypothetical", zone_class, lot_sqft, height_limit);
@@ -168,8 +180,7 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   const sale_units = 0;
 
   // 4. PARKING, CONTRACTOR
-  const parking_cost =
-    calcBicycleParkingCost(max_units) + calcSurfaceParkingCost(buildable_sqft);
+  const parking_cost = calcBicycleParkingCost(max_units) + env.parking_cost;
   // Park land charged on non-exempt units, 22-7.3(j)(2), PDT/IPDT affordable
   const chargeable_units = max_units - affordable_units;
   const park_area = calcParkArea(chargeable_units, buildable_sqft);
@@ -180,12 +191,7 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   const hard_cost = hard_cost_base * cost_inflation_multiplier;
 
   // STEP 5. SOFT COSTS
-  const living_stories = livingStories(
-    gross_residential_sqft,
-    coverage_cap,
-    setback_cap,
-    floors
-  );
+  const living_stories = env.living_stories;
   const soft = calcSoftCosts({
     hard_cost,
     lot_sqft,
@@ -268,7 +274,7 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
 
   // TOD: no car parking income (bicycle only)
   // 7/20/26 Trey says to implement car parking for TOD for now
-  const parking_income = calcParkingIncome(buildable_sqft);
+  const parking_income = calcParkingIncome(env.stalls);
   const admin_income =
     max_units * 0.3 * INCOME.application_fee +
     max_units * 0.7 * INCOME.lease_renewal;
@@ -564,7 +570,10 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
     net_residential_sqft,
     net_commercial_sqft,
     max_units,
-    parking_stalls: parkingRequiredSpaces(buildable_sqft),
+    parking_stalls: env.stalls,
+    podium_levels: env.podium_levels,
+    parking_sqft: env.parking_sqft,
+    parking_share: env.parking_share,
     affordable_units,
     afd_rent_units,
     mkt_rent_units,

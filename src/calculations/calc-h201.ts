@@ -25,9 +25,9 @@ import {
   calcPredevEquity,
   calcPropertyTax,
   calcSoftCosts,
-  calcSurfaceParkingCost,
   commercialFracByZone,
   DEFAULT_PROFIT_MARGIN,
+  DEFAULT_RETAIL_SHARE,
   DEFAULT_TARGET_RETURN,
   DEFAULT_TARGET_SPREAD,
   DEFAULT_UNIT_TYPE,
@@ -38,25 +38,27 @@ import {
   EXPENSES,
   FEES,
   FINANCING,
+  floorPlates,
   HOLD,
   INCOME,
-  livingStories,
   LOT_COVERAGE,
   mixFixtureUnits,
   mixRentByAmi,
   mixUnitSize,
   ParcelOutput,
-  parkingRequiredSpaces,
+  PARKING,
+  podiumEnvelope,
   resolveCapRate,
   resolveConstMonths,
   RETAIL_CAP_SPREAD,
   RETAIL_PREMIUM,
-  setbackFootprint,
   sizeConstructionLoan,
   SliderInputs,
   solveIRR,
+  stepBackOf,
   VACANCY,
   zeroOutput,
+  zoneStepBack,
 } from "./calc-shared";
 
 // =========================================================
@@ -112,6 +114,8 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
   const waivable_fee_basis = sliders.waivable_fee_basis ?? "market_units";
   const const_months = resolveConstMonths(zone_class, sliders.const_months);
   const hard_cost_per_sqft = sliders.hard_cost_per_sqft ?? 450;
+  const parking_ratio = sliders.parking_ratio ?? PARKING.stalls_per_unit;
+  const retail_share = sliders.retail_share ?? DEFAULT_RETAIL_SHARE;
   const setback = sliders.setback ?? 10;
 
   // 2. BUILDABLE ENVELOPE (h201_hard)
@@ -121,34 +125,43 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
   // waikiki precincts must keep 35–50% of the lot open; that and the coverage
   // cap are both measured on the zoning lot, so the stricter one governs
   const far_cap = far * lot_sqft;
-  const coverage_cap =
-    envelopeCoverage(zone_class, far, coverage) * lot_sqft * floors;
-  const setback_cap = setbackFootprint(lot_sqft, setback) * floors;
-  const buildable_sqft = Math.min(far_cap, coverage_cap, setback_cap);
-
-  let gross_residential_sqft = buildable_sqft;
-  let gross_commercial_sqft = 0;
-  let net_commercial_sqft = 0;
+  // per-storey floor plates
+  const plates = floorPlates({
+    floors,
+    floor_height: 10,
+    height_limit,
+    lot_sqft,
+    coverage_plate: envelopeCoverage(zone_class, far, coverage) * lot_sqft,
+    setback,
+    stepback: stepBackOf(sliders, zoneStepBack(zone_class)),
+  });
 
   // commercial use checker, returns 0 if the selected zone isn't compatible
   const frac = include_retail ? commercialFracByZone(zone_class) : 0;
-
-  if (frac > 0) {
-    gross_commercial_sqft = frac * lot_sqft;
-    gross_residential_sqft = buildable_sqft - gross_commercial_sqft;
-    net_commercial_sqft = gross_commercial_sqft * EFFICIENCY;
-  }
+  const unit_size = mixUnitSize(unit_type);
+  const env = podiumEnvelope({
+    plates,
+    far_cap,
+    retail_cap: frac * lot_sqft,
+    retail_share,
+    unit_size,
+    parking_ratio,
+  });
+  const gross_residential_sqft = env.residential_sqft;
+  const gross_commercial_sqft = env.retail_sqft;
+  // floor area counted toward FAR; parking is excluded
+  const buildable_sqft = gross_residential_sqft + gross_commercial_sqft;
   const net_residential_sqft = gross_residential_sqft * EFFICIENCY;
+  const net_commercial_sqft = gross_commercial_sqft * EFFICIENCY;
 
   const residential_rate = hard_cost_per_sqft ?? 450;
   const retail_rate = residential_rate + RETAIL_PREMIUM;
   const building_cost =
-    gross_residential_sqft * residential_rate +
+    (gross_residential_sqft + env.lobby_sqft) * residential_rate +
     gross_commercial_sqft * retail_rate;
 
   // 3. UNITS + AFFORDABILITY VALIDATION (50% + 1 rule)
-  const unit_size = mixUnitSize(unit_type);
-  const max_units = Math.floor(net_residential_sqft / unit_size);
+  const max_units = env.units;
 
   if (max_units <= 0)
     return zeroOutput("hypothetical", zone_class, lot_sqft, height_limit);
@@ -171,7 +184,7 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
   const sale_units = 0;
 
   // 4. PARKING, CONSTRUCTION COSTS
-  const parking_cost = calcSurfaceParkingCost(buildable_sqft);
+  const parking_cost = env.parking_cost;
   // Park land charged only on non-exempt units, ROH 22-7.3(j)(3), 201H afd rental units are exempt
   const chargeable_units = max_units - afd_rent_units;
   const park_area = calcParkArea(chargeable_units, buildable_sqft);
@@ -182,12 +195,7 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
   const hard_cost = hard_cost_base * cost_inflation_multiplier;
 
   // STEP 5. SOFT COSTS
-  const living_stories = livingStories(
-    gross_residential_sqft,
-    coverage_cap,
-    setback_cap,
-    floors
-  );
+  const living_stories = env.living_stories;
   const soft = calcSoftCosts({
     hard_cost,
     lot_sqft,
@@ -267,7 +275,7 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
   const pri =
     affordable_rent * afd_rent_units * 12 + market_rent * mkt_rent_units * 12;
 
-  const parking_income = calcParkingIncome(buildable_sqft);
+  const parking_income = calcParkingIncome(env.stalls);
   const admin_income =
     max_units * 0.3 * INCOME.application_fee +
     max_units * 0.7 * INCOME.lease_renewal;
@@ -565,7 +573,10 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
     net_residential_sqft,
     net_commercial_sqft,
     max_units,
-    parking_stalls: parkingRequiredSpaces(buildable_sqft),
+    parking_stalls: env.stalls,
+    podium_levels: env.podium_levels,
+    parking_sqft: env.parking_sqft,
+    parking_share: env.parking_share,
     affordable_units,
     afd_rent_units,
     mkt_rent_units,
