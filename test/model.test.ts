@@ -14,8 +14,12 @@ import {
   calcFAR,
   calcFarPdt,
   calcFarTod,
+  IMX1_PDT_MAX_UNITS,
+  lotAfterOpenSpace,
   openSpaceBonus,
+  openSpaceBonusOver,
   todIneligibleReason,
+  todNotApplicableReason,
   todOpenSpaceCostSqft,
   todPlanCeiling,
   todEligible,
@@ -316,7 +320,7 @@ describe("pathwayEnvelope", () => {
 describe("parcelInputs", () => {
   it("is the pathway defaults plus the parcel's envelope", () => {
     for (const program of PROGRAMS) {
-      const { height_limit, max_far } = pathwayEnvelope(program, low);
+      const { height_limit, max_far, open_space_bonus } = pathwayEnvelope(program, low);
       expect(parcelInputs(program, low)).toEqual({
         ...DEFAULT_INPUTS[program],
         program,
@@ -324,8 +328,13 @@ describe("parcelInputs", () => {
         zone_class: "A-2",
         height_limit,
         max_far,
-        // TOD also passes the open-space bonus: none outside IPD-T
-        ...(program === "tod" ? { open_space_bonus: 0 } : {}),
+        // the open-space bonus rides along wherever the pathway has one (none
+        // in A-2); TOD always passes it
+        ...(program === "tod"
+          ? { open_space_bonus: 0 }
+          : open_space_bonus !== undefined
+            ? { open_space_bonus }
+            : {}),
       });
     }
   });
@@ -385,6 +394,40 @@ describe("calcParcel", () => {
   });
 });
 
+// ── Open-space bonus (§ 21-3.120-2(c)) ─────────────────────────────────────
+
+describe("open-space bonus", () => {
+  const bmx4: Parcel = { lot_sqft: 20000, zone_class: "BMX-4", height: 200 };
+
+  it("tops business FAR up to the district ceiling, never below zero", () => {
+    expect(OPEN_SPACE_FAR_CEILING).toEqual({ "B-2": 3.5, "BMX-3": 3.5, "BMX-4": 7.5 });
+    expect(openSpaceBonusOver("BMX-4", 4.0)).toBe(3.5);
+    expect(openSpaceBonusOver("B-2", 2.5)).toBe(1.0);
+    expect(openSpaceBonusOver("B-2", 5.0)).toBe(0);
+    expect(openSpaceBonusOver("A-2", 3.0)).toBe(0);
+    // one sqft of plaza for every five of bonus floor area
+    expect(lotAfterOpenSpace(20000, 3.5)).toBe(6000);
+    expect(lotAfterOpenSpace(20000)).toBe(20000);
+  });
+
+  it("applies in Standard, Before Ord. 26-7 and 201H, not Bill 7", () => {
+    for (const program of ["bill6", "standard", "h201"] as const) {
+      const envelope = pathwayEnvelope(program, bmx4);
+      expect(envelope, program).toMatchObject({ max_far: 7.5, open_space_bonus: 3.5 });
+      expect(parcelInputs(program, bmx4).open_space_bonus, program).toBe(3.5);
+      // the plaza stays set aside when the FAR lever is overridden
+      expect(parcelInputs(program, bmx4, { max_far: 5 }).open_space_bonus, program).toBe(3.5);
+    }
+    expect(pathwayEnvelope("bill7", bmx4).open_space_bonus).toBeUndefined();
+  });
+
+  it("never applies under PD-T", () => {
+    for (const tier of TIERS) {
+      expect(pathwayEnvelope("tod", { ...bmx4, zone_class: "BMX-3", tod_regime: "pdt", slu_urban: true }, { tier }).open_space_bonus ?? 0).toBe(0);
+    }
+  });
+});
+
 // ── TOD pathway (§ 21-9.100-5) ─────────────────────────────────────────────
 
 // Real TOD parcels from analytics' gauge data, one per case, plus synthetic
@@ -400,8 +443,12 @@ const TOD = {
   pdtNoMapBonus: { lot_sqft: 30000, zone_class: "BMX-3", height: 60, tod_regime: "pdt", slu_urban: true },
   ineligibleZone: { lot_sqft: 30000, zone_class: "R-5", height: 30, tod_regime: "ipdt", slu_urban: true },
   pdtIndustrial: { lot_sqft: 30000, zone_class: "I-2", height: 60, tod_regime: "pdt", slu_urban: true },
+  pdtImx1: { lot_sqft: 30000, zone_class: "IMX-1", height: 60, tod_regime: "pdt", slu_urban: true, tod_map_bonus_height: 90 },
+  ipdtIndustrial: { lot_sqft: 30000, zone_class: "I-2", height: 60, tod_regime: "ipdt", slu_urban: true, station_area: "Airport", tod_precinct: "tiz" },
   outside: { lot_sqft: 30000, zone_class: "BMX-3", height: 60 },
 } satisfies Record<string, Parcel>;
+
+const TIERS = ["base", "minor_sd", "major_sd", "with_benefits"] as const;
 
 describe("TOD pathway", () => {
   it("applies every eligibility gate, with a reason", () => {
@@ -411,9 +458,39 @@ describe("TOD pathway", () => {
     expect(todIneligibleReason(TOD.ineligibleZone)).toMatch(/not an eligible district/);
     expect(todIneligibleReason(TOD.smallLot)).toMatch(/20,000 sqft minimum/);
     expect(todIneligibleReason(TOD.notUrban)).toMatch(/urban district/);
-    expect(todIneligibleReason(TOD.pdtIndustrial)).toMatch(/not permitted .* under PD-T/);
-    // the same industrial zone is fine under IPD-T, which imports BMX-3 uses
-    expect(todIneligibleReason({ ...TOD.pdtIndustrial, tod_regime: "ipdt" })).toBeNull();
+    // industrial zones are eligible districts; whether housing is allowed is
+    // a separate question (not applicable, below)
+    expect(todIneligibleReason(TOD.pdtIndustrial)).toBeNull();
+  });
+
+  it("marks housing not applicable where the zone does not allow it at the tier", () => {
+    // I-1/I-2/I-3 under PD-T: never
+    for (const tier of TIERS) {
+      expect(todNotApplicableReason(TOD.pdtIndustrial, tier)).toMatch(/not permitted .* under PD-T/);
+      expect(pathwayEnvelope("tod", TOD.pdtIndustrial, { tier })).toMatchObject({ status: "not_applicable", max_units: 0 });
+    }
+    // IMX-1 under PD-T: from a minor permit up
+    expect(todNotApplicableReason(TOD.pdtImx1, "base")).toMatch(/minor special district permit/);
+    for (const tier of ["minor_sd", "major_sd", "with_benefits"] as const) {
+      expect(todNotApplicableReason(TOD.pdtImx1, tier)).toBeNull();
+    }
+    // industrial under IPD-T: approval only (BMX-3 uses); permits count as base
+    for (const tier of ["base", "minor_sd", "major_sd"] as const) {
+      expect(todNotApplicableReason(TOD.ipdtIndustrial, tier)).toMatch(/needs IPD-T approval/);
+    }
+    expect(todNotApplicableReason(TOD.ipdtIndustrial, "with_benefits")).toBeNull();
+    // other zones: always applicable
+    for (const tier of TIERS) expect(todNotApplicableReason(TOD.ipdtCore, tier)).toBeNull();
+  });
+
+  it("caps IMX-1 under PD-T at 10 units", () => {
+    expect(IMX1_PDT_MAX_UNITS).toBe(10);
+    for (const tier of ["minor_sd", "major_sd", "with_benefits"] as const) {
+      expect(pathwayEnvelope("tod", TOD.pdtImx1, { tier }).max_units).toBe(10);
+      expect(calcParcel("tod", TOD.pdtImx1, {}, { tier }).max_units).toBeLessThanOrEqual(10);
+    }
+    // IPD-T has no unit cap
+    expect(pathwayEnvelope("tod", { ...TOD.pdtImx1, tod_regime: "ipdt" }, { tier: "with_benefits" }).max_units).toBeUndefined();
   });
 
   it("keeps an ineligible parcel at its base FAR and zoned height", () => {
@@ -425,30 +502,55 @@ describe("TOD pathway", () => {
     }
   });
 
-  it("builds PD-T to the minor SD ladder at base and the PD-T ladder with benefits", () => {
+  it("builds PD-T to underlying zoning at base, then the permit ladder", () => {
     const p = TOD.pdtNoMapBonus;
-    const base = pathwayEnvelope("tod", p, { tier: "base" });
-    const full = pathwayEnvelope("tod", p, { tier: "with_benefits" });
-    expect(base).toMatchObject({ status: "eligible", far_source: "pdt_ladder", height_source: "base" });
-    expect(base.max_far).toBe(calcFarPdt(p.zone_class, p.lot_sqft, "minor_sd"));
-    expect(full.max_far).toBe(calcFarPdt(p.zone_class, p.lot_sqft, "pdt"));
-    // the map's bonus height only counts with benefits
-    expect(pathwayEnvelope("tod", TOD.pdtMapBonus, { tier: "with_benefits" }).height_source).toBe("pdt_map_bonus");
-    expect(pathwayEnvelope("tod", TOD.pdtMapBonus, { tier: "base" }).height_source).toBe("base");
+    const env = (tier: (typeof TIERS)[number], generous_height?: boolean) =>
+      pathwayEnvelope("tod", p, { tier, generous_height });
+    // base: underlying zoning, no open-space bonus in a special district
+    expect(env("base")).toMatchObject({ status: "eligible", far_source: "base", height_source: "base", height_limit: 60 });
+    expect(env("base").max_far).toBe(baseFar(p.zone_class, p.lot_sqft));
+    // minor and major permits share the minor FAR; heights +60 / +120
+    expect(env("minor_sd")).toMatchObject({ far_source: "pdt_ladder", height_source: "pdt_minor_sd", height_limit: 120 });
+    expect(env("major_sd")).toMatchObject({ height_source: "pdt_major_sd", height_limit: 180 });
+    expect(env("minor_sd").max_far).toBe(calcFarPdt(p.zone_class, p.lot_sqft, "minor_sd"));
+    expect(env("major_sd").max_far).toBe(env("minor_sd").max_far);
+    // approval: the PD-T FAR; with no parenthetical, the zoned height
+    // (strict, § 21-9.100-10(c)(2)) unless the generous reading is asked for
+    expect(env("with_benefits").max_far).toBe(calcFarPdt(p.zone_class, p.lot_sqft, "pdt"));
+    expect(env("with_benefits")).toMatchObject({ height_limit: 60, height_source: "base" });
+    expect(env("with_benefits", true)).toMatchObject({ height_limit: 180, height_source: "pdt_major_sd" });
+    // a parenthetical caps the permits and is the approval height
+    const m = TOD.pdtMapBonus; // zoned 60, parenthetical 60
+    for (const tier of TIERS) expect(pathwayEnvelope("tod", m, { tier }).height_limit).toBe(60);
+    expect(pathwayEnvelope("tod", m, { tier: "with_benefits" }).height_source).toBe("pdt_map_bonus");
+    // minor and major permits need no 20,000 sqft lot; approval does
+    const small = { ...p, lot_sqft: 9000 };
+    expect(pathwayEnvelope("tod", small, { tier: "minor_sd" }).status).toBe("eligible");
+    expect(pathwayEnvelope("tod", small, { tier: "with_benefits" }).status).toBe("ineligible");
   });
 
-  it("builds IPD-T to the formula at base and the plan ceiling with benefits", () => {
+  it("builds IPD-T to zoning plus the open-space bonus at base, and the formula or plan on approval", () => {
     const p = TOD.ipdtCore;
     const plan = todPlanCeiling(p.station_area, p.tod_precinct);
     const base = pathwayEnvelope("tod", p, { tier: "base" });
     const full = pathwayEnvelope("tod", p, { tier: "with_benefits" });
-    expect(base.far_source).toBe("ipdt_formula");
-    expect(base.max_far).toBe(calcFarTod(p.zone_class, p.lot_sqft, openSpaceBonus(p.zone_class)));
+    expect(base).toMatchObject({ far_source: "base", height_source: "base", height_limit: p.height });
+    expect(base.max_far).toBe(baseFar(p.zone_class, p.lot_sqft) + openSpaceBonus(p.zone_class));
+    expect(base.open_space_bonus).toBe(openSpaceBonus(p.zone_class));
+    // minor and major permits don't exist outside a special district
+    for (const tier of ["minor_sd", "major_sd"] as const) {
+      expect(pathwayEnvelope("tod", p, { tier })).toEqual(base);
+    }
     expect(plan.far).not.toBeNull();
     expect(full.far_source).toBe("plan_ceiling");
-    expect(full.max_far).toBe(calcFarTod(p.zone_class, p.lot_sqft, openSpaceBonus(p.zone_class), plan.far!));
-    // where the plan sets no FAR, the formula applies in both tiers
-    expect(pathwayEnvelope("tod", TOD.ipdtNoPlanFar, { tier: "with_benefits" }).far_source).toBe("ipdt_formula");
+    expect(full.max_far).toBe(plan.far);
+    // the plan's FAR replaces the formula, so no plaza is set aside
+    expect(full.open_space_bonus).toBe(0);
+    // where the plan sets no FAR, the formula applies, with its bonus
+    const noPlan = pathwayEnvelope("tod", TOD.ipdtNoPlanFar, { tier: "with_benefits" });
+    expect(noPlan.far_source).toBe("ipdt_formula");
+    expect(noPlan.max_far).toBe(calcFarTod("B-2", TOD.ipdtNoPlanFar.lot_sqft, openSpaceBonus("B-2")));
+    expect(noPlan).toMatchObject({ height_source: "ipdt_doubling", height_limit: 120 });
   });
 
   it("never lets a plan's height cap fall below the zoned height", () => {
@@ -470,7 +572,7 @@ describe("TOD pathway", () => {
 
   it("results for every TOD case match the snapshot", () => {
     const results = Object.entries(TOD).flatMap(([name, parcel]) =>
-      (["base", "with_benefits"] as const).map((tier) => {
+      TIERS.map((tier) => {
         const output = calcParcel("tod", parcel, {}, { tier });
         return { case: name, tier, envelope: pathwayEnvelope("tod", parcel, { tier }), level: overallLevel(output), output };
       })
@@ -570,10 +672,14 @@ describe("TOD rules", () => {
     // +120 ft or triple, whichever is lower
     expect(todHeightPdt(40, "major_sd")).toBe(120);
     expect(todHeightPdt(200, "major_sd")).toBe(320);
-    // PD-T: the map's bonus height, else the zoned height
+    // the parenthetical caps the permits, but never below the zoned height
+    expect(todHeightPdt(40, "major_sd", 90)).toBe(90);
+    expect(todHeightPdt(60, "minor_sd", 45)).toBe(60);
+    // PD-T approval: the map's bonus height, else the major permit height
+    // (the envelope applies the strict reading, the zoned height, by default)
     expect(todHeightPdt(60, "pdt", 150)).toBe(150);
-    expect(todHeightPdt(60, "pdt")).toBe(60);
-    expect(todHeightPdt(60)).toBe(60);
+    expect(todHeightPdt(60, "pdt")).toBe(180);
+    expect(todHeightPdt(60)).toBe(180);
   });
 
   it("doubles height to at most 450 ft without a plan, and keeps a higher zoned height under one", () => {

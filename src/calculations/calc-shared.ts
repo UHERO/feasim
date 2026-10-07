@@ -14,7 +14,6 @@ export const COST_PER_ZONE: Record<string, number> = {
   "R-5": 170.5,
   "B-1": 200.0,
   "B-2": 161.21,
-  "BMX-2": 266.91,
   "BMX-3": 231.18,
   "BMX-4": 231.18,
   Apart: 161.21,
@@ -26,7 +25,7 @@ export const COST_PER_ZONE: Record<string, number> = {
 export const ZONE_GROUPS = {
   lowDensity: ["A-1", "AMX-1", "R-5"],
   // zones permitting ground floor commercial use
-  mixedUse: ["AMX-1", "AMX-2", "AMX-3", "BMX-2", "BMX-3", "BMX-4", "ApartMix"],
+  mixedUse: ["AMX-1", "AMX-2", "AMX-3", "BMX-3", "BMX-4", "ApartMix"],
   // Waikiki Special District: Apartment Precinct and Apartment Mixed Use Subprecinct
   waikiki: ["Apart", "ApartMix"],
 } satisfies Record<string, string[]>;
@@ -50,8 +49,7 @@ export function permitsGroundFloorRetail(zone_class: string): boolean {
 // ground floor commercial fraction of lot area, by zone (ROH Table 21-3.3)
 export function commercialFracByZone(zone_class: string): number {
   if (zone_class === "AMX-1") return COMMERCIAL_COVERAGE.commercial1;
-  if (zone_class === "AMX-2" || zone_class === "BMX-2")
-    return COMMERCIAL_COVERAGE.commercial2;
+  if (zone_class === "AMX-2") return COMMERCIAL_COVERAGE.commercial2;
   if (["AMX-3", "BMX-3", "BMX-4", "ApartMix"].includes(zone_class))
     return COMMERCIAL_COVERAGE.commercial3;
   return 0;
@@ -241,28 +239,8 @@ export const HOLD = {
   tax_exemption_years: 15,
 };
 
-// cap rates by zone class
-export const CAP_RATES: Record<string, number> = {
-  // metro class_c (low-rise)
-  "A-1": (0.056 + 0.059) / 2,
-  "AMX-1": (0.056 + 0.059) / 2,
-  "R-5": (0.056 + 0.059) / 2,
-  low_rise: (0.056 + 0.059) / 2,
-  // metro class_b (mid-rise)
-  "A-2": (0.0495 + 0.0524) / 2,
-  "AMX-2": (0.0495 + 0.0524) / 2,
-  "B-2": (0.0495 + 0.0524) / 2,
-  "BMX-2": (0.0495 + 0.0524) / 2,
-  mid_rise: (0.0495 + 0.0524) / 2,
-  // metro class_a (high-rise)
-  "A-3": (0.049 + 0.0517) / 2,
-  "AMX-3": (0.049 + 0.0517) / 2,
-  "BMX-3": (0.049 + 0.0517) / 2,
-  "BMX-4": (0.049 + 0.0517) / 2,
-  // Waikiki apartment precincts sit above metro class_a on their own
-  Apart: 0.054,
-  ApartMix: 0.054,
-};
+// market cap rate, the same for every zone
+export const DEFAULT_CAP_RATE = 0.051;
 
 // required return-on-cost spread over cap rate (150 bps)
 export const DEFAULT_TARGET_SPREAD = 0.015;
@@ -273,10 +251,10 @@ export const DEFAULT_TARGET_RETURN = 0.115;
 // developer profit as a margin on total project cost (dev cost + finance)
 export const DEFAULT_PROFIT_MARGIN = 0.15;
 
-// slider override if provided, else the cap rate for the zone
-export function resolveCapRate(zone_class: string, override?: number): number {
+// slider override if provided, else the market cap rate
+export function resolveCapRate(override?: number): number {
   if (override != null && override > 0) return override;
-  return CAP_RATES[zone_class] ?? CAP_RATES["low_rise"];
+  return DEFAULT_CAP_RATE;
 }
 
 // retail cap rate spread above residential cap rate
@@ -295,7 +273,6 @@ export const LOT_COVERAGE: Record<string, number> = {
   Apart: 1.0,
   ApartMix: 1.0,
   "B-2": 1.0,
-  "BMX-2": 1.0,
   "BMX-3": 1.0,
   "BMX-4": 1.0,
 };
@@ -1449,6 +1426,8 @@ export interface SliderInputs {
   retail_share?: number;
   // parking stalls per dwelling unit
   parking_ratio?: number;
+  // a legal cap on dwelling units (TOD: IMX-1 under PD-T)
+  max_units?: number;
   // height step-back; off unless stepback_trigger_ft is set
   stepback_trigger_ft?: number;
   stepback_above_ft?: number;
@@ -1654,7 +1633,8 @@ export function calcFAR(zone_class: string, lot_sqft: number): number {
   // IMX-1 § 21-3.140-1(c)(1) scales with the use mix; a residential model
   // takes the base rung.
   if (zone_class === "IMX-1") return 1.5;
-  // the open-space bonus (3.5 / 3.5 / 7.5 under § 21-3.120-2(c)) is not modeled
+  // Table 21-3.4; the open-space bonus (§ 21-3.120-2(c)) is added by each
+  // pathway that allows it (openSpaceBonusOver)
   if (zone_class === "B-2" || zone_class === "BMX-3") return 2.5;
   if (zone_class === "BMX-4") return 4.0;
   return 0;
@@ -1667,7 +1647,7 @@ export const TOD_ELIGIBLE_DISTRICTS = [
   "A-1", "A-2", "A-3",
   "AMX-1", "AMX-2", "AMX-3",
   "B-1", "B-2",
-  "BMX-2", "BMX-3", "BMX-4",
+  "BMX-3", "BMX-4",
   "Resort", "ResCom", "ResMix",
   "I-1", "I-2", "I-3",
   "IMX-1",
@@ -1693,12 +1673,12 @@ export function todUseZone(zone_class: string): string {
 }
 
 // § 21-9.100-5(e)(1). DOUBLE_AFTER_BONUS orders it 2 x (base + bonus).
-const DOUBLE_AFTER_BONUS = ["B-2", "BMX-2", "BMX-3", "BMX-4", "IMX-1"];
+// § 21-9.100-5(e)(1)(C): FAR doubles after the open-space bonus in these only
+const DOUBLE_AFTER_BONUS = ["B-2", "BMX-3", "BMX-4", "IMX-1"];
 
 // § 21-3.120-2(c) ceilings; the bonus is the gap from base FAR
 export const OPEN_SPACE_FAR_CEILING: Record<string, number> = {
   "B-2": 3.5,
-  "BMX-2": 3.5,
   "BMX-3": 3.5,
   "BMX-4": 7.5,
 };
@@ -1708,9 +1688,8 @@ export const OPEN_SPACE_FAR_CEILING: Record<string, number> = {
 const TABLE_21_3_3 = ["A-1", "AMX-1", "A-2", "AMX-2", "A-3", "AMX-3"];
 
 /**
- * Base FAR by district family. calcFarBill6 must NOT be used for the business
- * districts: it returns 3.0 for B-2 and 4.0 for BMX-3 against the table's 2.5,
- * and 0 for B-1, industrial and resort.
+ * Base FAR by district family: Table 21-3.3 for the apartment districts,
+ * calcFAR (Table 21-3.4 and the others) for the rest.
  */
 export function baseFar(zone_class: string, lot_sqft = 0): number {
   if (TABLE_21_3_3.includes(zone_class)) return calcFarBill6(zone_class);
@@ -1719,9 +1698,18 @@ export function baseFar(zone_class: string, lot_sqft = 0): number {
 
 /** largest open-space bonus the district allows, in FAR */
 export function openSpaceBonus(zone_class: string): number {
+  return openSpaceBonusOver(zone_class, baseFar(zone_class));
+}
+
+/** open-space bonus on top of a pathway's own FAR, up to the district ceiling */
+export function openSpaceBonusOver(zone_class: string, far: number): number {
   const ceiling = OPEN_SPACE_FAR_CEILING[zone_class];
-  if (ceiling == null) return 0;
-  return Math.max(0, ceiling - baseFar(zone_class));
+  return ceiling == null ? 0 : Math.max(0, ceiling - far);
+}
+
+/** lot left for the building once the bonus's public open space (5:1) is set aside */
+export function lotAfterOpenSpace(lot_sqft: number, bonus = 0): number {
+  return lot_sqft - Math.min(lot_sqft, (bonus * lot_sqft) / 5);
 }
 
 export function calcFarTod(
@@ -1765,27 +1753,38 @@ export function calcFarPdt(
   return base;
 }
 
-// § 21-9.100-8(a)(1)(D).
+// § 21-9.100-8(a)(1)(D): every route goes up to the map's parenthetical bonus
+// height where one is shown; PD-T approval reaches the parenthetical, or the
+// major permit height where the map shows none.
 export function todHeightPdt(
   base_height: number,
   route: TodPermitRoute = "pdt",
   map_bonus_height?: number
 ): number {
+  const major = Math.min(base_height + 120, 3 * base_height);
+  const capped = (height: number) =>
+    Math.max(
+      base_height,
+      map_bonus_height != null ? Math.min(height, map_bonus_height) : height
+    );
   switch (route) {
     case "base":
       return base_height;
     case "minor_sd":
-      return Math.min(base_height + 60, 2 * base_height);
+      return capped(Math.min(base_height + 60, 2 * base_height));
     case "major_sd":
-      return Math.min(base_height + 120, 3 * base_height);
+      return capped(major);
     case "pdt":
-      return map_bonus_height ?? base_height;
+      return Math.max(base_height, map_bonus_height ?? major);
   }
 }
 
 // Table 21-5.1 bars multi-unit dwelling in industrial districts; IPD-T lifts
-// that via the BMX-3 use import, PD-T only for IMX-1 (§ 21-9.100-9(c)).
+// that via the BMX-3 use import (§ 21-9.100-5(d)(1)). Under PD-T only IMX-1
+// may have dwellings: up to 10 per zoning lot above the ground floor, with a
+// special district permit (§ 21-9.100-7(c)).
 const INDUSTRIAL = ["I-1", "I-2", "I-3", "IMX-1"];
+export const IMX1_PDT_MAX_UNITS = 10;
 
 export type ResidentialUse = "permitted" | "discretionary" | "not_permitted";
 
@@ -1871,24 +1870,32 @@ export function todHeightLimit(
 ): number {
   if (!todEligible(zone_class, lot_sqft)) return base_height;
   if (plan_height != null) return Math.max(plan_height, base_height);
-  return Math.min(2 * base_height, TOD_MAX_HEIGHT_FT);
+  return Math.max(base_height, Math.min(2 * base_height, TOD_MAX_HEIGHT_FT));
 }
 
 // calculate FAR based on bill 6 ordinanace (ONLY USE FOR BILL 6 PATH)
 export function calcFarBill6(zone_class: string): number {
+  // Ord. 26-7 changed the apartment districts only; business districts keep
+  // Table 21-3.4
+  if (zone_class in BUSINESS_FAR) return BUSINESS_FAR[zone_class];
   if (ZONE_GROUPS.lowDensity.includes(zone_class)) return 2.0;
-  if (zone_class === "A-2" || zone_class === "AMX-2" || zone_class === "B-2")
-    return 3.0;
+  if (zone_class === "A-2" || zone_class === "AMX-2") return 3.0;
   if (
     zone_class === "A-3" ||
     zone_class === "AMX-3" ||
-    zone_class === "BMX-3" ||
-    zone_class === "BMX-4" ||
     ZONE_GROUPS.waikiki.includes(zone_class)
   )
     return 4.0;
   return 0;
 }
+
+// ROH Table 21-3.4 base FAR
+const BUSINESS_FAR: Record<string, number> = {
+  "B-1": 1.0,
+  "B-2": 2.5,
+  "BMX-3": 2.5,
+  "BMX-4": 4.0,
+};
 
 const APARTMENT_ZONES = ["A-1", "A-2", "A-3", "AMX-1", "AMX-2", "AMX-3"];
 
@@ -1945,7 +1952,6 @@ export function constructionMonthsByZone(zone_class: string): number {
     zone_class === "A-2" ||
     zone_class === "AMX-2" ||
     zone_class === "B-2" ||
-    zone_class === "BMX-2" ||
     zone_class === "mid_rise"
   )
     return 24;
@@ -1988,7 +1994,6 @@ export function permittingMonthsByZone(zone_class: string): number {
     return Math.round(535 / 30);
   if (
     zone_class === "B-2" ||
-    zone_class === "BMX-2" ||
     zone_class === "BMX-3" ||
     zone_class === "BMX-4"
   )
@@ -2029,8 +2034,7 @@ export function excavationDepthByZone(zone_class: string): number {
   if (
     zone_class === "A-2" ||
     zone_class === "AMX-2" ||
-    zone_class === "B-2" ||
-    zone_class === "BMX-2"
+    zone_class === "B-2"
   )
     return 5;
   if (
@@ -2221,6 +2225,8 @@ export function podiumEnvelope(i: {
   parking_ratio: number;
   // a legal cap on units (Bill 7)
   max_units?: number;
+  // a cap on the unit count; only the floor area those units need is built
+  unit_cap?: number;
 }) {
   const plates = i.plates;
   const floors = plates.length;
@@ -2232,6 +2238,15 @@ export function podiumEnvelope(i: {
   );
   const above = new Array<number>(floors + 1).fill(0);
   for (let j = floors - 1; j >= 0; j--) above[j] = above[j + 1] + plates[j];
+  // a unit-count cap limits the floor area, so only those units are built
+  if (i.unit_cap != null)
+    i = {
+      ...i,
+      far_cap: Math.min(
+        i.far_cap,
+        retail_sqft + (i.unit_cap * i.unit_size) / EFFICIENCY + 1e-6
+      ),
+    };
   const stallsOn = (sqft: number) => Math.floor(sqft / PARKING.stall_sqft);
 
   // surface lot first: if every stall fits on the ground plate a slimmer
@@ -2250,6 +2265,11 @@ export function podiumEnvelope(i: {
     const open = Math.max(0, ground - footprint);
     if (stalls <= Math.floor(open / PARKING.surface_stall_sqft)) {
       const parking_sqft = stalls * PARKING.surface_stall_sqft;
+      // the building only slims as far as the lot needs
+      const built = Math.max(
+        footprint,
+        Math.min(ground - parking_sqft, residential_sqft + retail_sqft)
+      );
       const gross_sqft = residential_sqft + retail_sqft + parking_sqft;
       let living_stories = 0;
       for (
@@ -2257,7 +2277,7 @@ export function podiumEnvelope(i: {
         j < floors && filled < residential_sqft - 1e-9;
         j++
       ) {
-        filled += Math.min(footprint, plates[j]);
+        filled += Math.min(built, plates[j]);
         living_stories++;
       }
       return {

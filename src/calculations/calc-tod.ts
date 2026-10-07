@@ -71,7 +71,7 @@ export const TOD_DEFAULT_EQUITY = 0.3;
 export const TOD_DEFAULT_LAND_COST = 200;
 export const TOD_DEFAULT_PERMANENT_RATE = 0.0675;
 export const TOD_DEFAULT_HOLD_YEARS = 10;
-export const TOD_DEFAULT_RETAIL_RENT = 65;
+export const TOD_DEFAULT_RETAIL_RENT = 5;
 export const TOD_DEFAULT_AFFORDABLE_AMI = "ami_80";
 export const TOD_DEFAULT_MARKET_AMI = "ami_80";
 
@@ -151,6 +151,7 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
     retail_share,
     unit_size,
     parking_ratio,
+    unit_cap: sliders.max_units,
   });
   const gross_residential_sqft = env.residential_sqft;
   const gross_commercial_sqft = env.retail_sqft;
@@ -309,7 +310,7 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   const noi = residential_noi + retail_noi;
 
   // GDV is gross disposition applied at point of sale only
-  const cap_rate = resolveCapRate(zone_class, sliders.cap_rate);
+  const cap_rate = resolveCapRate(sliders.cap_rate);
   const rental_gdv = residential_noi / cap_rate;
   let retail_gdv_val = 0;
   if (retail_egi > 0) {

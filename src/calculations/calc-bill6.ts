@@ -35,6 +35,7 @@ import {
   floorPlates,
   HOLD,
   INCOME,
+  lotAfterOpenSpace,
   lotCoverageBill6,
   mixAffordablePrice,
   mixFixtureUnits,
@@ -86,11 +87,12 @@ function bill6Hard(
   parking_ratio: number,
   retail_share: number,
   max_far?: number,
-  stepback?: StepBack
+  stepback?: StepBack,
+  open_space_bonus = 0
 ) {
   const floors = Math.floor(height_limit / floor_height);
 
-  const far = max_far ?? calcFarBill6(zone_class);
+  const far = max_far ?? calcFarBill6(zone_class) + open_space_bonus;
   const coverage = lotCoverageBill6(zone_class);
   // waikiki precincts must keep 35–50% of the lot open; that and the coverage
   // cap are both measured on the zoning lot, so the stricter one governs
@@ -101,7 +103,9 @@ function bill6Hard(
     floor_height,
     height_limit,
     lot_sqft,
-    coverage_plate: envelopeCoverage(zone_class, far, coverage) * lot_sqft,
+    coverage_plate:
+      envelopeCoverage(zone_class, far, coverage) *
+      lotAfterOpenSpace(lot_sqft, open_space_bonus),
     setback,
     stepback,
   });
@@ -312,7 +316,7 @@ function bill6Noi(
   property_tax: number,
   cap_rate_override?: number
 ) {
-  const cap_rate = resolveCapRate(zone_class, cap_rate_override);
+  const cap_rate = resolveCapRate(cap_rate_override);
 
   // NOI is after property tax (buyer pays it, so value reflects it)
   const tax = allocatePropertyTax(property_tax, residential_egi, retail_egi);
@@ -606,7 +610,8 @@ export function calcbill6Single(sliders: SliderInputs): ParcelOutput {
     parking_ratio,
     retail_share,
     max_far,
-    stepBackOf(sliders, zoneStepBack(zone_class))
+    stepBackOf(sliders, zoneStepBack(zone_class)),
+    sliders.open_space_bonus ?? 0
   );
   if (hard.max_units <= 0)
     return zeroOutput("hypothetical", zone_class, lot_sqft, height_limit);

@@ -334,7 +334,7 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   // =========================================================
   // Step 6: NOI & GDV (gross, no disposition cost baked in)
   // =========================================================
-  const cap_rate = resolveCapRate(zone_class, sliders.cap_rate);
+  const cap_rate = resolveCapRate(sliders.cap_rate);
   // NOI is after property tax (bill 7: improvements exempt, land-only tax)
   // bill 7's 15yr improvement exemption applies only while the affordable rent is 80% AMI or less
   const tax_exempt = Number(String(affordable_ami).replace("ami_", "")) <= 80;

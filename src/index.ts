@@ -9,14 +9,18 @@ export * from "./calculations";
 // constants and helpers the gauge and calculator use directly
 export { DEFAULT_TARGET_RETURN, GRANT, zoneName } from "./calculations/calc-shared";
 
-// TOD rules (§ 21-9.100-5): eligibility, PD-T / IPD-T FAR and height, station
-// area plan ceilings, open-space bonus
+// TOD rules (§ 21-9.100-5, -8, -10): eligibility, PD-T / IPD-T FAR and height,
+// station area plan ceilings, the IMX-1 unit cap; and the open-space bonus
+// (§ 21-3.120-2(c)), which Standard, Before Ord. 26-7 and 201H also apply
 export {
   baseFar,
   calcFarPdt,
   calcFarTod,
+  IMX1_PDT_MAX_UNITS,
+  lotAfterOpenSpace,
   OPEN_SPACE_FAR_CEILING,
   openSpaceBonus,
+  openSpaceBonusOver,
   residentialUse,
   TOD_ELIGIBLE_DISTRICTS,
   TOD_MAX_FAR,

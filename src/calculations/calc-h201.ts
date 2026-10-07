@@ -6,7 +6,7 @@
 //   - User selects affordability % (≥ 50%+1 threshold)
 //   - Affordable units split proportionally between rental & sale
 //   - Surface car parking required (cost AND income)
-//   - Retail allowed only for AMX-1/2/3, BMX-2/3/4 zones
+//   - Retail allowed only for AMX-1/2/3, BMX-3/4 zones
 //   - Impact fees are a user input (default $5,000/unit, vs $1,836 default elsewhere)
 //   - Full property tax from year 1 (no exemption, unlike Bill 7's 15-yr improvement exemption)
 //   - Permit/plan-review fees apply to MARKET units only (affordable exempt)
@@ -42,6 +42,7 @@ import {
   HOLD,
   INCOME,
   LOT_COVERAGE,
+  lotAfterOpenSpace,
   mixFixtureUnits,
   mixRentByAmi,
   mixUnitSize,
@@ -73,7 +74,7 @@ export const H201_DEFAULT_LAND_COST = 200;
 export const H201_DEFAULT_PERMITTING_MO = 12;
 export const H201_DEFAULT_PERMANENT_RATE = 0.0675;
 export const H201_DEFAULT_HOLD_YEARS = 10;
-export const H201_DEFAULT_RETAIL_RENT = 65;
+export const H201_DEFAULT_RETAIL_RENT = 5;
 export const H201_DEFAULT_AFFORDABLE_AMI = "ami_80";
 export const H201_DEFAULT_MARKET_AMI = "ami_140";
 
@@ -120,7 +121,9 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
 
   // 2. BUILDABLE ENVELOPE (h201_hard)
   const floors = Math.floor(height_limit / 10);
-  const far = sliders.max_far ?? calcFAR(zone_class, lot_sqft);
+  const open_space_bonus = sliders.open_space_bonus ?? 0;
+  const far =
+    sliders.max_far ?? calcFAR(zone_class, lot_sqft) + open_space_bonus;
   const coverage = LOT_COVERAGE[zone_class] ?? 0.6;
   // waikiki precincts must keep 35–50% of the lot open; that and the coverage
   // cap are both measured on the zoning lot, so the stricter one governs
@@ -131,7 +134,9 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
     floor_height: 10,
     height_limit,
     lot_sqft,
-    coverage_plate: envelopeCoverage(zone_class, far, coverage) * lot_sqft,
+    coverage_plate:
+      envelopeCoverage(zone_class, far, coverage) *
+      lotAfterOpenSpace(lot_sqft, open_space_bonus),
     setback,
     stepback: stepBackOf(sliders, zoneStepBack(zone_class)),
   });
@@ -310,7 +315,7 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
   const retail_noi = retail_egi - retail_opex - tax.retail_tax;
   const noi = residential_noi + retail_noi;
 
-  const cap_rate = resolveCapRate(zone_class, sliders.cap_rate);
+  const cap_rate = resolveCapRate(sliders.cap_rate);
 
   const rental_gdv = residential_noi / cap_rate;
   let retail_gdv_val = 0;

@@ -3,7 +3,8 @@
 // The model (calcSingle) takes one flat set of inputs. For a real parcel, the
 // lot size and zone come from the parcel, but its height limit and FAR depend
 // on the pathway: Bill 6 has its own FAR schedule, Bill 7 caps height at 60 ft
-// and sets FAR 4.0, TOD applies the PD-T / IPD-T rules of § 21-9.100-5, and a
+// and sets FAR 4.0, TOD applies the PD-T / IPD-T rules of § 21-9.100-5, -8
+// and -10, Standard, Before Ord. 26-7 and 201H add the open-space bonus, and a
 // parcel with no recorded height gets the pathway's default (TOD excepted:
 // those parcels are reported as not modeled). These rules used to live in the
 // Policy Gauge (and, for FAR, again in the Development Calculator); here they
@@ -25,8 +26,11 @@ import {
   calcFarBill6,
   calcFarPdt,
   calcFarTod,
+  IMX1_PDT_MAX_UNITS,
   openSpaceBonus,
+  openSpaceBonusOver,
   residentialUse,
+  todHeightLimit,
   todHeightPdt,
   todPlanCeiling,
   TOD_ELIGIBLE_DISTRICTS,
@@ -53,8 +57,9 @@ export interface Parcel {
   height: number;
 
   // ── TOD pathway only ───────────────────────────────────────────────────
-  /** PD-T inside the six adopted TOD special districts, IPD-T outside them;
-   *  absent = no transit permit available */
+  /** PD-T inside an adopted TOD special district (Waipahu, Aiea-Pearl City,
+   *  Halawa, and East Kapolei lots with a parenthetical height), IPD-T in the
+   *  other station areas; absent = no transit permit available */
   tod_regime?: "pdt" | "ipdt";
   /** entirely within the state land use urban district, § 21-9.100-5(b)(4) */
   slu_urban?: boolean;
@@ -73,40 +78,47 @@ export interface Envelope {
   max_far: number;
   /** TOD: where the FAR and height came from (they can differ in source) */
   far_source?: "base" | "ipdt_formula" | "plan_ceiling" | "pdt_ladder";
-  height_source?: "base" | "ipdt_doubling" | "plan_cap" | "pdt_map_bonus";
+  height_source?:
+    | "base"
+    | "ipdt_doubling"
+    | "plan_cap"
+    | "pdt_minor_sd"
+    | "pdt_major_sd"
+    | "pdt_map_bonus";
   /**
    * TOD: whether the parcel can use the transit permit. "not_modeled" means
-   * the governing rules are not loaded for it: leave it out of totals rather
-   * than counting it as infeasible.
+   * the governing rules are not loaded for it, and "not_applicable" that
+   * housing is not permitted at this tier: leave both out of totals rather
+   * than counting them as infeasible.
    */
-  status?: "eligible" | "ineligible" | "not_modeled";
+  status?: "eligible" | "ineligible" | "not_modeled" | "not_applicable";
   status_reason?: string;
+  /** a legal cap on dwelling units (TOD: IMX-1 under PD-T) */
+  max_units?: number;
+  /** FAR earned by public open space; its ground is given up at 5:1 */
+  open_space_bonus?: number;
 }
 
-/** TOD entitlement tier. "with_benefits" is a ceiling: the community
- *  benefits that buy it are not priced. */
-export type TodTier = "base" | "with_benefits";
+/** Permit tiers, least to most. Minor and major special district permits
+ *  exist only inside the TOD special districts (PD-T); IPD-T treats them as
+ *  base. "with_benefits" is PD-T or IPD-T approval. Every tier above base is a
+ *  ceiling: the benefits that buy it are not priced. */
+export type TodTier = "base" | "minor_sd" | "major_sd" | "with_benefits";
 
-/** Options for the TOD pathway; the other pathways ignore them. */
 export interface TodEnvelopeOpts {
-  /** default "base" */
   tier?: TodTier;
-  /** § 21-3.120-2(b) open-space bonus, in FAR. IPD-T only. */
+  /** § 21-3.120-2(b) bonus, in FAR. IPD-T only. */
   density_bonus?: number;
-  /** TOD zoning map parenthetical, PD-T only; defaults to the parcel's */
+  /** TOD zoning map parenthetical, PD-T only */
   map_bonus_height?: number;
+  /** PD-T approval with no parenthetical on the map: the major permit height
+   *  (generous) instead of the zoned height (strict, § 21-9.100-10(c)(2)) */
+  generous_height?: boolean;
 }
 
-// height used when a parcel has no recorded height (not TOD: see todEnvelope)
-const DEFAULT_HEIGHT: Record<Exclude<ProgramId, "tod">, number> = {
-  bill6: BILL6_DEFAULT_HEIGHT_LIMIT,
-  bill7: BILL7_DEFAULT_HEIGHT_LIMIT,
-  standard: STD_DEFAULT_HEIGHT_LIMIT,
-  h201: H201_DEFAULT_HEIGHT_LIMIT,
-};
+const INDUSTRIAL_ZONES = ["I-1", "I-2", "I-3", "IMX-1"];
 
-/** Why a parcel can't use the TOD transit permit; null when it clears every
- *  § 21-9.100-5(b) gate. */
+/** null when the parcel clears every § 21-9.100-5(b) gate */
 export function todIneligibleReason(parcel: Parcel): string | null {
   if (!parcel.tod_regime) return "outside every TOD special district boundary";
   if (!TOD_ELIGIBLE_DISTRICTS.includes(parcel.zone_class))
@@ -115,14 +127,31 @@ export function todIneligibleReason(parcel: Parcel): string | null {
     return "below the 20,000 sqft minimum project size";
   if (parcel.slu_urban === false)
     return "not entirely within the state land use urban district";
-  if (residentialUse(parcel.zone_class, parcel.tod_regime) === "not_permitted")
-    return `multi-unit dwelling is not permitted in ${parcel.zone_class} under PD-T`;
   return null;
 }
 
-// TOD's envelope: PD-T inside the adopted special districts, IPD-T outside
-// them; the parcel decides, not the user
-function todEnvelope(parcel: Parcel, opts: TodEnvelopeOpts): Envelope {
+/** null unless housing is not permitted in the zone at this tier */
+export function todNotApplicableReason(
+  parcel: Parcel,
+  tier: TodTier
+): string | null {
+  if (!parcel.tod_regime || !INDUSTRIAL_ZONES.includes(parcel.zone_class))
+    return null;
+  if (residentialUse(parcel.zone_class, parcel.tod_regime) === "not_permitted")
+    return `multi-unit dwelling is not permitted in ${parcel.zone_class} under PD-T`;
+  // IPD-T has no special district permits: anything short of approval is base
+  if (parcel.tod_regime === "pdt" ? tier !== "base" : tier === "with_benefits")
+    return null;
+  // Table 21-9.8: housing in IMX-1 needs a minor special district permit
+  if (parcel.tod_regime === "pdt")
+    return "IMX-1: housing needs a minor special district permit (Table 21-9.8)";
+  return `housing in ${parcel.zone_class} needs IPD-T approval`;
+}
+
+function todEnvelope(
+  parcel: Parcel,
+  opts: TodEnvelopeOpts = {}
+): Envelope {
   const tier = opts.tier ?? "base";
   const base_height = parcel.height;
 
@@ -137,7 +166,28 @@ function todEnvelope(parcel: Parcel, opts: TodEnvelopeOpts): Envelope {
     };
   }
 
-  const reason = todIneligibleReason(parcel);
+  const not_applicable = todNotApplicableReason(parcel, tier);
+  if (not_applicable) {
+    return {
+      height_limit: base_height,
+      max_far: baseFar(parcel.zone_class, parcel.lot_sqft),
+      far_source: "base",
+      height_source: "base",
+      status: "not_applicable",
+      status_reason: not_applicable,
+      max_units: 0,
+    };
+  }
+
+  // § 21-9.100-10(a)(1): the 20,000 sqft minimum is for PD-T approval; minor
+  // and major special district permits have none
+  const sd_permit =
+    parcel.tod_regime === "pdt" && (tier === "minor_sd" || tier === "major_sd");
+  const reason = todIneligibleReason(
+    sd_permit
+      ? { ...parcel, lot_sqft: Math.max(parcel.lot_sqft, TOD_MIN_LOT_SQFT) }
+      : parcel
+  );
   if (reason) {
     return {
       height_limit: base_height,
@@ -150,15 +200,59 @@ function todEnvelope(parcel: Parcel, opts: TodEnvelopeOpts): Envelope {
   }
 
   if (parcel.tod_regime === "pdt") {
-    const route = tier === "with_benefits" ? "pdt" : "minor_sd";
     const map_bonus = opts.map_bonus_height ?? parcel.tod_map_bonus_height;
+    const imx1 = parcel.zone_class === "IMX-1";
+    // by right: the underlying zoning, with no open-space bonus inside a TOD
+    // special district (§ 21-9.100-8(a)(1)(B))
+    if (tier === "base") {
+      return {
+        height_limit: base_height,
+        max_far: baseFar(parcel.zone_class, parcel.lot_sqft),
+        far_source: "base",
+        height_source: "base",
+        status: "eligible",
+      };
+    }
+    // minor or major special district permit, or PD-T approval
+    // (§ 21-9.100-8(a)(1)(A), (D); § 21-9.100-10)
+    const route = tier === "with_benefits" ? "pdt" : tier;
+    const strict_no_bonus =
+      route === "pdt" && map_bonus == null && !opts.generous_height;
     return {
-      height_limit: todHeightPdt(base_height, route, map_bonus),
+      height_limit: strict_no_bonus
+        ? base_height
+        : todHeightPdt(base_height, route, map_bonus),
       max_far: calcFarPdt(parcel.zone_class, parcel.lot_sqft, route),
       far_source: "pdt_ladder",
-      height_source:
-        tier === "with_benefits" && map_bonus != null ? "pdt_map_bonus" : "base",
+      height_source: strict_no_bonus
+        ? "base"
+        : tier === "minor_sd"
+          ? "pdt_minor_sd"
+          : tier === "major_sd" || map_bonus == null
+            ? "pdt_major_sd"
+            : "pdt_map_bonus",
       status: "eligible",
+      // § 21-9.100-7(c)
+      ...(imx1 && {
+        max_units: IMX1_PDT_MAX_UNITS,
+        status_reason: `IMX-1 under PD-T: up to ${IMX1_PDT_MAX_UNITS} units above the ground floor, with a special district permit`,
+      }),
+    };
+  }
+
+  // IPD-T: every bonus needs community benefits (§ 21-9.100-5(g)(1)), so the
+  // base tier is the underlying zoning, with the district's open-space bonus.
+  // Special district permits don't exist outside the TOD special districts.
+  if (tier !== "with_benefits") {
+    const zoning_bonus =
+      opts.density_bonus ?? openSpaceBonus(parcel.zone_class);
+    return {
+      height_limit: base_height,
+      max_far: baseFar(parcel.zone_class, parcel.lot_sqft) + zoning_bonus,
+      far_source: "base",
+      height_source: "base",
+      status: "eligible",
+      open_space_bonus: zoning_bonus,
     };
   }
 
@@ -166,29 +260,39 @@ function todEnvelope(parcel: Parcel, opts: TodEnvelopeOpts): Envelope {
     parcel.station_area ?? null,
     parcel.tod_precinct ?? "tiz"
   );
-  const max_far = calcFarTod(
+  const bonus = opts.density_bonus ?? openSpaceBonus(parcel.zone_class);
+  const formula_far = calcFarTod(parcel.zone_class, parcel.lot_sqft, bonus);
+  // a station-area plan's FAR replaces the formula where it is higher, and
+  // then the open-space bonus (and its plaza) is not needed
+  const plan_far = plan.far != null && plan.far > formula_far ? plan.far : null;
+
+  // § 21-9.100-5(e)(2): a plan's height, or twice the zoned height up to
+  // 450 ft where no plan height is known; a higher zoned height prevails
+  const published = parcel.tod_map_bonus_height ?? plan.height;
+  const height_limit = todHeightLimit(
     parcel.zone_class,
     parcel.lot_sqft,
-    opts.density_bonus ?? openSpaceBonus(parcel.zone_class),
-    tier === "with_benefits" ? plan.far ?? undefined : undefined
+    base_height,
+    published ?? undefined
   );
-
-  // § 21-9.100-5(e)(2)(B): the plan maximum caps both tiers unless base is higher
-  const published = parcel.tod_map_bonus_height ?? plan.height;
-  const height_limit =
-    published != null ? Math.max(published, base_height) : base_height;
 
   return {
     height_limit,
-    max_far,
-    far_source:
-      tier === "with_benefits" && plan.far != null
-        ? "plan_ceiling"
-        : "ipdt_formula",
-    height_source: published != null ? "plan_cap" : "base",
+    max_far: plan_far ?? formula_far,
+    far_source: plan_far != null ? "plan_ceiling" : "ipdt_formula",
+    height_source: published != null ? "plan_cap" : "ipdt_doubling",
     status: "eligible",
+    open_space_bonus: plan_far != null ? 0 : bonus,
   };
 }
+
+// height used when a parcel has no recorded height (not TOD: see todEnvelope)
+const DEFAULT_HEIGHT: Record<Exclude<ProgramId, "tod">, number> = {
+  bill6: BILL6_DEFAULT_HEIGHT_LIMIT,
+  bill7: BILL7_DEFAULT_HEIGHT_LIMIT,
+  standard: STD_DEFAULT_HEIGHT_LIMIT,
+  h201: H201_DEFAULT_HEIGHT_LIMIT,
+};
 
 /**
  * The height limit and FAR a pathway gives a parcel, before any override.
@@ -205,7 +309,11 @@ export function pathwayEnvelope(
   switch (program) {
     case "bill6":
       // Bill 6 has its own FAR schedule, not the base zone lookup
-      return { height_limit: height, max_far: calcFarBill6(parcel.zone_class) };
+      return withOpenSpaceBonus(
+        parcel.zone_class,
+        height,
+        calcFarBill6(parcel.zone_class)
+      );
     case "bill7":
       return {
         height_limit: Math.min(height, BILL7_MAX_HEIGHT),
@@ -214,29 +322,41 @@ export function pathwayEnvelope(
     case "standard":
     case "h201":
     default:
-      return {
-        height_limit: height,
-        max_far: calcFAR(parcel.zone_class, parcel.lot_sqft),
-      };
+      return withOpenSpaceBonus(
+        parcel.zone_class,
+        height,
+        calcFAR(parcel.zone_class, parcel.lot_sqft)
+      );
   }
 }
 
-/** Ground the IPD-T open-space bonus consumes, at § 21-3.120-2(b)'s 5:1, sqft. */
+// the district's open-space bonus (§ 21-3.120-2(c)) on top of a pathway's own
+// FAR, earned with public open space
+function withOpenSpaceBonus(
+  zone_class: string,
+  height_limit: number,
+  far: number
+): Envelope {
+  const bonus = openSpaceBonusOver(zone_class, far);
+  return { height_limit, max_far: far + bonus, open_space_bonus: bonus };
+}
+
+/** Ground the TOD open-space bonus consumes, at 5:1, sqft. A number is the
+ *  IPD-T density bonus; otherwise the TOD envelope options. */
 export function todOpenSpaceCostSqft(
   parcel: Parcel,
-  density_bonus?: number
+  opts: TodEnvelopeOpts | number = {}
 ): number {
-  if (parcel.tod_regime !== "ipdt") return 0;
-  const bonus = density_bonus ?? openSpaceBonus(parcel.zone_class);
-  return (bonus * parcel.lot_sqft) / 5;
+  const o = typeof opts === "number" ? { density_bonus: opts } : opts;
+  return ((todEnvelope(parcel, o).open_space_bonus ?? 0) * parcel.lot_sqft) / 5;
 }
 
 /**
  * Each pathway's default assumptions: everything except the envelope (lot
  * size, zone, height limit, FAR), which comes from the parcel.
  *
- * `cap_rate` is deliberately absent: left out, the model uses the parcel's
- * zone cap rate. Pass one to apply a single rate instead.
+ * `cap_rate` is deliberately absent: left out, the model uses its flat
+ * default (5.1%). Pass one to apply a different rate.
  */
 export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
   const standard: SliderInputs = {
@@ -321,7 +441,8 @@ export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
  * `levers.height_limit` and `levers.max_far` override the pathway's envelope
  * for this parcel (a lever applied to many parcels applies one value to all).
  * Bill 7's height cap still applies: 30 ft builds to 30 ft, 75 ft to 60 ft.
- * Under TOD, IPD-T parcels also take the open-space bonus. Levers set to
+ * The open-space bonus and, under TOD, the unit cap follow the parcel's
+ * envelope, as in the gauge. Levers set to
  * `undefined` count as not set. `opts` applies to TOD only.
  */
 export function parcelInputs(
@@ -346,11 +467,10 @@ export function parcelInputs(
     max_far: set.max_far ?? envelope.max_far,
   };
   if (program === "tod") {
-    // the open-space bonus follows the parcel's regime, as the gauge does
-    inputs.open_space_bonus =
-      parcel.tod_regime === "ipdt"
-        ? opts.density_bonus ?? openSpaceBonus(parcel.zone_class)
-        : 0;
+    inputs.max_units = envelope.max_units;
+    inputs.open_space_bonus = envelope.open_space_bonus ?? 0;
+  } else if (envelope.open_space_bonus !== undefined) {
+    inputs.open_space_bonus = envelope.open_space_bonus;
   }
   return inputs;
 }
