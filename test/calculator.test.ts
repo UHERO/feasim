@@ -71,6 +71,14 @@ describe("calculator defaults", () => {
     if (inputs.max_units !== undefined) expect(r.max_units, name).toBeLessThanOrEqual(inputs.max_units);
   });
 
+  it.each(cases)("%s splits the stalls and bicycle spaces without losing any", (name, inputs) => {
+    const r = calcSingle(inputs);
+    expect((r.surface_stalls ?? 0) + (r.ground_floor_stalls ?? 0) + (r.podium_stalls ?? 0), name).toBe(
+      r.parking_stalls
+    );
+    expect((r.bicycle_short_term ?? 0) + (r.bicycle_long_term ?? 0), name).toBe(r.bicycle_spaces ?? 0);
+  });
+
   it("builds retail only where the zone permits it", () => {
     for (const [name, inputs] of cases) {
       const r = calcSingle(inputs);

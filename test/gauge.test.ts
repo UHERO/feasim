@@ -103,6 +103,17 @@ describe.each(PROGRAMS)("gauge: %s", (program) => {
     }
   });
 
+  it("splits the stalls and bicycle spaces without losing any", () => {
+    for (const { parcel, r } of results) {
+      const where = (r.surface_stalls ?? 0) + (r.ground_floor_stalls ?? 0) + (r.podium_stalls ?? 0);
+      expect(where, parcel.tmk).toBe(r.parking_stalls);
+      // a surface lot means no parking inside the building
+      if ((r.surface_stalls ?? 0) > 0) expect(where - (r.surface_stalls ?? 0), parcel.tmk).toBe(0);
+      if ((r.podium_stalls ?? 0) > 0) expect(r.podium_levels, parcel.tmk).toBeGreaterThan(0);
+      expect((r.bicycle_short_term ?? 0) + (r.bicycle_long_term ?? 0), parcel.tmk).toBe(r.bicycle_spaces ?? 0);
+    }
+  });
+
   it("builds to the parcel's envelope", () => {
     for (const { parcel, r } of results) {
       const env = pathwayEnvelope(program, parcel);

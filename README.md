@@ -80,7 +80,7 @@ The model is copied from `UHERO/analytics`:
 | Branch | Analytics commit | Includes |
 | --- | --- | --- |
 | `main` | `00640ace` (branch `gauge-v10-sakura`, 9/29/26) | The pathways as of that date |
-| `add-tests` | `da45f2df` (branch `gauge-v11-sakura`, 10/8/26) | Adds the TOD permit tiers (PD-T and IPD-T), the open-space bonus, the flat 5.1% cap rate, ground-floor and podium parking, the Article 6 parking minimums with the per-parcel exemption, loading spaces and bicycle parking, the TOD 40 ft front parking rule, BWS water charges, the loan fee, and the test suite |
+| `add-tests` | `c7d7774b` (branch `gauge-v11-sakura`, 10/9/26) | Adds the TOD permit tiers (PD-T and IPD-T), the open-space bonus, the flat 5.1% cap rate, ground-floor and podium parking, the Article 6 parking minimums with the per-parcel exemption, loading spaces and bicycle parking, the TOD 40 ft front parking rule, the parking breakdown on the output (surface, ground-floor and podium stalls; short- and long-term bicycle spaces), BWS water charges, the loan fee, and the test suite |
 
 | Here | In analytics |
 | --- | --- |

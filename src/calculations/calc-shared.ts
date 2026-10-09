@@ -1610,6 +1610,12 @@ export interface ParcelOutput {
   loading_spaces?: number;
   // § 21-6.40 bicycle parking spaces, short- and long-term
   bicycle_spaces?: number;
+  bicycle_short_term?: number;
+  bicycle_long_term?: number;
+  // where the stalls go: a surface lot, the ground floor, or podium floors
+  surface_stalls?: number;
+  ground_floor_stalls?: number;
+  podium_stalls?: number;
   // parking levels above the ground floor
   podium_levels: number;
   parking_sqft: number;
@@ -2506,6 +2512,9 @@ export function podiumEnvelope(i: {
         lobby_sqft: 0,
         units,
         stalls,
+        surface_stalls: stalls,
+        ground_floor_stalls: 0,
+        podium_stalls: 0,
         loading_spaces,
         bicycle_short_term: bicycle.short_term,
         bicycle_long_term: bicycle.long_term,
@@ -2648,6 +2657,9 @@ export function podiumEnvelope(i: {
     lobby_sqft,
     units: res.units,
     stalls,
+    surface_stalls: 0,
+    ground_floor_stalls: Math.min(stalls, ground_stalls),
+    podium_stalls: stalls - Math.min(stalls, ground_stalls),
     loading_spaces,
     bicycle_short_term: bicycle.short_term,
     bicycle_long_term: bicycle.long_term,
