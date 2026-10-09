@@ -14,6 +14,8 @@
 
 import {
   allocatePropertyTax,
+  article6Parking,
+  calcBicycleParkingCost,
   calcConstructionInterest,
   calcDevRLV,
   calcDscrMaxLoan,
@@ -41,6 +43,7 @@ import {
   floorPlates,
   HOLD,
   INCOME,
+  legalParkingRatio,
   LOT_COVERAGE,
   lotAfterOpenSpace,
   mixFixtureUnits,
@@ -115,7 +118,11 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
   const waivable_fee_basis = sliders.waivable_fee_basis ?? "market_units";
   const const_months = resolveConstMonths(zone_class, sliders.const_months);
   const hard_cost_per_sqft = sliders.hard_cost_per_sqft ?? 450;
-  const parking_ratio = sliders.parking_ratio ?? PARKING.stalls_per_unit;
+  // Article 6 minimum unless the lever is set (§ 21-6.20); no 201H
+  // exemption is assumed
+  const parking_ratio =
+    sliders.parking_ratio ??
+    (sliders.parking_exempt ? 0 : legalParkingRatio(unit_type));
   const retail_share = sliders.retail_share ?? DEFAULT_RETAIL_SHARE;
   const setback = sliders.setback ?? 10;
 
@@ -151,6 +158,7 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
     retail_share,
     unit_size,
     parking_ratio,
+    ...article6Parking(lot_sqft, sliders.parking_exempt),
   });
   const gross_residential_sqft = env.residential_sqft;
   const gross_commercial_sqft = env.retail_sqft;
@@ -189,7 +197,9 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
   const sale_units = 0;
 
   // 4. PARKING, CONSTRUCTION COSTS
-  const parking_cost = env.parking_cost;
+  const parking_cost =
+    env.parking_cost +
+    calcBicycleParkingCost(env.bicycle_short_term, env.bicycle_long_term);
   // Park land charged only on non-exempt units, ROH 22-7.3(j)(3), 201H afd rental units are exempt
   const chargeable_units = max_units - afd_rent_units;
   const park_area = calcParkArea(chargeable_units, buildable_sqft);
@@ -580,6 +590,8 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
     net_commercial_sqft,
     max_units,
     parking_stalls: env.stalls,
+    loading_spaces: env.loading_spaces,
+    bicycle_spaces: env.bicycle_short_term + env.bicycle_long_term,
     podium_levels: env.podium_levels,
     parking_sqft: env.parking_sqft,
     parking_share: env.parking_share,

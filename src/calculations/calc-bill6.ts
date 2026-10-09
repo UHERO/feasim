@@ -8,6 +8,8 @@
 
 import {
   allocatePropertyTax,
+  article6Parking,
+  calcBicycleParkingCost,
   calcConstructionInterest,
   calcDevRLV,
   calcDscrMaxLoan,
@@ -35,6 +37,7 @@ import {
   floorPlates,
   HOLD,
   INCOME,
+  legalParkingRatio,
   lotAfterOpenSpace,
   lotCoverageBill6,
   mixAffordablePrice,
@@ -88,7 +91,8 @@ function bill6Hard(
   retail_share: number,
   max_far?: number,
   stepback?: StepBack,
-  open_space_bonus = 0
+  open_space_bonus = 0,
+  parking_exempt = false
 ) {
   const floors = Math.floor(height_limit / floor_height);
 
@@ -119,6 +123,7 @@ function bill6Hard(
     retail_share,
     unit_size: mixUnitSize(unit_type),
     parking_ratio,
+    ...article6Parking(lot_sqft, parking_exempt),
   });
   const gross_residential_sqft = env.residential_sqft;
   const gross_commercial_sqft = env.retail_sqft;
@@ -143,7 +148,9 @@ function bill6Hard(
   const mkt_sale_units = 0;
   const affordable_units = afd_rent_units;
 
-  const parking_cost = env.parking_cost;
+  const parking_cost =
+    env.parking_cost +
+    calcBicycleParkingCost(env.bicycle_short_term, env.bicycle_long_term);
   // park land is charged only on units NOT exempt under §22-7.3(j)
   const chargeable_units = max_units - affordable_units;
   const park_area = calcParkArea(chargeable_units, buildable_sqft);
@@ -163,6 +170,8 @@ function bill6Hard(
     park_area,
     living_stories: env.living_stories,
     parking_stalls: env.stalls,
+    loading_spaces: env.loading_spaces,
+    bicycle_spaces: env.bicycle_short_term + env.bicycle_long_term,
     podium_levels: env.podium_levels,
     parking_sqft: env.parking_sqft,
     parking_share: env.parking_share,
@@ -592,7 +601,10 @@ export function calcbill6Single(sliders: SliderInputs): ParcelOutput {
     sliders.permitting_months ?? permittingMonthsByZone(zone_class);
   const setback = sliders.setback ?? 10;
   const hard_cost_per_sqft = sliders.hard_cost_per_sqft ?? 450;
-  const parking_ratio = sliders.parking_ratio ?? 0.5;
+  // Article 6 minimum unless the lever is set (§ 21-6.20)
+  const parking_ratio =
+    sliders.parking_ratio ??
+    (sliders.parking_exempt ? 0 : legalParkingRatio(unit_type));
   const retail_share = sliders.retail_share ?? DEFAULT_RETAIL_SHARE;
 
   // Step 1: Hard costs
@@ -611,7 +623,8 @@ export function calcbill6Single(sliders: SliderInputs): ParcelOutput {
     retail_share,
     max_far,
     stepBackOf(sliders, zoneStepBack(zone_class)),
-    sliders.open_space_bonus ?? 0
+    sliders.open_space_bonus ?? 0,
+    sliders.parking_exempt ?? false
   );
   if (hard.max_units <= 0)
     return zeroOutput("hypothetical", zone_class, lot_sqft, height_limit);
@@ -833,6 +846,8 @@ export function calcbill6Single(sliders: SliderInputs): ParcelOutput {
     net_commercial_sqft: hard.net_commercial_sqft,
     max_units: hard.max_units,
     parking_stalls: hard.parking_stalls,
+    loading_spaces: hard.loading_spaces,
+    bicycle_spaces: hard.bicycle_spaces,
     podium_levels: hard.podium_levels,
     parking_sqft: hard.parking_sqft,
     parking_share: hard.parking_share,

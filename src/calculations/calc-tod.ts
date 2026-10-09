@@ -11,6 +11,7 @@
 
 import {
   allocatePropertyTax,
+  bicycleRequired,
   calcBicycleParkingCost,
   calcConstructionInterest,
   calcDevRLV,
@@ -36,13 +37,16 @@ import {
   FEES,
   FINANCING,
   floorPlates,
+  frontStripSqft,
   HOLD,
   INCOME,
+  LOADING,
   lotCoverage,
   mixFixtureUnits,
   mixRentByAmi,
   mixUnitSize,
   PARKING,
+  PARKING_MINIMUM,
   podiumEnvelope,
   resolveCapRate,
   resolveConstMonths,
@@ -151,6 +155,16 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
     retail_share,
     unit_size,
     parking_ratio,
+    // no parking minimum near rail (§ 21-6.20(a)); loading still applies
+    joint_use: PARKING_MINIMUM.joint_use,
+    loading: lot_sqft > LOADING.min_lot_sqft,
+    // § 21-6.40(a): not required in the industrial districts
+    bicycle: bicycleRequired(zone_class),
+    front_strip_sqft: frontStripSqft(
+      lot_sqft,
+      setback,
+      sliders.front_no_parking_ft ?? 0
+    ),
     unit_cap: sliders.max_units,
   });
   const gross_residential_sqft = env.residential_sqft;
@@ -181,7 +195,9 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   const sale_units = 0;
 
   // 4. PARKING, CONTRACTOR
-  const parking_cost = calcBicycleParkingCost(max_units) + env.parking_cost;
+  const parking_cost =
+    env.parking_cost +
+    calcBicycleParkingCost(env.bicycle_short_term, env.bicycle_long_term);
   // Park land charged on non-exempt units, 22-7.3(j)(2), PDT/IPDT affordable
   const chargeable_units = max_units - affordable_units;
   const park_area = calcParkArea(chargeable_units, buildable_sqft);
@@ -573,6 +589,8 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
     net_commercial_sqft,
     max_units,
     parking_stalls: env.stalls,
+    loading_spaces: env.loading_spaces,
+    bicycle_spaces: env.bicycle_short_term + env.bicycle_long_term,
     podium_levels: env.podium_levels,
     parking_sqft: env.parking_sqft,
     parking_share: env.parking_share,

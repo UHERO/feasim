@@ -53,13 +53,28 @@ export {
   wsfcCategory,
 } from "./calculations/calc-shared";
 
-// parking (surface lot, ground floor, podium) and height step-backs
+// parking (surface lot, ground floor, podium) and height step-backs; the
+// Article 6 minimums (§ 21-6.20), joint use, loading (§ 21-6.110) and bicycle
+// parking (§ 21-6.40); the TOD special district front strip (§ 21-9.100-8(c))
 export {
+  article6Parking,
+  BICYCLE_PARKING,
+  bicycleRequired,
+  bicycleSpaces,
+  calcBicycleParkingCost,
   calcParkingIncome,
   DEFAULT_RETAIL_SHARE,
   floorPlates,
+  frontStripSqft,
+  legalParkingRatio,
+  LOADING,
+  loadingSpaces,
+  loadingSqft,
   PARKING,
+  PARKING_MINIMUM,
+  PDT_FRONT_NO_PARKING_FT,
   podiumEnvelope,
+  roundHalfUp,
   stepBackOf,
   yardFootprint,
   zoneStepBack,

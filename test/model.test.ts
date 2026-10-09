@@ -16,6 +16,18 @@ import {
   calcFarTod,
   IMX1_PDT_MAX_UNITS,
   lotAfterOpenSpace,
+  article6Parking,
+  BICYCLE_PARKING,
+  bicycleRequired,
+  bicycleSpaces,
+  calcBicycleParkingCost,
+  frontStripSqft,
+  legalParkingRatio,
+  LOADING,
+  loadingSpaces,
+  loadingSqft,
+  PDT_FRONT_NO_PARKING_FT,
+  roundHalfUp,
   openSpaceBonus,
   openSpaceBonusOver,
   todIneligibleReason,
@@ -872,12 +884,13 @@ describe("parking", () => {
     expect(calcParkingIncome(10)).toBe(10 * 100 * 12);
   });
 
-  it("defaults to 0.5 stalls per unit for Standard and Before Ord. 26-7, none elsewhere", () => {
-    expect(DEFAULT_INPUTS.bill6.parking_ratio).toBe(0.5);
-    expect(DEFAULT_INPUTS.standard.parking_ratio).toBe(0.5);
+  it("defaults to the Article 6 minimum for Standard, Before Ord. 26-7 and 201H, none for Bill 7 and TOD", () => {
+    // left unset, the model applies the legal minimum for the unit mix
+    expect(DEFAULT_INPUTS.bill6.parking_ratio).toBeUndefined();
+    expect(DEFAULT_INPUTS.standard.parking_ratio).toBeUndefined();
+    expect(DEFAULT_INPUTS.h201.parking_ratio).toBeUndefined();
     expect(DEFAULT_INPUTS.bill7.parking_ratio).toBe(0);
     expect(DEFAULT_INPUTS.tod.parking_ratio).toBe(0);
-    expect(DEFAULT_INPUTS.h201.parking_ratio).toBe(0);
   });
 
   it("builds a surface lot when the stalls fit beside a slimmer building", () => {
@@ -890,10 +903,11 @@ describe("parking", () => {
 
   it("puts stalls on the ground floor and housing on the rest of it", () => {
     const e = env(flat(3, 6000), 0.05, 20000);
-    expect(e).toMatchObject({ units: 27, stalls: 2, podium_levels: 0, lobby_sqft: 0 });
-    // two upper floors plus what the stalls leave on the ground floor
-    expect(e.residential_sqft).toBe(12000 + 6000 - 2 * 330);
-    expect(e.parking_cost).toBe(2 * 330 * 190);
+    // 0.05 x 28 = 1.4 stalls, rounded to 1 (§ 21-6.20(b)(1))
+    expect(e).toMatchObject({ units: 28, stalls: 1, podium_levels: 0, lobby_sqft: 0 });
+    // two upper floors plus what the stall leaves on the ground floor
+    expect(e.residential_sqft).toBe(12000 + 6000 - 330);
+    expect(e.parking_cost).toBe(330 * 190);
   });
 
   it("caps units by stalls rather than adding an empty podium", () => {
@@ -920,7 +934,7 @@ describe("parking", () => {
           for (const ratio of [0, 0.05, 0.25, 0.5, 1, 1.5]) {
             const e = env(flat(floors, plate), ratio, plate * far);
             expect(e.units).toBeLessThanOrEqual(prev);
-            expect(e.stalls).toBeGreaterThanOrEqual(Math.ceil(ratio * e.units - 1e-9));
+            expect(e.stalls).toBe(roundHalfUp(ratio * e.units));
             const structured = ratio > 0 && !(e.podium_levels === 0 && e.parking_sqft === e.stalls * 360);
             const groundHomes = structured && e.podium_levels === 0 && e.lobby_sqft === 0;
             const storeys = (structured && !groundHomes ? 1 + e.podium_levels : 0) + e.living_stories;
@@ -930,11 +944,96 @@ describe("parking", () => {
         }
   });
 
-  it("leaves the building unchanged with no parking", () => {
+  it("builds no stalls with no parking, keeping only loading and bicycle area", () => {
     const base: SliderInputs = { program: "bill6", zone_class: "A-2", lot_sqft: 12000, height_limit: 60 };
     const none = calcSingle({ ...base, parking_ratio: 0 });
-    expect(none).toMatchObject({ parking_stalls: 0, podium_levels: 0, parking_sqft: 0, parking_share: 0 });
+    expect(none).toMatchObject({ parking_stalls: 0, podium_levels: 0 });
+    expect(none.parking_sqft).toBeCloseTo(
+      loadingSqft(none.loading_spaces ?? 0) + (none.bicycle_spaces ?? 0) * BICYCLE_PARKING.sqft_per_space,
+      9
+    );
     expect(calcSingle({ ...base, parking_ratio: 1 }).max_units).toBeLessThanOrEqual(none.max_units);
+  });
+});
+
+// ── Article 6 parking, loading and bicycle parking (ROH Ch. 21) ────────────
+
+describe("Article 6 parking minimums", () => {
+  it("sets the legal minimum at 1 stall per 1,000 sqft of dwelling area", () => {
+    expect(legalParkingRatio("one_bb_100")).toBe(0.5);
+    expect(legalParkingRatio("studio50_1br50")).toBe(0.4);
+    expect(legalParkingRatio("two_bb_100")).toBe(0.7);
+    expect(roundHalfUp(12.5)).toBe(13);
+    expect(roundHalfUp(12.49)).toBe(12);
+  });
+
+  it("adds 1 stall per 500 sqft of retail, at 90% when housing and retail share", () => {
+    const flat = (floors: number, plate: number) => new Array(floors).fill(plate);
+    const base = { plates: flat(10, 10000), far_cap: 1e9, retail_cap: 10000, retail_share: 0.2, unit_size: 500, ...article6Parking(5000) };
+    const housing = podiumEnvelope({ ...base, retail_cap: 0, parking_ratio: 0.5 });
+    expect(housing.stalls).toBe(roundHalfUp(0.5 * housing.units));
+    const mixed = podiumEnvelope({ ...base, parking_ratio: 0.5 });
+    expect(mixed.stalls).toBe(roundHalfUp(0.9 * (0.5 * mixed.units + mixed.retail_sqft / 500)));
+    // retail stalls are required even when the housing ratio is 0
+    expect(podiumEnvelope({ ...base, parking_ratio: 0 }).stalls).toBe(roundHalfUp(2000 / 500));
+  });
+
+  it("requires no stalls on a parcel exempt under § 21-6.20(a)", () => {
+    const parcel: Parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 150 };
+    for (const program of ["bill6", "standard", "h201"] as const) {
+      const exempt = calcParcel(program, { ...parcel, parking_exempt: true }, { include_retail: true });
+      expect(exempt.parking_stalls, program).toBe(0);
+      expect(exempt.loading_spaces, program).toBeGreaterThan(0); // loading is not exempted
+      expect(calcParcel(program, parcel, { include_retail: true }).parking_stalls, program).toBeGreaterThan(0);
+    }
+  });
+
+  it("sizes loading spaces by Table 21-6.5", () => {
+    expect([19, 20, 150, 151, 300, 399, 400].map((u) => loadingSpaces(u, 0))).toEqual([0, 1, 1, 2, 2, 2, 3]);
+    expect([1999, 2000, 10001, 20001, 40001].map((r) => loadingSpaces(0, r))).toEqual([0, 1, 2, 3, 4]);
+    expect(loadingSpaces(40, 2000, 0.9)).toBe(2);
+    expect(loadingSqft(1)).toBe(161.5);
+    expect(loadingSqft(3)).toBe(420 + 2 * 161.5);
+    expect(LOADING.min_lot_sqft).toBe(7500);
+  });
+});
+
+describe("bicycle parking", () => {
+  it("follows Table 21-6.3 for housing and retail", () => {
+    expect(bicycleSpaces(40, 0, 0)).toEqual({ short_term: 4, long_term: 20 });
+    expect(bicycleSpaces(40, 2000, 4)).toEqual({ short_term: 5, long_term: 21 });
+    expect(bicycleSpaces(0, 25000, 50)).toEqual({ short_term: 13, long_term: 2 });
+    expect(bicycleSpaces(5, 0, 0)).toEqual({ short_term: 1, long_term: 3 });
+    expect(BICYCLE_PARKING.sqft_per_space).toBe(22);
+    expect(calcBicycleParkingCost(5, 21)).toBe(5 * 225 + 21 * 1250);
+  });
+
+  it("applies outside Bill 7 and the industrial districts", () => {
+    expect(bicycleRequired("BMX-3")).toBe(true);
+    for (const zone of ["I-1", "I-2", "I-3", "IMX-1"]) expect(bicycleRequired(zone)).toBe(false);
+    const inputs: Omit<SliderInputs, "program"> = { zone_class: "BMX-3", lot_sqft: 20000, height_limit: 60 };
+    for (const program of ["bill6", "standard", "h201", "tod"] as const)
+      expect(calcSingle({ ...inputs, program }).bicycle_spaces, program).toBeGreaterThan(0);
+    expect(calcSingle({ ...inputs, program: "bill7" }).bicycle_spaces ?? 0).toBe(0);
+  });
+});
+
+describe("TOD special district front strip", () => {
+  it("keeps parking out of the front 40 ft on PD-T parcels only", () => {
+    expect(PDT_FRONT_NO_PARKING_FT).toBe(40);
+    expect(frontStripSqft(20000, 10, 40)).toBeCloseTo(2400, 6);
+    const pdt: Parcel = { lot_sqft: 30000, zone_class: "BMX-3", height: 60, tod_regime: "pdt", slu_urban: true };
+    for (const tier of TIERS) expect(pathwayEnvelope("tod", pdt, { tier }).front_no_parking_ft).toBe(40);
+    expect(pathwayEnvelope("tod", { ...pdt, tod_regime: "ipdt" }).front_no_parking_ft).toBeUndefined();
+    expect(parcelInputs("tod", pdt).front_no_parking_ft).toBe(40);
+  });
+
+  it("never adds units", () => {
+    for (const lot_sqft of [10000, 30000, 100000, 250000])
+      for (const ratio of [0.5, 1]) {
+        const inputs: SliderInputs = { program: "tod", zone_class: "A-2", lot_sqft, height_limit: 40, max_far: 3, parking_ratio: ratio };
+        expect(calcSingle({ ...inputs, front_no_parking_ft: 40 }).max_units).toBeLessThanOrEqual(calcSingle(inputs).max_units);
+      }
   });
 });
 

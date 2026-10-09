@@ -307,11 +307,149 @@ export const PARKING = {
 // ground-floor retail share of the floor plate
 export const DEFAULT_RETAIL_SHARE = 0.1;
 
-// bicycle parking
-export const BICYCLE_PARKING = {
-  short_term: { ratio: 1 / 10, cost_per_space: 200, sqft_per_space: 10 },
-  long_term: { ratio: 1 / 2, cost_per_space: 750, sqft_per_space: 15 },
+// § 21-6.20 minimum off-street parking (Table 21-6.1) and § 21-6.30(g) joint
+// use (Table 21-6.2), for pathways that must provide parking
+export const PARKING_MINIMUM = {
+  // 1 stall per 1,000 sqft of private dwelling area, common areas excluded
+  residential_sqft_per_stall: 1000,
+  // Commercial 1 (retail and sales, eating and drinking, offices): 1 per 500
+  retail_sqft_per_stall: 500,
+  // housing and retail sharing the stalls and loading
+  joint_use: 0.9,
 };
+
+// § 21-6.110 off-street loading (Table 21-6.5) and § 21-6.130 space sizes
+export const LOADING = {
+  // lots of this size or less need no loading space
+  min_lot_sqft: 7500,
+  // 19 ft x 8 ft 6 in
+  small_sqft: 19 * 8.5,
+  // 35 ft x 12 ft, for a third of the spaces when more than one is required
+  large_sqft: 35 * 12,
+};
+
+// § 21-6.20(b)(1), § 21-6.110(b)(3): a fraction of 0.5 or more rounds up
+export function roundHalfUp(x: number): number {
+  return Math.floor(x + 0.5 + 1e-9);
+}
+
+/** legal minimum stalls per unit: 1 per 1,000 sqft of private dwelling area;
+ *  exempt parcels (§ 21-6.20(a)) pass `parking_exempt` instead */
+export function legalParkingRatio(unit_type: string): number {
+  return mixUnitSize(unit_type) / PARKING_MINIMUM.residential_sqft_per_stall;
+}
+
+/** Table 21-6.5: loading spaces for multifamily (by units) and retail (by
+ *  floor area), with the joint-use rate when both need one */
+export function loadingSpaces(
+  units: number,
+  retail_sqft: number,
+  joint_use = 1
+): number {
+  const multifamily =
+    units < 20
+      ? 0
+      : units <= 150
+        ? 1
+        : units <= 300
+          ? 2
+          : 2 + roundHalfUp((units - 300) / 200);
+  const retail =
+    retail_sqft < 2000
+      ? 0
+      : retail_sqft <= 10000
+        ? 1
+        : retail_sqft <= 20000
+          ? 2
+          : retail_sqft <= 40000
+            ? 3
+            : retail_sqft <= 60000
+              ? 4
+              : 4 + roundHalfUp((retail_sqft - 60000) / 50000);
+  const joint = multifamily > 0 && retail > 0 ? joint_use : 1;
+  return roundHalfUp(joint * (multifamily + retail));
+}
+
+/** § 21-6.130(a): ground area the loading spaces take, sqft */
+export function loadingSqft(spaces: number): number {
+  if (spaces <= 0) return 0;
+  if (spaces === 1) return LOADING.small_sqft;
+  const large = roundHalfUp(spaces / 3);
+  return large * LOADING.large_sqft + (spaces - large) * LOADING.small_sqft;
+}
+
+/** Article 6 inputs to podiumEnvelope for a pathway that must provide
+ *  parking: retail stalls, the joint-use rate and loading. An exempt lot
+ *  (§ 21-6.20(a)) needs no stalls but still needs loading (§ 21-6.110). */
+export function article6Parking(lot_sqft: number, parking_exempt = false) {
+  return {
+    retail_stalls_per_sqft: parking_exempt
+      ? 0
+      : 1 / PARKING_MINIMUM.retail_sqft_per_stall,
+    joint_use: PARKING_MINIMUM.joint_use,
+    loading: lot_sqft > LOADING.min_lot_sqft,
+    bicycle: true,
+  };
+}
+
+// bicycle parking
+// § 21-6.40, Table 21-6.3. Costs are installed costs per space (GoodLockers,
+// Nov 2025): a U-rack for short-term, a locker for long-term.
+export const BICYCLE_PARKING = {
+  short_term: {
+    // residential: 1 per 10 units; commercial: 1 per 2,000 sqft or portion,
+    // or 1 per 10 vehicle spaces or portion, whichever is greater
+    units_per_space: 10,
+    retail_sqft_per_space: 2000,
+    stalls_per_space: 10,
+    cost_per_space: 225,
+  },
+  long_term: {
+    // residential: 1 per 2 units; commercial: 1 per 12,000 sqft, or 1 per 30
+    // vehicle spaces or portion, whichever is greater
+    units_per_space: 2,
+    retail_sqft_per_space: 12000,
+    stalls_per_space: 30,
+    cost_per_space: 1250,
+  },
+  // § 21-6.40(d)(1): 2 ft x 6 ft, plus 5 ft clear on the 2 ft access side
+  sqft_per_space: 2 * 6 + 2 * 5,
+};
+
+/** § 21-6.40(a): the districts that require bicycle parking (apartment,
+ *  AMX, business, BMX, resort and Waikiki; not industrial) */
+export function bicycleRequired(zone_class: string): boolean {
+  return !INDUSTRIAL.includes(zone_class);
+}
+
+/** Table 21-6.3: short- and long-term spaces for the housing and the retail,
+ *  with a fraction of 0.5 or more rounded up (§ 21-6.40(b)) */
+export function bicycleSpaces(
+  units: number,
+  retail_sqft: number,
+  retail_stalls: number
+): { short_term: number; long_term: number } {
+  const st = BICYCLE_PARKING.short_term;
+  const lt = BICYCLE_PARKING.long_term;
+  const up = (x: number) => Math.ceil(x - 1e-9);
+  const retail = retail_sqft > 0;
+  const short_retail = retail
+    ? Math.max(
+        up(retail_sqft / st.retail_sqft_per_space),
+        up(retail_stalls / st.stalls_per_space)
+      )
+    : 0;
+  const long_retail = retail
+    ? Math.max(
+        retail_sqft / lt.retail_sqft_per_space,
+        up(retail_stalls / lt.stalls_per_space)
+      )
+    : 0;
+  return {
+    short_term: roundHalfUp(units / st.units_per_space + short_retail),
+    long_term: roundHalfUp(units / lt.units_per_space + long_retail),
+  };
+}
 
 // fee constants
 export const FEES = {
@@ -1426,6 +1564,12 @@ export interface SliderInputs {
   retail_share?: number;
   // parking stalls per dwelling unit
   parking_ratio?: number;
+  // § 21-6.20(a): no off-street parking required (Primary Urban Center and
+  // Ewa plan areas, within 0.5 miles of rail, TOD special districts)
+  parking_exempt?: boolean;
+  // § 21-9.100-8(c)(1): no ground-floor parking within this many feet of
+  // the front lot line (TOD special districts)
+  front_no_parking_ft?: number;
   // a legal cap on dwelling units (TOD: IMX-1 under PD-T)
   max_units?: number;
   // height step-back; off unless stepback_trigger_ft is set
@@ -1462,6 +1606,10 @@ export interface ParcelOutput {
   net_commercial_sqft: number;
   max_units: number;
   parking_stalls: number;
+  // § 21-6.110 loading spaces, in the parking area
+  loading_spaces?: number;
+  // § 21-6.40 bicycle parking spaces, short- and long-term
+  bicycle_spaces?: number;
   // parking levels above the ground floor
   podium_levels: number;
   parking_sqft: number;
@@ -2028,6 +2176,22 @@ export function yardFootprint(
   return Math.max(0, width - 2 * side) * Math.max(0, depth - front - rear);
 }
 
+// § 21-9.100-8(c)(1): no at-grade or ground-floor parking within this many
+// feet of the front lot line in a TOD special district
+export const PDT_FRONT_NO_PARKING_FT = 40;
+
+// ground inside the yards within `depth` ft of the front lot line, on the
+// same 2:1 lot fronting its short side
+export function frontStripSqft(
+  lot_sqft: number,
+  setback: number,
+  depth: number,
+  ratio = 2
+): number {
+  const width = Math.sqrt(lot_sqft / ratio);
+  return Math.max(0, width - 2 * setback) * Math.max(0, depth - setback);
+}
+
 // excavation depth by zone class
 export function excavationDepthByZone(zone_class: string): number {
   if (ZONE_GROUPS.lowDensity.includes(zone_class)) return 3;
@@ -2223,6 +2387,17 @@ export function podiumEnvelope(i: {
   retail_share: number;
   unit_size: number;
   parking_ratio: number;
+  // stalls required per sqft of ground-floor retail (Table 21-6.1); 0 for none
+  retail_stalls_per_sqft?: number;
+  // Table 21-6.2 rate when housing and retail share stalls and loading
+  joint_use?: number;
+  // § 21-6.110: reserve ground for the required loading spaces
+  loading?: boolean;
+  // § 21-6.40: reserve ground for the required bicycle parking
+  bicycle?: boolean;
+  // ground-floor area along the front where no stalls or loading may go
+  // (§ 21-9.100-8(c)); the building's frontage holds retail, lobby or housing
+  front_strip_sqft?: number;
   // a legal cap on units (Bill 7)
   max_units?: number;
   // a cap on the unit count; only the floor area those units need is built
@@ -2231,11 +2406,31 @@ export function podiumEnvelope(i: {
   const plates = i.plates;
   const floors = plates.length;
   const ground = plates[0] ?? 0;
-  const parking = i.parking_ratio > 0;
   const retail_sqft = Math.max(
     0,
     Math.min(i.retail_cap, i.retail_share * ground, i.far_cap)
   );
+  const retail_stalls = retail_sqft * (i.retail_stalls_per_sqft ?? 0);
+  const parking = i.parking_ratio > 0 || retail_stalls > 0;
+  // housing and retail share the stalls (Table 21-6.2)
+  const joint =
+    i.parking_ratio > 0 && retail_stalls > 0 ? (i.joint_use ?? 1) : 1;
+  const stallsFor = (units: number) =>
+    roundHalfUp(joint * (i.parking_ratio * units + retail_stalls));
+  // most units whose stalls fit `capacity`; stallsFor rises with units
+  const unitsFor = (capacity: number) => {
+    if (stallsFor(0) > capacity) return 0;
+    if (i.parking_ratio <= 0) return Infinity;
+    let lo = 0;
+    let hi = 1;
+    while (stallsFor(hi) <= capacity) hi *= 2;
+    while (hi - lo > 1) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (stallsFor(mid) <= capacity) lo = mid;
+      else hi = mid;
+    }
+    return lo;
+  };
   const above = new Array<number>(floors + 1).fill(0);
   for (let j = floors - 1; j >= 0; j--) above[j] = above[j + 1] + plates[j];
   // a unit-count cap limits the floor area, so only those units are built
@@ -2249,6 +2444,28 @@ export function podiumEnvelope(i: {
     };
   const stallsOn = (sqft: number) => Math.floor(sqft / PARKING.stall_sqft);
 
+  // loading spaces, sized for the most units the envelope holds
+  const most_units = Math.min(
+    Math.floor(
+      (Math.max(0, Math.min(i.far_cap, above[0]) - retail_sqft) * EFFICIENCY) /
+        i.unit_size
+    ),
+    i.max_units ?? Infinity
+  );
+  const loading_spaces = i.loading
+    ? loadingSpaces(most_units, retail_sqft, i.joint_use ?? 1)
+    : 0;
+  // § 21-6.40: bicycle parking, sized the same way
+  const bicycle = i.bicycle
+    ? bicycleSpaces(most_units, retail_sqft, retail_stalls)
+    : { short_term: 0, long_term: 0 };
+  // loading and bicycle parking take ground in the parking area
+  const loading_sqft =
+    loadingSqft(loading_spaces) +
+    (bicycle.short_term + bicycle.long_term) * BICYCLE_PARKING.sqft_per_space;
+  // the front strip keeps parking and loading behind the building's frontage
+  const front_strip = Math.min(ground, i.front_strip_sqft ?? 0);
+
   // surface lot first: if every stall fits on the ground plate a slimmer
   // building leaves open, no parking is built into the building
   if (parking) {
@@ -2260,11 +2477,14 @@ export function podiumEnvelope(i: {
       Math.floor((residential_sqft * EFFICIENCY) / i.unit_size),
       i.max_units ?? Infinity
     );
-    const stalls = Math.max(0, Math.ceil(i.parking_ratio * units - 1e-9));
+    const stalls = stallsFor(units);
     const footprint = slimFootprint(plates, residential_sqft + retail_sqft);
-    const open = Math.max(0, ground - footprint);
-    if (stalls <= Math.floor(open / PARKING.surface_stall_sqft)) {
-      const parking_sqft = stalls * PARKING.surface_stall_sqft;
+    // the building fronts the street; open ground in the strip stays unpaved
+    const open = Math.max(0, ground - Math.max(footprint, front_strip));
+    if (
+      stalls <= Math.floor((open - loading_sqft) / PARKING.surface_stall_sqft)
+    ) {
+      const parking_sqft = stalls * PARKING.surface_stall_sqft + loading_sqft;
       // the building only slims as far as the lot needs
       const built = Math.max(
         footprint,
@@ -2286,6 +2506,9 @@ export function podiumEnvelope(i: {
         lobby_sqft: 0,
         units,
         stalls,
+        loading_spaces,
+        bicycle_short_term: bicycle.short_term,
+        bicycle_long_term: bicycle.long_term,
         podium_levels: 0,
         parking_sqft,
         parking_cost: parking_sqft * PARKING.surface_cost_per_sqft,
@@ -2300,7 +2523,7 @@ export function podiumEnvelope(i: {
   const residentialAt = (podium_levels: number) => {
     const by_height = parking
       ? above[firstResidential(podium_levels)]
-      : above[0] - retail_sqft;
+      : above[0] - retail_sqft - loading_sqft;
     const residential_sqft = Math.max(
       0,
       Math.min(i.far_cap - retail_sqft, by_height)
@@ -2312,13 +2535,18 @@ export function podiumEnvelope(i: {
 
   // without a podium, the ground floor left after its stalls is housing when
   // a unit fits there
-  const ground_stalls = parking ? stallsOn(ground - retail_sqft) : 0;
+  const ground_stalls = parking
+    ? stallsOn(
+        Math.max(0, ground - loading_sqft - Math.max(retail_sqft, front_strip))
+      )
+    : 0;
   const groundLeft = (stalls: number) =>
-    Math.max(0, ground - retail_sqft - stalls * PARKING.stall_sqft);
+    Math.max(
+      0,
+      ground - retail_sqft - loading_sqft - stalls * PARKING.stall_sqft
+    );
   const groundHousing = (stalls: number) =>
     groundLeft(stalls) >= i.unit_size / EFFICIENCY ? groundLeft(stalls) : 0;
-  const stallsFor = (units: number) =>
-    Math.max(0, Math.ceil(i.parking_ratio * units - 1e-9));
   const fit = (sqft: number) =>
     Math.min(
       Math.floor((sqft * EFFICIENCY) / i.unit_size),
@@ -2337,13 +2565,19 @@ export function podiumEnvelope(i: {
             (podium_levels === 0 ? groundHousing(stalls) : 0)
         )
       );
-    const by_stalls = Math.floor(capacity / i.parking_ratio + 1e-9);
-    let units = Math.min(fit(room(0)), by_stalls);
-    for (let n = 0; n < 100; n++) {
-      const next = Math.min(fit(room(stallsFor(units))), by_stalls);
-      if (next >= units) break;
-      units = next;
+    const by_stalls = unitsFor(capacity);
+    // the most units whose stalls leave room for them; more units need more
+    // stalls and so leave less room, so the test only fails above the answer
+    const fits = (u: number) => fit(room(stallsFor(u))) >= u;
+    let lo = 0;
+    let hi = Math.min(fit(room(0)), by_stalls);
+    if (fits(hi)) lo = hi;
+    while (hi - lo > 1) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (fits(mid)) lo = mid;
+      else hi = mid;
     }
+    const units = lo;
     const sqft = room(stallsFor(units));
     const by_area = fit(sqft);
     return {
@@ -2388,9 +2622,9 @@ export function podiumEnvelope(i: {
   // ground floor too small for a unit: lobby, loading, circulation
   const lobby_sqft =
     parking && ground_housing === 0
-      ? Math.max(0, ground - retail_sqft - ground_parking_sqft)
+      ? Math.max(0, ground - retail_sqft - loading_sqft - ground_parking_sqft)
       : 0;
-  const parking_sqft = ground_parking_sqft + podium_sqft;
+  const parking_sqft = ground_parking_sqft + podium_sqft + loading_sqft;
   const gross_sqft =
     res.residential_sqft + retail_sqft + lobby_sqft + parking_sqft;
 
@@ -2414,6 +2648,9 @@ export function podiumEnvelope(i: {
     lobby_sqft,
     units: res.units,
     stalls,
+    loading_spaces,
+    bicycle_short_term: bicycle.short_term,
+    bicycle_long_term: bicycle.long_term,
     podium_levels,
     parking_sqft,
     parking_cost: parking_sqft * PARKING.cost_per_sqft,
@@ -2427,13 +2664,14 @@ export function calcParkingIncome(stalls: number): number {
   return stalls * PARKING.monthly_rent_per_stall * 12;
 }
 
-// bicycle parking: calculate total cost
-export function calcBicycleParkingCost(num_units: number): number {
-  const st_spaces = Math.round(num_units * BICYCLE_PARKING.short_term.ratio);
-  const lt_spaces = Math.round(num_units * BICYCLE_PARKING.long_term.ratio);
+// bicycle parking: racks and lockers (their floor area is in the envelope)
+export function calcBicycleParkingCost(
+  short_term: number,
+  long_term: number
+): number {
   return (
-    st_spaces * BICYCLE_PARKING.short_term.cost_per_space +
-    lt_spaces * BICYCLE_PARKING.long_term.cost_per_space
+    short_term * BICYCLE_PARKING.short_term.cost_per_space +
+    long_term * BICYCLE_PARKING.long_term.cost_per_space
   );
 }
 

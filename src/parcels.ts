@@ -1,14 +1,5 @@
-// Real parcels: turning a parcel's physical envelope into model inputs.
-//
-// The model (calcSingle) takes one flat set of inputs. For a real parcel, the
-// lot size and zone come from the parcel, but its height limit and FAR depend
-// on the pathway: Bill 6 has its own FAR schedule, Bill 7 caps height at 60 ft
-// and sets FAR 4.0, TOD applies the PD-T / IPD-T rules of § 21-9.100-5, -8
-// and -10, Standard, Before Ord. 26-7 and 201H add the open-space bonus, and a
-// parcel with no recorded height gets the pathway's default (TOD excepted:
-// those parcels are reported as not modeled). These rules used to live in the
-// Policy Gauge (and, for FAR, again in the Development Calculator); here they
-// are written once so every user of the model applies them the same way.
+// Real parcels: each pathway's envelope rules (the Policy Gauge's) and default
+// assumptions, turned into model inputs.
 
 import {
   BILL6_DEFAULT_HEIGHT_LIMIT,
@@ -27,6 +18,7 @@ import {
   calcFarPdt,
   calcFarTod,
   IMX1_PDT_MAX_UNITS,
+  PDT_FRONT_NO_PARKING_FT,
   openSpaceBonus,
   openSpaceBonusOver,
   residentialUse,
@@ -37,46 +29,40 @@ import {
   TOD_MIN_LOT_SQFT,
 } from "./calculations/calc-shared";
 
-/** Bill 7 caps the building envelope at this height, whatever the zoning. */
+/** Bill 7's height cap, ft, and statutory FAR. */
 export const BILL7_MAX_HEIGHT = 60;
-/** Bill 7's statutory FAR. */
 export const BILL7_FAR = 4.0;
 
 /** A real parcel's physical envelope. */
 export interface Parcel {
-  /** Tax map key; copied onto the output when given. */
   tmk?: string;
-  /** Lot area, sqft. */
   lot_sqft: number;
-  /** Zoning district, e.g. "A-2", "BMX-3", "Apart" (Waikīkī Apartment Precinct). */
   zone_class: string;
-  /**
-   * Zoned height limit, ft. 0 or less means unknown: the pathway default is
-   * used, except under TOD, where the parcel is reported as not modeled.
-   */
+  /** ft; 0 = unknown (pathway default, or not modeled under TOD) */
   height: number;
 
-  // ── TOD pathway only ───────────────────────────────────────────────────
-  /** PD-T inside an adopted TOD special district (Waipahu, Aiea-Pearl City,
-   *  Halawa, and East Kapolei lots with a parenthetical height), IPD-T in the
-   *  other station areas; absent = no transit permit available */
+  // TOD only
+  /** PD-T in an adopted special district, IPD-T elsewhere; absent = no permit */
   tod_regime?: "pdt" | "ipdt";
-  /** entirely within the state land use urban district, § 21-9.100-5(b)(4) */
+  /** entirely in the state land use urban district, § 21-9.100-5(b)(4) */
   slu_urban?: boolean;
-  /** PD-T only: parenthetical bonus height from the TOD zoning map, ft */
+  /** PD-T: parenthetical height on the TOD zoning map, ft */
   tod_map_bonus_height?: number;
-  /** station area, a key into TOD_PLAN_STANDARDS */
+  /** a key into TOD_PLAN_STANDARDS */
   station_area?: string;
-  /** "core" = TOD Precinct (<= 1/4 mi); "tiz" = 1/4 to 1/2 mi */
+  /** "core" <= 1/4 mi, "tiz" 1/4 to 1/2 mi */
   tod_precinct?: "core" | "tiz";
+
+  // Standard, Bill 6 and 201H
+  /** § 21-6.20(a): no off-street parking required */
+  parking_exempt?: boolean;
 }
 
 /** A pathway's own height limit and FAR for a parcel. */
 export interface Envelope {
-  /** ft */
   height_limit: number;
   max_far: number;
-  /** TOD: where the FAR and height came from (they can differ in source) */
+  /** TOD: where the FAR and height came from */
   far_source?: "base" | "ipdt_formula" | "plan_ceiling" | "pdt_ladder";
   height_source?:
     | "base"
@@ -85,24 +71,19 @@ export interface Envelope {
     | "pdt_minor_sd"
     | "pdt_major_sd"
     | "pdt_map_bonus";
-  /**
-   * TOD: whether the parcel can use the transit permit. "not_modeled" means
-   * the governing rules are not loaded for it, and "not_applicable" that
-   * housing is not permitted at this tier: leave both out of totals rather
-   * than counting them as infeasible.
-   */
+  /** TOD; leave "not_modeled" and "not_applicable" out of totals */
   status?: "eligible" | "ineligible" | "not_modeled" | "not_applicable";
   status_reason?: string;
-  /** a legal cap on dwelling units (TOD: IMX-1 under PD-T) */
+  /** TOD: IMX-1 unit cap under PD-T */
   max_units?: number;
-  /** FAR earned by public open space; its ground is given up at 5:1 */
+  /** FAR earned by public open space, its ground given up at 5:1 */
   open_space_bonus?: number;
+  /** PD-T: no ground-floor parking within this distance of the front, ft */
+  front_no_parking_ft?: number;
 }
 
-/** Permit tiers, least to most. Minor and major special district permits
- *  exist only inside the TOD special districts (PD-T); IPD-T treats them as
- *  base. "with_benefits" is PD-T or IPD-T approval. Every tier above base is a
- *  ceiling: the benefits that buy it are not priced. */
+/** Permit tiers, least to most. Minor and major permits are PD-T only (IPD-T
+ *  treats them as base); "with_benefits" is PD-T or IPD-T approval. */
 export type TodTier = "base" | "minor_sd" | "major_sd" | "with_benefits";
 
 export interface TodEnvelopeOpts {
@@ -111,8 +92,7 @@ export interface TodEnvelopeOpts {
   density_bonus?: number;
   /** TOD zoning map parenthetical, PD-T only */
   map_bonus_height?: number;
-  /** PD-T approval with no parenthetical on the map: the major permit height
-   *  (generous) instead of the zoned height (strict, § 21-9.100-10(c)(2)) */
+  /** PD-T approval without a parenthetical: major permit height, not zoned */
   generous_height?: boolean;
 }
 
@@ -149,6 +129,18 @@ export function todNotApplicableReason(
 }
 
 function todEnvelope(
+  parcel: Parcel,
+  opts: TodEnvelopeOpts = {}
+): Envelope {
+  const envelope = todTierEnvelope(parcel, opts);
+  // § 21-9.100-8(c): the special district's parking placement applies to
+  // every lot in it, whatever the tier
+  return parcel.tod_regime === "pdt"
+    ? { ...envelope, front_no_parking_ft: PDT_FRONT_NO_PARKING_FT }
+    : envelope;
+}
+
+function todTierEnvelope(
   parcel: Parcel,
   opts: TodEnvelopeOpts = {}
 ): Envelope {
@@ -294,11 +286,7 @@ const DEFAULT_HEIGHT: Record<Exclude<ProgramId, "tod">, number> = {
   h201: H201_DEFAULT_HEIGHT_LIMIT,
 };
 
-/**
- * The height limit and FAR a pathway gives a parcel, before any override.
- * This is what a parcel builds to while the height and FAR levers are left
- * alone. `opts` applies to TOD only.
- */
+/** A pathway's height limit and FAR for a parcel. `opts` is TOD only. */
 export function pathwayEnvelope(
   program: ProgramId,
   parcel: Parcel,
@@ -308,7 +296,6 @@ export function pathwayEnvelope(
   const height = parcel.height > 0 ? parcel.height : DEFAULT_HEIGHT[program];
   switch (program) {
     case "bill6":
-      // Bill 6 has its own FAR schedule, not the base zone lookup
       return withOpenSpaceBonus(
         parcel.zone_class,
         height,
@@ -330,8 +317,7 @@ export function pathwayEnvelope(
   }
 }
 
-// the district's open-space bonus (§ 21-3.120-2(c)) on top of a pathway's own
-// FAR, earned with public open space
+// § 21-3.120-2(c) open-space bonus on top of the pathway's FAR
 function withOpenSpaceBonus(
   zone_class: string,
   height_limit: number,
@@ -341,8 +327,7 @@ function withOpenSpaceBonus(
   return { height_limit, max_far: far + bonus, open_space_bonus: bonus };
 }
 
-/** Ground the TOD open-space bonus consumes, at 5:1, sqft. A number is the
- *  IPD-T density bonus; otherwise the TOD envelope options. */
+/** Ground the TOD open-space bonus uses, sqft. A number = IPD-T density bonus. */
 export function todOpenSpaceCostSqft(
   parcel: Parcel,
   opts: TodEnvelopeOpts | number = {}
@@ -351,13 +336,8 @@ export function todOpenSpaceCostSqft(
   return ((todEnvelope(parcel, o).open_space_bonus ?? 0) * parcel.lot_sqft) / 5;
 }
 
-/**
- * Each pathway's default assumptions: everything except the envelope (lot
- * size, zone, height limit, FAR), which comes from the parcel.
- *
- * `cap_rate` is deliberately absent: left out, the model uses its flat
- * default (5.1%). Pass one to apply a different rate.
- */
+/** Each pathway's default assumptions, all but the parcel's envelope. With no
+ *  `cap_rate` the model uses its flat 5.1%. */
 export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
   const standard: SliderInputs = {
     program: "standard",
@@ -373,7 +353,7 @@ export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
     waivable_fee_basis: "market_units",
     park: "in_lieu",
     setback: 10,
-    parking_ratio: 0.5,
+    // no parking_ratio: the model applies the Article 6 minimum
     permitting_months: 18,
     const_months: 12,
     leaseup_months: 9,
@@ -394,12 +374,11 @@ export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
     h201: {
       ...standard,
       program: "h201",
-      parking_ratio: 0,
       affordable_ami: "ami_120",
       market_ami: "ami_140",
       affordability: 0.51,
       hard_cost_per_sqft: 550,
-      // 201H projects are GET-exempt, so opex matches Bill 7
+      // GET-exempt, so opex matches Bill 7
       opex_ratio: 0.19,
     },
     bill7: {
@@ -416,7 +395,7 @@ export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
       hard_cost_per_sqft: 450,
       land_cost: 200,
       opex_ratio: 0.19,
-      // Bill 7 waives the city fees and park dedication (ROH 43-10.8)
+      // fees and park dedication waived (ROH 43-10.8)
       waivable_fee_basis: "none",
       park: "exempt",
       setback: 10,
@@ -435,15 +414,9 @@ export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
 })();
 
 /**
- * Model inputs for a real parcel under a pathway: the pathway's default
- * assumptions, then any `levers` the caller sets, then the parcel's envelope.
- *
- * `levers.height_limit` and `levers.max_far` override the pathway's envelope
- * for this parcel (a lever applied to many parcels applies one value to all).
- * Bill 7's height cap still applies: 30 ft builds to 30 ft, 75 ft to 60 ft.
- * The open-space bonus and, under TOD, the unit cap follow the parcel's
- * envelope, as in the gauge. Levers set to
- * `undefined` count as not set. `opts` applies to TOD only.
+ * Model inputs for a parcel: pathway defaults, then `levers` (undefined = not
+ * set), then the parcel's envelope. `levers.height_limit` / `max_far` override
+ * the envelope; Bill 7's 60 ft cap still applies. `opts` is TOD only.
  */
 export function parcelInputs(
   program: ProgramId,
@@ -469,17 +442,17 @@ export function parcelInputs(
   if (program === "tod") {
     inputs.max_units = envelope.max_units;
     inputs.open_space_bonus = envelope.open_space_bonus ?? 0;
+    inputs.front_no_parking_ft = envelope.front_no_parking_ft;
   } else if (envelope.open_space_bonus !== undefined) {
     inputs.open_space_bonus = envelope.open_space_bonus;
   }
+  // § 21-6.20(a) exemption
+  if (program === "bill6" || program === "standard" || program === "h201")
+    inputs.parking_exempt = parcel.parking_exempt;
   return inputs;
 }
 
-/**
- * One real parcel's pro forma under a pathway:
- * `calcSingle(parcelInputs(program, parcel, levers, opts))`, with the
- * parcel's TMK on the output when it has one. `opts` applies to TOD only.
- */
+/** `calcSingle(parcelInputs(...))`, with the parcel's TMK on the output. */
 export function calcParcel(
   program: ProgramId,
   parcel: Parcel,
