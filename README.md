@@ -16,9 +16,12 @@ cd policy-simulator-package
 npm install
 npm run build
 
-# then, from your own project
-npm install ../policy-simulator-package
+# then, from your own project, install it by the path where you cloned it
+npm install /absolute/path/to/policy-simulator-package
+# e.g. npm install C:/Users/you/code/policy-simulator-package
 ```
+
+A relative path such as `../policy-simulator-package` also works, but only when the package is cloned in the same folder as your project. Once the package is on the npm registry, this step becomes `npm install @uhero-data/policy-simulator`.
 
 Drop `--branch add-tests` to use `main`. Installing straight from GitHub (`npm install github:UHERO/policy-simulator-package`) also works on npm 11 and earlier, but npm 12 blocks git installs and install scripts by default.
 
