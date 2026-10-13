@@ -73,7 +73,7 @@ import {
 export const STD_DEFAULT_EQUITY = 0.3;
 export const STD_DEFAULT_HEIGHT_LIMIT = 30;
 export const STD_DEFAULT_FLOOR_HEIGHT = 10;
-export const STD_DEFAULT_LAND_COST = 200;
+export const STD_DEFAULT_LAND_COST = 130;
 export const STD_DEFAULT_PERMANENT_RATE = 0.0675;
 export const STD_DEFAULT_HOLD_YEARS = 10;
 

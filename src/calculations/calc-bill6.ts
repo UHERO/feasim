@@ -68,7 +68,7 @@ import {
 export const BILL6_DEFAULT_EQUITY = 0.3;
 export const BILL6_DEFAULT_HEIGHT_LIMIT = 30;
 export const BILL6_DEFAULT_FLOOR_HEIGHT = 10;
-export const BILL6_DEFAULT_LAND_COST = 200;
+export const BILL6_DEFAULT_LAND_COST = 130;
 export const BILL6_DEFAULT_PERMANENT_RATE = 0.0675;
 export const BILL6_DEFAULT_HOLD_YEARS = 10;
 

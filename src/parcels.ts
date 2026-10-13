@@ -348,7 +348,7 @@ export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
     retail_rent: 5,
     retail_share: 0.1,
     hard_cost_per_sqft: 450,
-    land_cost: 200,
+    land_cost: 130,
     opex_ratio: 0.3,
     waivable_fee_basis: "market_units",
     park: "in_lieu",
@@ -393,7 +393,7 @@ export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
       grant_type: "post_construct",
       grant_amount: 12000,
       hard_cost_per_sqft: 450,
-      land_cost: 200,
+      land_cost: 130,
       opex_ratio: 0.19,
       // fees and park dedication waived (ROH 43-10.8)
       waivable_fee_basis: "none",

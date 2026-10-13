@@ -58,7 +58,7 @@ export const DEFAULT_RETAIL_RENT = 3;
 export const DEFAULT_HEIGHT_LIMIT = 30;
 export const DEFAULT_PERMANENT_RATE = 0.0675;
 export const DEFAULT_HOLD_YEARS = 10;
-export const DEFAULT_LAND_COST = 200;
+export const DEFAULT_LAND_COST = 130;
 export const DEFAULT_GRANT_TYPE = "post_construct" as
   "none" | "pre_construct" | "post_construct";
 export const DEFAULT_INCLUDE_RETAIL = false;
