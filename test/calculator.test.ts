@@ -17,6 +17,7 @@ import {
   PDT_FRONT_NO_PARKING_FT,
   roundHalfUp,
   type Parcel,
+  type ParcelOutput,
   type ProgramId,
   type SliderInputs,
 } from "../src";
@@ -35,6 +36,12 @@ const TOD_CASES = {
   "tod PD-T tier 2": { regime: "pdt", tier: "major_sd" },
   "tod PD-T tier 3": { regime: "pdt", tier: "with_benefits" },
 } as const;
+
+// the soft cost line items, without their total
+function softCostItems(r: ParcelOutput) {
+  const { total, ...items } = r.soft_cost_breakdown!;
+  return { total, sum: Object.values(items).reduce((s, v) => s + v, 0) };
+}
 
 // round to 10 significant digits: floating-point math can differ in the last
 // digit across node versions
@@ -77,6 +84,16 @@ describe("calculator defaults", () => {
       r.parking_stalls
     );
     expect((r.bicycle_short_term ?? 0) + (r.bicycle_long_term ?? 0), name).toBe(r.bicycle_spaces ?? 0);
+  });
+
+  it.each(cases)("%s itemizes the soft cost", (name, inputs) => {
+    const r = calcSingle(inputs);
+    if (r.max_units === 0) return;
+    const { total, sum } = softCostItems(r);
+    expect(sum, name).toBeCloseTo(total, 6);
+    // Bill 7, TOD and 201H round soft_cost to the dollar
+    expect(Math.abs(total - r.soft_cost), name).toBeLessThan(1);
+    for (const v of Object.values(r.soft_cost_breakdown!)) expect(v, name).toBeGreaterThanOrEqual(0);
   });
 
   it("builds retail only where the zone permits it", () => {

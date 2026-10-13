@@ -643,6 +643,7 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     mkt_sale_units,
     hard_cost,
     soft_cost,
+    soft_cost_breakdown: soft,
     dev_cost: total_dev_cost,
     total_financing_cost,
     rlv_financing_cost,

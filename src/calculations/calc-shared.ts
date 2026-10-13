@@ -1628,6 +1628,9 @@ export interface ParcelOutput {
   mkt_sale_units: number;
   hard_cost: number;
   soft_cost: number;
+  // soft_cost by line item (fees, permits, water charges, construction
+  // management); absent when nothing is built
+  soft_cost_breakdown?: SoftCostBreakdown;
   dev_cost: number;
   total_financing_cost: number;
   // financing cost of the construction-only loan that RLV is computed on;

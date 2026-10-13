@@ -606,6 +606,7 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
     mkt_sale_units,
     hard_cost: Math.round(hard_cost),
     soft_cost: Math.round(soft_cost),
+    soft_cost_breakdown: soft,
     dev_cost: Math.round(dev_cost),
     total_financing_cost: Math.round(total_financing_cost),
     rlv_financing_cost: Math.round(rlv_financing_cost),

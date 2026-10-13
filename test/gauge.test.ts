@@ -114,6 +114,16 @@ describe.each(PROGRAMS)("gauge: %s", (program) => {
     }
   });
 
+  it("itemizes the soft cost", () => {
+    for (const { parcel, r } of results) {
+      if (r.max_units === 0) continue;
+      const { total, ...items } = r.soft_cost_breakdown!;
+      expect(Object.values(items).reduce((sum, v) => sum + v, 0), parcel.tmk).toBeCloseTo(total, 6);
+      // Bill 7, TOD and 201H round soft_cost to the dollar
+      expect(Math.abs(total - r.soft_cost), parcel.tmk).toBeLessThan(1);
+    }
+  });
+
   it("builds to the parcel's envelope", () => {
     for (const { parcel, r } of results) {
       const env = pathwayEnvelope(program, parcel);

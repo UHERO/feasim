@@ -98,7 +98,7 @@ Every function returns a `ParcelOutput`. Some of its fields:
 | Building | `max_units`, `buildable_sqft`, `net_residential_sqft`, `net_commercial_sqft`, `height_limit` |
 | Units | `affordable_units`, `mkt_rent_units`, `afd_rent_units`, `mkt_sale_units`, `afd_sale_units` |
 | Parking | `parking_stalls`, split into `surface_stalls`, `ground_floor_stalls` and `podium_stalls`; `podium_levels`, `loading_spaces`, `bicycle_spaces` |
-| Costs | `hard_cost`, `soft_cost`, `dev_cost`, `total_financing_cost` |
+| Costs | `hard_cost`, `soft_cost` (itemized in `soft_cost_breakdown`: permits, fees, water charges, construction management), `dev_cost`, `total_financing_cost` |
 | Income | `egi` (effective gross income), `noi` (net operating income), `gdv` (gross development value) |
 | Returns | `dev_roc` (return on cost), `dev_levered_irr`, `dev_equity_multiple`, `dev_profit`, `dev_dscr` |
 | Land | `rlv` and `rlv_sqft`: the residual land value, or the most a developer could pay for the land and still hit their target return |
@@ -240,7 +240,7 @@ UHERO's Policy Simulator dashboard is one application built on this model. Its s
 
 | Here | In `UHERO/analytics` |
 | --- | --- |
-| `src/calculations/*.ts` | `app/housing/policy/calculator/calculations/*.ts` (unchanged) |
+| `src/calculations/*.ts` | `app/housing/policy/calculator/calculations/*.ts` (unchanged, except that the output also returns `soft_cost_breakdown`) |
 | `src/feasibility.ts` | `app/housing/policy/shared/feasibility.ts` (import path only) |
 | `src/parcels.ts` | The Policy Gauge's pathway rules (`gauge/calculations/calc-*.ts`) and default assumptions (`gauge/dashboard.tsx`), as one module; identical results for every parcel |
 

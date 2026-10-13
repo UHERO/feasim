@@ -874,6 +874,7 @@ export function calcStandardSingle(sliders: SliderInputs): ParcelOutput {
     mkt_sale_units: hard.mkt_sale_units,
     hard_cost: hard_cost,
     soft_cost,
+    soft_cost_breakdown: soft,
     dev_cost: loan.total_dev_cost,
     total_financing_cost,
     rlv_financing_cost,
