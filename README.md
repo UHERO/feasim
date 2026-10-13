@@ -1,158 +1,247 @@
-# @uhero-data/policy-simulator
+# @uhero/policy-simulator
 
-UHERO's development feasibility model for Oahu housing policy pathways (Standard, Bill 7, TOD, 201H, and the pre–Ord. 26-7). Given one set of inputs describing a lot and the market and policy assumptions, it returns the project's pro forma: units, costs, income, financing, residual land value, and developer returns.
+A development feasibility model for housing on Oʻahu, from the University of Hawaiʻi Economic Research Organization (UHERO).
 
-## Important Notice
+Give it a lot (its size, zoning and height limit) and a policy pathway, such as current zoning, Bill 7 or a transit-oriented development (TOD) permit. It works out what a developer could build there, then runs the project's pro forma: units, parking, costs, rents and sales, financing, residual land value and developer returns. It finishes with a verdict: is the project strong, marginal or poor?
 
-The model's source lives in UHERO's analytics repository, to which access cannot be granted outside the organization. This package makes the model code available publicly. As of 10/7/2026 it is behind the analytics version: new features are being added there and will be brought over here in later updates. The `add-tests` branch is the most current (see [Source](#source)).
+Some things you can use it for:
+
+- **Compare pathways for one lot:** Which policy makes a project pencil?
+- **Test assumptions:** How do land cost, construction cost, interest rates or a subsidy change the answer?
+- **Run many parcels:** Map or total the housing a policy would make feasible across a district or the whole island.
+
+**Note:** The model code is in plain TypeScript with no runtime dependencies, so it runs in Node or the browser.
 
 ## Install
 
-The package is not on the npm registry yet. Clone it, build it, then install the folder into your project:
-
 ```sh
-git clone --branch add-tests https://github.com/UHERO/policy-simulator-package.git
-cd policy-simulator-package
-npm install
-npm run build
-
-# then, from your own project, install it by the path where you cloned it
-npm install /absolute/path/to/policy-simulator-package
-# e.g. npm install C:/Users/you/code/policy-simulator-package
+npm install @uhero/policy-simulator
 ```
 
-A relative path such as `../policy-simulator-package` also works, but only when the package is cloned in the same folder as your project. Once the package is on the npm registry, this step becomes `npm install @uhero-data/policy-simulator`.
+> Until the first release is on npm, install from source: clone this repo, run `npm install` and `npm run build` in it, then run `npm install /path/to/policy-simulator-package` from your project.
 
-Drop `--branch add-tests` to use `main`. Installing straight from GitHub (`npm install github:UHERO/policy-simulator-package`) also works on npm 11 and earlier, but npm 12 blocks git installs and install scripts by default.
-
-## Usage
-> **Note:** This package has two usages: multi-parcel simulation (`calcParcel`) and single-hypothetical-parcel simulation (`calcSingle`).
-
-**A real parcel under a pathway.** `calcParcel` applies the pathway's rules (ex. its FAR, Bill 7's 60 ft height cap, TOD's FAR bonus, a default height when the parcel has none) and its default assumptions, then runs the model:
+## Quick start
 
 ```ts
 import { calcParcel, overallLevel } from "@uhero-data/policy-simulator";
 
-const parcel = { tmk: "11061028", lot_sqft: 20000, zone_class: "BMX-3", height: 150 };
+// a 20,000 sqft lot zoned BMX-3 with a 150 ft height limit
+const parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 150 };
 
-const output = calcParcel("bill7", parcel);
-output.max_units;      // potential units
-output.dev_roc;        // return on cost
-overallLevel(output);  // "strong" | "marginal" | "poor"
+const result = calcParcel("standard", parcel);
 
-// change any assumption; height_limit / max_far override the envelope
-// (bill 7 still builds to at most 60 ft)
-calcParcel("bill7", parcel, { land_cost: 250, height_limit: 75 });
-
-// many parcels
-const outputs = parcels.map((p) => calcParcel("tod", p));
+// this returns your results for these example fields
+result.max_units;     
+result.dev_roc;        
+result.rlv_sqft;       
+overallLevel(result); 
 ```
 
-**Any set of inputs.** `calcSingle` is the model itself: one flat set of
-inputs in, one pro forma out. `program` picks the pathway; inputs left out
-fall back to the model's defaults.
+## Concepts
+
+### Pathways
+
+A pathway is a set of rules a project can be built under. Each pathway sets what can be built on the lot and carries its own default assumptions.
+
+| `program` | Pathway | What it changes |
+| --- | --- | --- |
+| `"standard"` | Current zoning | The zone's FAR and height under the Land Use Ordinance, with the Article 6 parking minimums |
+| `"bill6"` | Before Ord. 26-7 | The FAR rules as they stood before Ordinance 26-7 |
+| `"bill7"` | Bill 7 | An affordable housing pathway with FAR 4.0 and a 60 ft height cap, construction grants, waived impact fees, and no required parking |
+| `"tod"` | Transit-oriented development | PD-T and IPD-T permits near rail stations (ROH § 21-9.100): FAR and height bonuses by tier, station area plan limits, no required parking |
+| `"h201"` | HRS § 201H | Exemptions for affordable housing projects. The defaults make 51% of units affordable at 120% of area median income (AMI); set `affordability` and `affordable_ami` to change that. |
+
+### Parcels
+
+`calcParcel` takes a parcel:
+
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `lot_sqft` | yes | Lot area, sqft |
+| `zone_class` | yes | Zoning district, such as `"A-2"`, `"BMX-3"` or `"I-2"` |
+| `height` | yes | Height limit, ft. Use `0` if unknown, and the pathway's default is used. |
+| `tmk` | no | An ID such as the tax map key, copied onto the result |
+| `parking_exempt` | no | No off-street parking required (ROH § 21-6.20(a)). Applies to `standard`, `bill6` and `h201`. |
+| `tod_regime` | TOD | `"pdt"` (in an adopted TOD special district) or `"ipdt"` (elsewhere). Leave it out if the lot can't get a TOD permit. |
+| `slu_urban` | TOD | `true` if the lot is entirely in the State Land Use urban district |
+| `station_area`, `tod_precinct` | TOD | The rail station area, and `"core"` (within ¼ mile) or `"tiz"` (¼ to ½ mile) |
+| `tod_map_bonus_height` | TOD | PD-T: the bonus height in parentheses on the TOD zoning map, ft |
+
+### Assumptions (Levers)
+
+Everything else comes from the pathway's defaults, `DEFAULT_INPUTS[program]`. "Levers" is the name of the third argument of `calcParcel` and `parcelInputs` in `src/parcels.ts`:
+`calcParcel(program, parcel, levers = {}, opts = {})`. Change any of them by passing levers as the third argument:
+
+```ts
+calcParcel("standard", parcel, {
+  // $ per sqft of lot
+  land_cost: 250,
+  // construction, $ per sqft of building            
+  hard_cost_per_sqft: 500,
+  // permanent loan interest rate
+  permanent_rate: 0.065,
+  // equity share of the construction financing
+  equity: 0.35,
+  // ground-floor retail, where the zone permits it         
+  include_retail: true,      
+});
+```
+
+**Note:** `height_limit` and `max_far` override the pathway's envelope. Bill 7 still caps height at 60 ft. See the `SliderInputs` type for the full list, with units.
+
+### Results
+
+Every function returns a `ParcelOutput`. Some of its fields:
+
+| Group | Fields |
+| --- | --- |
+| Building | `max_units`, `buildable_sqft`, `net_residential_sqft`, `net_commercial_sqft`, `height_limit` |
+| Units | `affordable_units`, `mkt_rent_units`, `afd_rent_units`, `mkt_sale_units`, `afd_sale_units` |
+| Parking | `parking_stalls`, split into `surface_stalls`, `ground_floor_stalls` and `podium_stalls`; `podium_levels`, `loading_spaces`, `bicycle_spaces` |
+| Costs | `hard_cost`, `soft_cost`, `dev_cost`, `total_financing_cost` |
+| Income | `egi` (effective gross income), `noi` (net operating income), `gdv` (gross development value) |
+| Returns | `dev_roc` (return on cost), `dev_levered_irr`, `dev_equity_multiple`, `dev_profit`, `dev_dscr` |
+| Land | `rlv` and `rlv_sqft`: the residual land value, or the most a developer could pay for the land and still hit their target return |
+
+**Note:** Rates are fractions, so `0.058` means 5.8% and money is in dollars.
+
+### The verdict
+
+`overallLevel(result)` scores four metrics:
+
+| Metric | Poor | Marginal | Strong |
+| --- | --- | --- | --- |
+| Return on cost | more than 1 point below the target | within 1 point | at or above the target |
+| Residual land value ÷ land price | under 90% | 90–110% | 110% or more |
+| Equity multiple | under 2.0× | 2.0–2.5× | 2.5× or more |
+| Levered IRR | under 8% | 8–12% | 12% or more |
+
+The project is **poor** if half or more of the metrics are poor, **strong** if none are poor and at least three of the four are strong, and **marginal** otherwise. `rocLevel`, `rlvLevel`, `equityMultipleLevel` and `irrLevel` give each metric on its own.
+
+## Some Examples
+
+1. Compare pathways for one lot
+
+```ts
+import { calcParcel, overallLevel, type ProgramId } from "@uhero-data/policy-simulator";
+
+const parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 150 };
+
+for (const program of ["standard", "bill7", "h201", "tod"] as ProgramId[]) {
+  const r = calcParcel(program, parcel);
+  console.log(program, r.max_units, r.dev_roc, overallLevel(r));
+}
+```
+
+2. Test how sensitive a result is to land cost
+
+```ts
+for (const land_cost of [100, 200, 300]) {
+  const r = calcParcel("standard", parcel, { land_cost });
+  console.log(land_cost, overallLevel(r));
+}
+```
+
+3. Run many parcels
+
+```ts
+const results = parcels.map((p) => calcParcel("tod", p));
+const feasibleUnits = results
+  .filter((r) => overallLevel(r) === "strong")
+  .reduce((sum, r) => sum + r.max_units, 0);
+```
+
+4. Change TOD permit tiers, the fourth argument picks the tier: `"base"`, `"minor_sd"`, `"major_sd"` or `"with_benefits"`
+
+```ts
+import { calcParcel, todIneligibleReason } from "@uhero-data/policy-simulator";
+
+const site = {
+  lot_sqft: 20000, zone_class: "BMX-3", height: 150,
+  tod_regime: "pdt", slu_urban: true, tod_precinct: "core",
+} as const;
+
+// null if the lot can use a TOD permit
+todIneligibleReason(site);  
+calcParcel("tod", site, {}, { tier: "with_benefits" });
+```
+
+5. A hypothetical lot, with no parcel.
+**Note:** `calcSingle` is the model itself: one flat set of inputs in, one result out. Use it when you want to set the FAR and height yourself instead of taking them from a pathway's rules.
 
 ```ts
 import { calcSingle, DEFAULT_INPUTS } from "@uhero-data/policy-simulator";
 
-calcSingle({ ...DEFAULT_INPUTS.standard, lot_sqft: 10000, zone_class: "A-2",
-             height_limit: 40, max_far: 1.3 });
+calcSingle({
+  ...DEFAULT_INPUTS.standard,
+  lot_sqft: 10000, zone_class: "A-2", height_limit: 40, max_far: 1.3,
+});
 ```
 
-| Export | What it is |
+## API
+
+| Export | What it does |
 | --- | --- |
-| `calcParcel(program, parcel, levers?)` | a real parcel's pro forma |
-| `parcelInputs(program, parcel, levers?)` | the inputs `calcParcel` runs |
-| `pathwayEnvelope(program, parcel)` | the height limit and FAR a pathway gives a parcel |
-| `DEFAULT_INPUTS[program]` | each pathway's default assumptions; with no `cap_rate` the model's default is used (the zone's rate on `main`, a flat 5.1% on `add-tests`) |
-| `calcSingle(inputs)` | the model: `SliderInputs` in, `ParcelOutput` out |
-| `overallLevel(output)` | the feasibility verdict/output |
+| `calcParcel(program, parcel, levers?, opts?)` | Run a parcel under a pathway. `opts.tier` sets the TOD tier. |
+| `parcelInputs(program, parcel, levers?, opts?)` | The full set of inputs `calcParcel` would run, without running it |
+| `pathwayEnvelope(program, parcel, opts?)` | The height limit and FAR a pathway gives a parcel |
+| `calcSingle(inputs)` | The model: `SliderInputs` in, `ParcelOutput` out |
+| `DEFAULT_INPUTS[program]` | Each pathway's default assumptions |
+| `overallLevel(result)` | The verdict: `"strong"`, `"marginal"` or `"poor"` |
+| `todIneligibleReason(parcel)`, `todNotApplicableReason(parcel, tier)` | Why a lot can't use a TOD permit, or can't have housing at a tier |
 
-On `add-tests` only:
+The package also exports the rules behind the model, such as the zoning FAR tables, the TOD rules, the parking and loading requirements, and the water charges, for use in your own calculations. Their TypeScript types document each one.
 
-| Export | What it is |
-| --- | --- |
-| `opts` on `calcParcel`, `parcelInputs` and `pathwayEnvelope` | `opts.tier` picks the TOD tier: `base`, `minor_sd`, `major_sd` or `with_benefits` |
-| `todIneligibleReason(parcel)`, `todNotApplicableReason(parcel, tier)` | why a TOD parcel can't use the transit permit, or can't have housing at a tier |
-| `parking_exempt` on a parcel | Standard, Before Ord. 26-7 and 201H: the parcel needs no off-street parking (§ 21-6.20(a)); otherwise the Article 6 minimum applies |
+## Model notes
 
-## Source
+- The model is for only for Oahu as of 10/12/2026.
+  - The zoning, fees, rents, sale prices and costs are for the City and County of Honolulu.
+- Every pathway is rental by default
+  - The defaults are 100% rental. Set `rental_split` and `sale_split` to model for-sale units in later versions.
+- The model is designed to be a first pass feasibility screen, not an appraisal
+  - The model estimates whether a typical project could pencil, it does not design a specific building.
 
-The model is copied from `UHERO/analytics`:
+The model's logic and data sources are documented here:
 
-| Branch | Analytics commit | Includes |
-| --- | --- | --- |
-| `main` | `00640ace` (branch `gauge-v10-sakura`, 9/29/26) | The pathways as of that date |
-| `add-tests` | `c7d7774b` (branch `gauge-v11-sakura`, 10/9/26) | Adds the TOD permit tiers (PD-T and IPD-T), the open-space bonus, the flat 5.1% cap rate, ground-floor and podium parking, the Article 6 parking minimums with the per-parcel exemption, loading spaces and bicycle parking, the TOD 40 ft front parking rule, the parking breakdown on the output (surface, ground-floor and podium stalls; short- and long-term bicycle spaces), BWS water charges, the loan fee, and the test suite |
+- [Policy Simulator Documentation](https://docs.google.com/document/d/1HwELgrw0IncCjsLrZh_BB0OYnBjdNXKX-kQArnLvL5k/edit?usp=sharing): how the model works
+- [Pro-Forma Variables Spreadsheet V2](https://docs.google.com/spreadsheets/d/1qVd_1RI3wjlhwmG2LTzQK0v08qlD47YCn9gULIG-1-4/edit?usp=sharing): the variables in use and their sources
+- [Assumptions Made Tracker](https://docs.google.com/spreadsheets/d/1QqSswndNPDVZwGPuKo3mlO7poFdPswB8rq8TlTXpmyo/edit?gid=0#gid=0): assumptions made in building the policy framework
 
-| Here | In analytics |
-| --- | --- |
-| `src/calculations/*.ts` | `app/housing/policy/calculator/calculations/*.ts` (unchanged) |
-| `src/feasibility.ts` | `app/housing/policy/shared/feasibility.ts` (import path only) |
-| `src/parcels.ts` | the Policy Gauge's pathway rules (`gauge/calculations/calc-*.ts`) and default assumptions (`gauge/dashboard.tsx`), rewritten as one module; results identical to the gauge's for every parcel |
+Background reading:
 
-**Note:** the two copies must be kept in sync, make any model change in both places.
-
-## Documentation
-
-The main documentation for model logic can be found in [Policy Simulator Documentation](https://docs.google.com/document/d/1HwELgrw0IncCjsLrZh_BB0OYnBjdNXKX-kQArnLvL5k/edit?usp=sharing). Listed below are further documentation on specific assumptions and data used in the code.
-- [Pro-Forma Variables Spreadsheet V2](https://docs.google.com/spreadsheets/d/1qVd_1RI3wjlhwmG2LTzQK0v08qlD47YCn9gULIG-1-4/edit?usp=sharing)
-  - A google spreadsheet with the currently used variables and their sources
-- [Assumptions Made Tracker](https://docs.google.com/spreadsheets/d/1QqSswndNPDVZwGPuKo3mlO7poFdPswB8rq8TlTXpmyo/edit?gid=0#gid=0)
-  - Various notation on the code and assumptions made when creating the policy framework
-
-## Resources
-- [Pro Forma Variables Spreadsheet V1](https://docs.google.com/spreadsheets/d/1_sSlavakP_3b8Ssv547RV-63rOuHqrqrIfim9JED3XU/edit?usp=sharing)
-  - An older version of the Pro Forma Variables Spreadsheet with all the variables used and their sources
-- [201-H Process Summary](https://dbedt.hawaii.gov/hhfdc/files/2023/05/2023-05-18-201H-Process-FINAL.pdf)
-  - brief summary on 201-H and its requirements
-- [Parcels & Zoning Dashboard](https://cchnl.maps.arcgis.com/apps/webappviewer/index.html?id=96d4994d61cc495fa1a8524b3b116eee)
-  - Interactive webviewer for Hawaii's parcels
+- [201-H Process Summary](https://dbedt.hawaii.gov/hhfdc/files/2023/05/2023-05-18-201H-Process-FINAL.pdf): 201H and its requirements
+- [Parcels & Zoning Dashboard](https://cchnl.maps.arcgis.com/apps/webappviewer/index.html?id=96d4994d61cc495fa1a8524b3b116eee): an interactive map of Oʻahu's parcels
 - [Honolulu Inclusionary Housing Flowchart](https://miro.com/app/board/uXjVJaPZAJQ=/)
-  - Helpful Miro board depicting the inclusionary housing policy for Hawaii's housing development
-- [Development Flowchart](https://miro.com/app/live-embed/uXjVJDi57jk=/?embedMode=view_only_without_ui&moveToViewport=-2298%2C-1870%2C3822%2C2086&embedId=247174178665)
-  - Helpful Miro board outlining the housing development process
+- [Development Flowchart](https://miro.com/app/live-embed/uXjVJDi57jk=/?embedMode=view_only_without_ui&moveToViewport=-2298%2C-1870%2C3822%2C2086&embedId=247174178665): the housing development process
+- [Pro Forma Variables Spreadsheet V1](https://docs.google.com/spreadsheets/d/1_sSlavakP_3b8Ssv547RV-63rOuHqrqrIfim9JED3XU/edit?usp=sharing): the older version, with every variable and its source
 
 ## Development
 
 ```sh
 npm install          # install dev dependencies
-npm test             # run the tests (add-tests branch)
+npm test             # run the tests
 npx vitest run -u    # re-record the pinned results after a deliberate change
 npm run build        # build dist
 ```
 
 ### Tests
 
-The test suite is on the `add-tests` branch, in `test/`:
+The tests are in `test/`:
 
-- **Snapshots** pin every output of the model for each pathway: its defaults,
-  scenarios that exercise its branches (grants, the Bill 7 tax exemption, park
-  dedication, retail, impact fees, financing, envelope), and a spread of real
-  Oʻahu parcels (every zone, with the smallest, median and largest lot and the
-  tallest height) through `calcParcel`. The pinned results live in
-  `test/__snapshots__/model.test.ts.snap`, and match the Policy Gauge's results
-  exactly.
-- **Behaviour checks** that must hold whatever the numbers: the same inputs give
-  the same outputs, inputs are never modified, unit counts are whole and
-  consistent, and policy rules such as Bill 7's 60 ft cap, park waiver and the
-  TOD permit tiers (`model.test.ts`).
-- **Calculator** (`calculator.test.ts`): the inputs the Project View builds at
-  each pathway's slider defaults, with retail on and off and under each TOD
-  regime and tier (`test/data/calculator-defaults.json`). Pins the results,
-  checks the Article 6 parking defaults, and checks that the TOD and Max FAR
-  envelopes match the Policy Gauge's for the same lot.
-- **Gauge** (`gauge.test.ts`): 287 real parcels sampled from the Policy Gauge's
-  parcel files (`test/data/gauge-parcels.json`), including TOD parcels in
-  every regime, station area and industrial district, PD-T parcels with
-  parentheticals, and parcels with and without the § 21-6.20(a) parking
-  exemption. Pins the per-parcel results and totals, and checks the rules on
-  every parcel: exempt parcels build no stalls and the rest the legal minimum,
-  bicycle parking outside industrial zones, no loading on lots of 7,500 sqft or
-  less, the PD-T 40 ft front strip, the IMX-1 unit cap, and the TOD status of
-  industrial land.
+- **`model.test.ts`** pins every output of the model for each pathway: its defaults, scenarios that exercise its branches (grants, the Bill 7 tax exemption, park dedication, retail, impact fees, financing, the envelope), and a sample of Oahu parcels (every zone, with the smallest, median and largest lot and the tallest height). It also checks rules that must hold whatever the numbers. For example, the same inputs give the same outputs, inputs are never modified, unit counts are whole and consistent, and policy rules such as Bill 7's 60 ft cap, its park waiver and the TOD permit tiers.
+- **`calculator.test.ts`** runs single hypothetical lots through `calcSingle` (`test/data/calculator-defaults.json`): each pathway's defaults, with retail on and off and under each TOD regime and tier. It checks the Article 6 parking defaults, and that the FAR and height match what `pathwayEnvelope` gives the same lot.
+- **`gauge.test.ts`** runs 287 Oahu parcels through `calcParcel` (`test/data/gauge-parcels.json`), including TOD parcels in every regime, station area and industrial district, PD-T parcels with bonus heights, and parcels with and without the parking exemption. It pins the per-parcel results and totals, and checks the rules on every parcel: exempt parcels build no stalls and the rest the legal minimum, bicycle parking outside industrial zones, no loading on lots of 7,500 sqft or less, the PD-T 40 ft front strip, the IMX-1 unit cap, and the TOD status of industrial land.
 
-Any change that moves a result fails the snapshot tests, on purpose. If the
-change is intended, run `npx vitest run -u`, review the snapshot diff in git
-(it shows exactly which outputs moved, and by how much), and commit it with the
-change.
+Any change that moves a result fails the snapshot tests, on purpose. If the change is intended, run `npx vitest run -u`, review the snapshot diff in git, and commit it with the change.
+
+### Where the model comes from
+
+UHERO's Policy Simulator dashboard is one application built on this model. Its source is in UHERO's private analytics repository, and this package is the public copy.
+
+| Here | In `UHERO/analytics` |
+| --- | --- |
+| `src/calculations/*.ts` | `app/housing/policy/calculator/calculations/*.ts` (unchanged) |
+| `src/feasibility.ts` | `app/housing/policy/shared/feasibility.ts` (import path only) |
+| `src/parcels.ts` | The Policy Gauge's pathway rules (`gauge/calculations/calc-*.ts`) and default assumptions (`gauge/dashboard.tsx`), as one module; identical results for every parcel |
+
+**Note:** Currently copied from analytics commit `c7d7774b` (branch `gauge-v11-sakura`, 10/9/26). Until analytics uses this package directly, make any model change in both places.
