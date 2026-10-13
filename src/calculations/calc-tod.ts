@@ -11,11 +11,11 @@
 
 import {
   allocatePropertyTax,
+  bicycleRequired,
   calcBicycleParkingCost,
   calcConstructionInterest,
   calcDevRLV,
   calcDscrMaxLoan,
-  calcFAR,
   calcLeaseupCarry,
   calcParkArea,
   calcParkingIncome,
@@ -23,9 +23,10 @@ import {
   calcPredevEquity,
   calcPropertyTax,
   calcSoftCosts,
-  calcSurfaceParkingCost,
+  calcFarTod,
   commercialFracByZone,
   DEFAULT_PROFIT_MARGIN,
+  DEFAULT_RETAIL_SHARE,
   DEFAULT_TARGET_RETURN,
   DEFAULT_TARGET_SPREAD,
   EFFICIENCY,
@@ -35,22 +36,31 @@ import {
   EXPENSES,
   FEES,
   FINANCING,
+  floorPlates,
+  frontStripSqft,
   HOLD,
   INCOME,
+  LOADING,
   lotCoverage,
+  mixFixtureUnits,
   mixRentByAmi,
   mixUnitSize,
-  parkingRequiredSpaces,
+  PARKING,
+  PARKING_MINIMUM,
+  podiumEnvelope,
   resolveCapRate,
   resolveConstMonths,
   RETAIL_CAP_SPREAD,
   RETAIL_PREMIUM,
-  setbackFootprint,
   sizeConstructionLoan,
   solveIRR,
+  stepBackOf,
+  todHeightLimit,
+  todUseZone,
   specialDistrictTotal,
   VACANCY,
   zeroOutput,
+  zoneStepBack,
   type ParcelOutput,
   type SliderInputs,
 } from "./calc-shared";
@@ -65,12 +75,9 @@ export const TOD_DEFAULT_EQUITY = 0.3;
 export const TOD_DEFAULT_LAND_COST = 200;
 export const TOD_DEFAULT_PERMANENT_RATE = 0.0675;
 export const TOD_DEFAULT_HOLD_YEARS = 10;
-export const TOD_DEFAULT_RETAIL_RENT = 65;
+export const TOD_DEFAULT_RETAIL_RENT = 5;
 export const TOD_DEFAULT_AFFORDABLE_AMI = "ami_80";
 export const TOD_DEFAULT_MARKET_AMI = "ami_80";
-
-// TOD regulatory minimums (affordability housing)
-const TOD_MIN_AFD_RENT_FRAC = 0.15;
 
 // =========================================================
 // MAIN ENTRY: calcTodSingle
@@ -96,7 +103,7 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   const market_ami = sliders.market_ami ?? TOD_DEFAULT_MARKET_AMI;
   const construction_rate =
     sliders.construction_rate ?? FINANCING.construction_rate;
-  const permitting_months = sliders.permitting_months ?? 3;
+  const permitting_months = sliders.permitting_months ?? 18;
   const impact_fee_per_unit = sliders.impact_fee ?? FEES.impact.per_dwelling;
   const waivable_fee_basis = sliders.waivable_fee_basis ?? "market_units";
   // park dedication is only waived under Bill 7 (ROH 43-10.8); every other
@@ -105,54 +112,81 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   const const_months = resolveConstMonths(zone_class, sliders.const_months);
   const opex_ratio = sliders.opex_ratio ?? EXPENSES.opex_ratio;
   const hard_cost_per_sqft = sliders.hard_cost_per_sqft ?? 450;
+  const parking_ratio = sliders.parking_ratio ?? PARKING.stalls_per_unit;
+  const retail_share = sliders.retail_share ?? DEFAULT_RETAIL_SHARE;
   const setback = sliders.setback ?? 10;
 
   // 2. BUILDABLE ENVELOPE (tod_hard)
   const floors = Math.floor(height_limit / floor_height);
 
-  // 2× FAR bonus
-  const base_far = calcFAR(zone_class, lot_sqft);
-  const far = sliders.max_far ?? base_far * 2;
+  const far = sliders.max_far ?? calcFarTod(zone_class, lot_sqft);
   // waikiki precincts must keep 35–50% of the lot open; that and the coverage
   // cap are both measured on the zoning lot, so the stricter one governs
   const far_cap = far * lot_sqft;
-  const coverage_cap =
-    envelopeCoverage(zone_class, far, lotCoverage(zone_class)) *
-    lot_sqft *
-    floors;
-  const setback_cap = setbackFootprint(lot_sqft, setback) * floors;
-  const buildable_sqft = Math.min(far_cap, coverage_cap, setback_cap);
+  // § 21-3.120-2(b): the bonus is earned at 5:1, so it consumes ground
+  const open_space_sqft = Math.min(
+    lot_sqft,
+    ((sliders.open_space_bonus ?? 0) * lot_sqft) / 5
+  );
+  const net_lot_sqft = lot_sqft - open_space_sqft;
+  // per-storey floor plates
+  const plates = floorPlates({
+    floors,
+    floor_height,
+    height_limit,
+    lot_sqft,
+    coverage_plate:
+      envelopeCoverage(zone_class, far, lotCoverage(zone_class)) * net_lot_sqft,
+    setback,
+    stepback: stepBackOf(sliders, zoneStepBack(zone_class)),
+  });
 
-  let gross_commercial_sqft = 0;
-  let net_commercial_sqft = 0;
-  let gross_residential_sqft = buildable_sqft;
-
-  // commercial use checker, returns 0 if the selected zone isn't compatible
-  {
-    const frac = include_retail ? commercialFracByZone(zone_class) : 0;
-    if (frac > 0) {
-      gross_commercial_sqft = frac * lot_sqft;
-      gross_residential_sqft = buildable_sqft - gross_commercial_sqft;
-      net_commercial_sqft = gross_commercial_sqft * EFFICIENCY;
-    }
-  }
+  // commercial use checker, returns 0 if the selected zone isn't compatible.
+  // IPD-T imports BMX-3 uses into every district but BMX-4 (§ 21-9.100-5(d)(1)),
+  // so ground-floor commercial follows the use district, not the base district.
+  const frac = include_retail
+    ? commercialFracByZone(todUseZone(zone_class))
+    : 0;
+  const unit_size = mixUnitSize(unit_type);
+  const env = podiumEnvelope({
+    plates,
+    far_cap,
+    retail_cap: frac * lot_sqft,
+    retail_share,
+    unit_size,
+    parking_ratio,
+    // no parking minimum near rail (§ 21-6.20(a)); loading still applies
+    joint_use: PARKING_MINIMUM.joint_use,
+    loading: lot_sqft > LOADING.min_lot_sqft,
+    // § 21-6.40(a): not required in the industrial districts
+    bicycle: bicycleRequired(zone_class),
+    front_strip_sqft: frontStripSqft(
+      lot_sqft,
+      setback,
+      sliders.front_no_parking_ft ?? 0
+    ),
+    unit_cap: sliders.max_units,
+  });
+  const gross_residential_sqft = env.residential_sqft;
+  const gross_commercial_sqft = env.retail_sqft;
+  // floor area counted toward FAR; parking is excluded
+  const buildable_sqft = gross_residential_sqft + gross_commercial_sqft;
   const net_residential_sqft = gross_residential_sqft * EFFICIENCY;
+  const net_commercial_sqft = gross_commercial_sqft * EFFICIENCY;
+
   const residential_rate = hard_cost_per_sqft ?? 450;
   const retail_rate = residential_rate + RETAIL_PREMIUM;
   const building_cost =
-    gross_residential_sqft * residential_rate +
+    (gross_residential_sqft + env.lobby_sqft) * residential_rate +
     gross_commercial_sqft * retail_rate;
 
   // 3. UNITS + AFFORDABILITY VALIDATION
-  const unit_size = mixUnitSize(unit_type);
-  const max_units = Math.floor(net_residential_sqft / unit_size);
+  const max_units = env.units;
 
   if (max_units <= 0)
     return zeroOutput("hypothetical", zone_class, lot_sqft, height_limit);
 
-  // 8/26/26, for-sale units are discarded, 100% rental
-  // now 15% affordable rental at <=80% AMI, 30-year restriction
-  const afd_rent_units = Math.ceil(max_units * TOD_MIN_AFD_RENT_FRAC);
+  const afd_rent_units = 0;
   const afd_sale_units = 0;
   const mkt_rent_units = Math.max(0, max_units - afd_rent_units);
   const mkt_sale_units = 0;
@@ -162,7 +196,8 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
 
   // 4. PARKING, CONTRACTOR
   const parking_cost =
-    calcBicycleParkingCost(max_units) + calcSurfaceParkingCost(buildable_sqft);
+    env.parking_cost +
+    calcBicycleParkingCost(env.bicycle_short_term, env.bicycle_long_term);
   // Park land charged on non-exempt units, 22-7.3(j)(2), PDT/IPDT affordable
   const chargeable_units = max_units - affordable_units;
   const park_area = calcParkArea(chargeable_units, buildable_sqft);
@@ -173,6 +208,7 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   const hard_cost = hard_cost_base * cost_inflation_multiplier;
 
   // STEP 5. SOFT COSTS
+  const living_stories = env.living_stories;
   const soft = calcSoftCosts({
     hard_cost,
     lot_sqft,
@@ -186,6 +222,8 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
     impact_fee_per_unit,
     zoning_application_fee: FEES.zoning.tod_application,
     special_district_fee: specialDistrictTotal(lot_sqft),
+    living_stories,
+    fu_per_unit: mixFixtureUnits(unit_type),
   });
   const soft_cost = soft.total;
 
@@ -197,8 +235,9 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   // RLV doesn't include land, the rest do
   const financeAt = (land_in_base: number, loan_principal: number) => {
     const base = dev_cost + land_in_base;
-    const equity_amount = Math.max(0, base - loan_principal);
     const loan_fee = loan_principal * FINANCING.loan_fee;
+    // the loan fee is due at closing and paid in equity
+    const equity_amount = Math.max(0, base + loan_fee - loan_principal);
 
     // predev is drawn from the equity left after the land purchase
     const predev = calcPredevEquity(
@@ -253,7 +292,7 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
 
   // TOD: no car parking income (bicycle only)
   // 7/20/26 Trey says to implement car parking for TOD for now
-  const parking_income = calcParkingIncome(buildable_sqft);
+  const parking_income = calcParkingIncome(env.stalls);
   const admin_income =
     max_units * 0.3 * INCOME.application_fee +
     max_units * 0.7 * INCOME.lease_renewal;
@@ -269,7 +308,6 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   const retail_egi = retail_pgi - retail_vacancy_loss;
   const egi = residential_egi + retail_egi;
 
-  // 8/26/26, for-sale units are discarded, 100% rental
   const afd_sales = 0;
   const mkt_sales = 0;
   const gross_sales = 0;
@@ -288,7 +326,7 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   const noi = residential_noi + retail_noi;
 
   // GDV is gross disposition applied at point of sale only
-  const cap_rate = resolveCapRate(zone_class, sliders.cap_rate);
+  const cap_rate = resolveCapRate(sliders.cap_rate);
   const rental_gdv = residential_noi / cap_rate;
   let retail_gdv_val = 0;
   if (retail_egi > 0) {
@@ -550,7 +588,17 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
     net_residential_sqft,
     net_commercial_sqft,
     max_units,
-    parking_stalls: parkingRequiredSpaces(buildable_sqft),
+    parking_stalls: env.stalls,
+    loading_spaces: env.loading_spaces,
+    bicycle_spaces: env.bicycle_short_term + env.bicycle_long_term,
+    bicycle_short_term: env.bicycle_short_term,
+    bicycle_long_term: env.bicycle_long_term,
+    surface_stalls: env.surface_stalls,
+    ground_floor_stalls: env.ground_floor_stalls,
+    podium_stalls: env.podium_stalls,
+    podium_levels: env.podium_levels,
+    parking_sqft: env.parking_sqft,
+    parking_share: env.parking_share,
     affordable_units,
     afd_rent_units,
     mkt_rent_units,

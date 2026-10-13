@@ -14,7 +14,6 @@ export const COST_PER_ZONE: Record<string, number> = {
   "R-5": 170.5,
   "B-1": 200.0,
   "B-2": 161.21,
-  "BMX-2": 266.91,
   "BMX-3": 231.18,
   "BMX-4": 231.18,
   Apart: 161.21,
@@ -26,7 +25,7 @@ export const COST_PER_ZONE: Record<string, number> = {
 export const ZONE_GROUPS = {
   lowDensity: ["A-1", "AMX-1", "R-5"],
   // zones permitting ground floor commercial use
-  mixedUse: ["AMX-1", "AMX-2", "AMX-3", "BMX-2", "BMX-3", "BMX-4", "ApartMix"],
+  mixedUse: ["AMX-1", "AMX-2", "AMX-3", "BMX-3", "BMX-4", "ApartMix"],
   // Waikiki Special District: Apartment Precinct and Apartment Mixed Use Subprecinct
   waikiki: ["Apart", "ApartMix"],
 } satisfies Record<string, string[]>;
@@ -50,8 +49,7 @@ export function permitsGroundFloorRetail(zone_class: string): boolean {
 // ground floor commercial fraction of lot area, by zone (ROH Table 21-3.3)
 export function commercialFracByZone(zone_class: string): number {
   if (zone_class === "AMX-1") return COMMERCIAL_COVERAGE.commercial1;
-  if (zone_class === "AMX-2" || zone_class === "BMX-2")
-    return COMMERCIAL_COVERAGE.commercial2;
+  if (zone_class === "AMX-2") return COMMERCIAL_COVERAGE.commercial2;
   if (["AMX-3", "BMX-3", "BMX-4", "ApartMix"].includes(zone_class))
     return COMMERCIAL_COVERAGE.commercial3;
   return 0;
@@ -241,28 +239,8 @@ export const HOLD = {
   tax_exemption_years: 15,
 };
 
-// cap rates by zone class
-export const CAP_RATES: Record<string, number> = {
-  // metro class_c (low-rise)
-  "A-1": (0.056 + 0.059) / 2,
-  "AMX-1": (0.056 + 0.059) / 2,
-  "R-5": (0.056 + 0.059) / 2,
-  low_rise: (0.056 + 0.059) / 2,
-  // metro class_b (mid-rise)
-  "A-2": (0.0495 + 0.0524) / 2,
-  "AMX-2": (0.0495 + 0.0524) / 2,
-  "B-2": (0.0495 + 0.0524) / 2,
-  "BMX-2": (0.0495 + 0.0524) / 2,
-  mid_rise: (0.0495 + 0.0524) / 2,
-  // metro class_a (high-rise)
-  "A-3": (0.049 + 0.0517) / 2,
-  "AMX-3": (0.049 + 0.0517) / 2,
-  "BMX-3": (0.049 + 0.0517) / 2,
-  "BMX-4": (0.049 + 0.0517) / 2,
-  // Waikiki apartment precincts sit above metro class_a on their own
-  Apart: 0.054,
-  ApartMix: 0.054,
-};
+// market cap rate, the same for every zone
+export const DEFAULT_CAP_RATE = 0.051;
 
 // required return-on-cost spread over cap rate (150 bps)
 export const DEFAULT_TARGET_SPREAD = 0.015;
@@ -273,10 +251,10 @@ export const DEFAULT_TARGET_RETURN = 0.115;
 // developer profit as a margin on total project cost (dev cost + finance)
 export const DEFAULT_PROFIT_MARGIN = 0.15;
 
-// slider override if provided, else the cap rate for the zone
-export function resolveCapRate(zone_class: string, override?: number): number {
+// slider override if provided, else the market cap rate
+export function resolveCapRate(override?: number): number {
   if (override != null && override > 0) return override;
-  return CAP_RATES[zone_class] ?? CAP_RATES["low_rise"];
+  return DEFAULT_CAP_RATE;
 }
 
 // retail cap rate spread above residential cap rate
@@ -295,7 +273,6 @@ export const LOT_COVERAGE: Record<string, number> = {
   Apart: 1.0,
   ApartMix: 1.0,
   "B-2": 1.0,
-  "BMX-2": 1.0,
   "BMX-3": 1.0,
   "BMX-4": 1.0,
 };
@@ -315,18 +292,164 @@ export const GRANT = {
 
 // parking
 export const PARKING = {
-  parking_ratio: 1.0,
-  stall_sqft: 300,
+  // default stalls per dwelling unit
+  stalls_per_unit: 0,
+  // gross sqft per stall incl. drive aisles (Ulupono 2020)
+  stall_sqft: 330,
   monthly_rent_per_stall: 100,
-  surface_cost_per_sqft: 170,
-  structured_cost_per_sqft: 195,
+  // RLB Q2 2026 Honolulu above-ground parking, low end of $190–245
+  cost_per_sqft: 190,
+  // surface lot: Ulupono 2020 on-grade construction, adjusted to 2026 + margin
+  surface_stall_sqft: 360,
+  surface_cost_per_sqft: 30,
 };
 
-// bicycle parking
-export const BICYCLE_PARKING = {
-  short_term: { ratio: 1 / 10, cost_per_space: 200, sqft_per_space: 10 },
-  long_term: { ratio: 1 / 2, cost_per_space: 750, sqft_per_space: 15 },
+// ground-floor retail share of the floor plate
+export const DEFAULT_RETAIL_SHARE = 0.1;
+
+// § 21-6.20 minimum off-street parking (Table 21-6.1) and § 21-6.30(g) joint
+// use (Table 21-6.2), for pathways that must provide parking
+export const PARKING_MINIMUM = {
+  // 1 stall per 1,000 sqft of private dwelling area, common areas excluded
+  residential_sqft_per_stall: 1000,
+  // Commercial 1 (retail and sales, eating and drinking, offices): 1 per 500
+  retail_sqft_per_stall: 500,
+  // housing and retail sharing the stalls and loading
+  joint_use: 0.9,
 };
+
+// § 21-6.110 off-street loading (Table 21-6.5) and § 21-6.130 space sizes
+export const LOADING = {
+  // lots of this size or less need no loading space
+  min_lot_sqft: 7500,
+  // 19 ft x 8 ft 6 in
+  small_sqft: 19 * 8.5,
+  // 35 ft x 12 ft, for a third of the spaces when more than one is required
+  large_sqft: 35 * 12,
+};
+
+// § 21-6.20(b)(1), § 21-6.110(b)(3): a fraction of 0.5 or more rounds up
+export function roundHalfUp(x: number): number {
+  return Math.floor(x + 0.5 + 1e-9);
+}
+
+/** legal minimum stalls per unit: 1 per 1,000 sqft of private dwelling area;
+ *  exempt parcels (§ 21-6.20(a)) pass `parking_exempt` instead */
+export function legalParkingRatio(unit_type: string): number {
+  return mixUnitSize(unit_type) / PARKING_MINIMUM.residential_sqft_per_stall;
+}
+
+/** Table 21-6.5: loading spaces for multifamily (by units) and retail (by
+ *  floor area), with the joint-use rate when both need one */
+export function loadingSpaces(
+  units: number,
+  retail_sqft: number,
+  joint_use = 1
+): number {
+  const multifamily =
+    units < 20
+      ? 0
+      : units <= 150
+        ? 1
+        : units <= 300
+          ? 2
+          : 2 + roundHalfUp((units - 300) / 200);
+  const retail =
+    retail_sqft < 2000
+      ? 0
+      : retail_sqft <= 10000
+        ? 1
+        : retail_sqft <= 20000
+          ? 2
+          : retail_sqft <= 40000
+            ? 3
+            : retail_sqft <= 60000
+              ? 4
+              : 4 + roundHalfUp((retail_sqft - 60000) / 50000);
+  const joint = multifamily > 0 && retail > 0 ? joint_use : 1;
+  return roundHalfUp(joint * (multifamily + retail));
+}
+
+/** § 21-6.130(a): ground area the loading spaces take, sqft */
+export function loadingSqft(spaces: number): number {
+  if (spaces <= 0) return 0;
+  if (spaces === 1) return LOADING.small_sqft;
+  const large = roundHalfUp(spaces / 3);
+  return large * LOADING.large_sqft + (spaces - large) * LOADING.small_sqft;
+}
+
+/** Article 6 inputs to podiumEnvelope for a pathway that must provide
+ *  parking: retail stalls, the joint-use rate and loading. An exempt lot
+ *  (§ 21-6.20(a)) needs no stalls but still needs loading (§ 21-6.110). */
+export function article6Parking(lot_sqft: number, parking_exempt = false) {
+  return {
+    retail_stalls_per_sqft: parking_exempt
+      ? 0
+      : 1 / PARKING_MINIMUM.retail_sqft_per_stall,
+    joint_use: PARKING_MINIMUM.joint_use,
+    loading: lot_sqft > LOADING.min_lot_sqft,
+    bicycle: true,
+  };
+}
+
+// bicycle parking
+// § 21-6.40, Table 21-6.3. Costs are installed costs per space (GoodLockers,
+// Nov 2025): a U-rack for short-term, a locker for long-term.
+export const BICYCLE_PARKING = {
+  short_term: {
+    // residential: 1 per 10 units; commercial: 1 per 2,000 sqft or portion,
+    // or 1 per 10 vehicle spaces or portion, whichever is greater
+    units_per_space: 10,
+    retail_sqft_per_space: 2000,
+    stalls_per_space: 10,
+    cost_per_space: 225,
+  },
+  long_term: {
+    // residential: 1 per 2 units; commercial: 1 per 12,000 sqft, or 1 per 30
+    // vehicle spaces or portion, whichever is greater
+    units_per_space: 2,
+    retail_sqft_per_space: 12000,
+    stalls_per_space: 30,
+    cost_per_space: 1250,
+  },
+  // § 21-6.40(d)(1): 2 ft x 6 ft, plus 5 ft clear on the 2 ft access side
+  sqft_per_space: 2 * 6 + 2 * 5,
+};
+
+/** § 21-6.40(a): the districts that require bicycle parking (apartment,
+ *  AMX, business, BMX, resort and Waikiki; not industrial) */
+export function bicycleRequired(zone_class: string): boolean {
+  return !INDUSTRIAL.includes(zone_class);
+}
+
+/** Table 21-6.3: short- and long-term spaces for the housing and the retail,
+ *  with a fraction of 0.5 or more rounded up (§ 21-6.40(b)) */
+export function bicycleSpaces(
+  units: number,
+  retail_sqft: number,
+  retail_stalls: number
+): { short_term: number; long_term: number } {
+  const st = BICYCLE_PARKING.short_term;
+  const lt = BICYCLE_PARKING.long_term;
+  const up = (x: number) => Math.ceil(x - 1e-9);
+  const retail = retail_sqft > 0;
+  const short_retail = retail
+    ? Math.max(
+        up(retail_sqft / st.retail_sqft_per_space),
+        up(retail_stalls / st.stalls_per_space)
+      )
+    : 0;
+  const long_retail = retail
+    ? Math.max(
+        retail_sqft / lt.retail_sqft_per_space,
+        up(retail_stalls / lt.stalls_per_space)
+      )
+    : 0;
+  return {
+    short_term: roundHalfUp(units / st.units_per_space + short_retail),
+    long_term: roundHalfUp(units / lt.units_per_space + long_retail),
+  };
+}
 
 // fee constants
 export const FEES = {
@@ -340,6 +463,116 @@ export const FEES = {
   zoning: { tod_application: 15000 },
   wastewater_charge_per_esdu: 7539,
 };
+
+// =========================================================
+// BWS WATER CHARGES (one-time soft costs, paid at building permit)
+// =========================================================
+
+// Water System Facilities Charge, $/fixture unit; flat, never escalated.
+// Multi-family rates only (single-family is not used).
+export const WSFC_PER_FU = {
+  // up to 3 living stories
+  multi_low_rise: 271.27,
+  // higher than 3 living stories
+  multi_high_rise: 204.12,
+} as const;
+
+// per application
+export const WSFC_MIN_FU = 20;
+// affordable-unit waiver cap, applied per project (BWS's is 500/yr islandwide)
+export const WSFC_WAIVER_UNIT_CAP = 500;
+
+// fixture units per dwelling unit, low-flow; no dishwasher or hose bibb,
+// in-unit washer
+export const FU_PER_UNIT = {
+  bath_1: 7.5,
+  bath_1_5: 9.8,
+  bath_2: 11.4,
+} as const;
+
+// baths assumed for each unit type
+export const BATHS_BY_UNIT_TYPE: Record<string, keyof typeof FU_PER_UNIT> = {
+  studio: "bath_1",
+  one_bb: "bath_1",
+  two_bb: "bath_1_5",
+  three_bb: "bath_2",
+  four_bb: "bath_2",
+};
+
+// matches BWS's worked examples
+export const COMMON_AREA_FU = 0;
+
+// new meter cost: fire service connection charge by meter size (inches)
+export const FIRE_METER_CHARGE: Record<string, number> = {
+  "5/8": 500,
+  "3/4": 600,
+  "1": 700,
+  "1.5": 1100,
+  "2": 1700,
+  "4": 5600,
+  "6": 12100,
+  "8": 21100,
+};
+
+export function wsfcCategory(
+  living_stories: number
+): "multi_low_rise" | "multi_high_rise" {
+  return living_stories <= 3 ? "multi_low_rise" : "multi_high_rise";
+}
+
+// blended fixture units per dwelling unit for a mix key
+export function mixFixtureUnits(mix_key: string): number {
+  const mix = UNIT_MIX[mix_key] ?? UNIT_MIX["one_bb_100"];
+  return mix.reduce(
+    (sum, m) =>
+      sum + FU_PER_UNIT[BATHS_BY_UNIT_TYPE[m.type] ?? "bath_1"] * m.weight,
+    0
+  );
+}
+
+// assumed fire meter size by residential stories
+export function fireMeterSize(living_stories: number): string {
+  if (living_stories <= 3) return "4";
+  if (living_stories <= 6) return "6";
+  return "8";
+}
+
+// residential stories built: residential floor area over the floor plate
+export function livingStories(
+  gross_residential_sqft: number,
+  coverage_cap: number,
+  setback_cap: number,
+  floors: number
+): number {
+  const plate = Math.min(coverage_cap, setback_cap) / Math.max(floors, 1);
+  if (plate <= 0 || gross_residential_sqft <= 0) return 0;
+  return Math.ceil(gross_residential_sqft / plate - 1e-9);
+}
+
+// WSFC and new meter cost on the units the Impact Fees toggle doesn't waive
+export function calcWaterFees(i: {
+  max_units: number;
+  water_chargeable_units: number;
+  living_stories: number;
+  fu_per_unit: number;
+}): { wsfc: number; water_meter: number; total_fu: number } {
+  if (i.max_units <= 0) return { wsfc: 0, water_meter: 0, total_fu: 0 };
+  const rate = WSFC_PER_FU[wsfcCategory(i.living_stories)];
+  const total_fu = Math.max(
+    i.max_units * i.fu_per_unit + COMMON_AREA_FU,
+    WSFC_MIN_FU
+  );
+  const waived_units = i.max_units - i.water_chargeable_units;
+  // WSFC is waived on the fixture units of the waived units
+  const wsfc =
+    i.water_chargeable_units > 0
+      ? (total_fu - waived_units * i.fu_per_unit) * rate
+      : 0;
+  // the meter waiver is the waived units' share of all units
+  const meter_gross = FIRE_METER_CHARGE[fireMeterSize(i.living_stories)];
+  const water_meter = (meter_gross * i.water_chargeable_units) / i.max_units;
+  return { wsfc, water_meter, total_fu };
+}
 
 // =========================================================
 // HHFDC AFFORDABLE SALE PRICE TABLES
@@ -1310,6 +1543,10 @@ export interface SliderInputs {
   target_return?: number;
   profit_margin?: number;
   affordable_ami?: string;
+  /** TOD/IPD-T only: § 21-3.120-2(b) open-space FAR bonus taken, in FAR. It
+   *  costs lot_sqft/5 of ground per 1.0 FAR, so it is both an uplift and a
+   *  land cost. */
+  open_space_bonus?: number;
   market_ami?: string;
   construction_rate?: number;
   equity?: number;
@@ -1323,6 +1560,22 @@ export interface SliderInputs {
   min_dscr?: number;
   include_retail?: boolean;
   retail_rent?: number;
+  // ground-floor retail as a share of the floor plate
+  retail_share?: number;
+  // parking stalls per dwelling unit
+  parking_ratio?: number;
+  // § 21-6.20(a): no off-street parking required (Primary Urban Center and
+  // Ewa plan areas, within 0.5 miles of rail, TOD special districts)
+  parking_exempt?: boolean;
+  // § 21-9.100-8(c)(1): no ground-floor parking within this many feet of
+  // the front lot line (TOD special districts)
+  front_no_parking_ft?: number;
+  // a legal cap on dwelling units (TOD: IMX-1 under PD-T)
+  max_units?: number;
+  // height step-back; off unless stepback_trigger_ft is set
+  stepback_trigger_ft?: number;
+  stepback_above_ft?: number;
+  stepback_ft_per_10ft?: number;
   mortgage?: number;
   park?: "exempt" | "in_lieu";
   permitting_months?: number;
@@ -1353,6 +1606,21 @@ export interface ParcelOutput {
   net_commercial_sqft: number;
   max_units: number;
   parking_stalls: number;
+  // § 21-6.110 loading spaces, in the parking area
+  loading_spaces?: number;
+  // § 21-6.40 bicycle parking spaces, short- and long-term
+  bicycle_spaces?: number;
+  bicycle_short_term?: number;
+  bicycle_long_term?: number;
+  // where the stalls go: a surface lot, the ground floor, or podium floors
+  surface_stalls?: number;
+  ground_floor_stalls?: number;
+  podium_stalls?: number;
+  // parking levels above the ground floor
+  podium_levels: number;
+  parking_sqft: number;
+  // share of the building's gross area used for parking
+  parking_share: number;
   affordable_units: number;
   afd_rent_units: number;
   mkt_rent_units: number;
@@ -1453,6 +1721,9 @@ export type SoftCostInputs = {
   impact_fee_per_unit: number;
   zoning_application_fee?: number;
   special_district_fee?: number;
+  // BWS water charges
+  living_stories: number;
+  fu_per_unit: number;
 };
 
 // soft cost line items (shared across all pathways)
@@ -1461,6 +1732,8 @@ export type SoftCostBreakdown = {
   building_permit: number;
   plan_review: number;
   wastewater: number;
+  wsfc: number;
+  water_meter: number;
   temp_occupancy: number;
   park_dedication: number;
   escp: number;
@@ -1502,27 +1775,281 @@ export function calcFAR(zone_class: string, lot_sqft: number): number {
     return 1.9;
   }
   if (zone_class === "B-1") return 1.0;
-  // the open-space bonus (3.5 / 3.5 / 7.5 under § 21-3.120-2(c)) is not modeled
+  // Resort, Table 21-3.4
+  if (zone_class === "Resort" || zone_class === "ResMix" || zone_class === "ResCom") {
+    if (lot_sqft < 10000) return 0.00006 * lot_sqft + 0.4;
+    if (lot_sqft <= 30000) return 0.00002 * lot_sqft + 0.8;
+    return 1.4;
+  }
+  // Industrial, Table 21-3.5
+  if (zone_class === "I-1") return 1.0;
+  if (zone_class === "I-2" || zone_class === "I-3") return 2.5;
+  // IMX-1 § 21-3.140-1(c)(1) scales with the use mix; a residential model
+  // takes the base rung.
+  if (zone_class === "IMX-1") return 1.5;
+  // Table 21-3.4; the open-space bonus (§ 21-3.120-2(c)) is added by each
+  // pathway that allows it (openSpaceBonusOver)
   if (zone_class === "B-2" || zone_class === "BMX-3") return 2.5;
   if (zone_class === "BMX-4") return 4.0;
   return 0;
 }
 
+// ── Transit permits — see the model documentation ────────────────────────
+
+// § 21-9.100-5(b)(5)
+export const TOD_ELIGIBLE_DISTRICTS = [
+  "A-1", "A-2", "A-3",
+  "AMX-1", "AMX-2", "AMX-3",
+  "B-1", "B-2",
+  "BMX-3", "BMX-4",
+  "Resort", "ResCom", "ResMix",
+  "I-1", "I-2", "I-3",
+  "IMX-1",
+];
+
+// § 21-9.100-5(b)(3), single-lot floor
+export const TOD_MIN_LOT_SQFT = 20000;
+
+// § 21-9.100-5(e)
+export const TOD_MAX_FAR = 7.5;
+export const TOD_MAX_HEIGHT_FT = 450;
+
+/** whether the IPD-T bonuses are available at all */
+export function todEligible(zone_class: string, lot_sqft: number): boolean {
+  return (
+    TOD_ELIGIBLE_DISTRICTS.includes(zone_class) && lot_sqft >= TOD_MIN_LOT_SQFT
+  );
+}
+
+// § 21-9.100-5(d)(1). Use-driven only; the envelope keeps the real district.
+export function todUseZone(zone_class: string): string {
+  return zone_class === "BMX-4" ? "BMX-4" : "BMX-3";
+}
+
+// § 21-9.100-5(e)(1). DOUBLE_AFTER_BONUS orders it 2 x (base + bonus).
+// § 21-9.100-5(e)(1)(C): FAR doubles after the open-space bonus in these only
+const DOUBLE_AFTER_BONUS = ["B-2", "BMX-3", "BMX-4", "IMX-1"];
+
+// § 21-3.120-2(c) ceilings; the bonus is the gap from base FAR
+export const OPEN_SPACE_FAR_CEILING: Record<string, number> = {
+  "B-2": 3.5,
+  "BMX-3": 3.5,
+  "BMX-4": 7.5,
+};
+
+// Table 21-3.3 districts; calcFAR still holds older lot-scaled formulas other
+// pathways depend on, so calcFarBill6 supplies the current flat figures.
+const TABLE_21_3_3 = ["A-1", "AMX-1", "A-2", "AMX-2", "A-3", "AMX-3"];
+
+/**
+ * Base FAR by district family: Table 21-3.3 for the apartment districts,
+ * calcFAR (Table 21-3.4 and the others) for the rest.
+ */
+export function baseFar(zone_class: string, lot_sqft = 0): number {
+  if (TABLE_21_3_3.includes(zone_class)) return calcFarBill6(zone_class);
+  return calcFAR(zone_class, lot_sqft);
+}
+
+/** largest open-space bonus the district allows, in FAR */
+export function openSpaceBonus(zone_class: string): number {
+  return openSpaceBonusOver(zone_class, baseFar(zone_class));
+}
+
+/** open-space bonus on top of a pathway's own FAR, up to the district ceiling */
+export function openSpaceBonusOver(zone_class: string, far: number): number {
+  const ceiling = OPEN_SPACE_FAR_CEILING[zone_class];
+  return ceiling == null ? 0 : Math.max(0, ceiling - far);
+}
+
+/** lot left for the building once the bonus's public open space (5:1) is set aside */
+export function lotAfterOpenSpace(lot_sqft: number, bonus = 0): number {
+  return lot_sqft - Math.min(lot_sqft, (bonus * lot_sqft) / 5);
+}
+
+export function calcFarTod(
+  zone_class: string,
+  lot_sqft: number,
+  // defaults to the district ceiling; 0 = no public open space provided
+  density_bonus?: number,
+  plan_far?: number
+): number {
+  if (!todEligible(zone_class, lot_sqft)) {
+    return baseFar(zone_class, lot_sqft);
+  }
+  const base = baseFar(zone_class, lot_sqft);
+  const bonus = density_bonus ?? openSpaceBonus(zone_class);
+  const doubled = DOUBLE_AFTER_BONUS.includes(zone_class)
+    ? 2 * (base + bonus)
+    : 2 * base + bonus;
+  const capped = Math.min(doubled, TOD_MAX_FAR);
+  return plan_far != null && plan_far > capped ? plan_far : capped;
+}
+
+// § 21-9.100-8(a)(1)(A). B-1, BMX-4 and resort are absent from the ladder.
+export type TodPermitRoute = "base" | "minor_sd" | "major_sd" | "pdt";
+
+const PDT_SCALED = ["A-1", "A-2", "A-3", "AMX-1", "AMX-2", "AMX-3", "I-1", "I-2", "I-3", "IMX-1"];
+
+export function calcFarPdt(
+  zone_class: string,
+  lot_sqft: number,
+  route: TodPermitRoute = "pdt"
+): number {
+  const base = baseFar(zone_class, lot_sqft);
+  if (route === "base") return base;
+  if (zone_class === "BMX-3" || zone_class === "B-2") {
+    return route === "pdt" ? 7.0 : 3.5;
+  }
+  if (PDT_SCALED.includes(zone_class)) {
+    return route === "pdt" ? 2.0 * base : 1.2 * base;
+  }
+  // B-1, BMX-4, resort: no uplift path
+  return base;
+}
+
+// § 21-9.100-8(a)(1)(D): every route goes up to the map's parenthetical bonus
+// height where one is shown; PD-T approval reaches the parenthetical, or the
+// major permit height where the map shows none.
+export function todHeightPdt(
+  base_height: number,
+  route: TodPermitRoute = "pdt",
+  map_bonus_height?: number
+): number {
+  const major = Math.min(base_height + 120, 3 * base_height);
+  const capped = (height: number) =>
+    Math.max(
+      base_height,
+      map_bonus_height != null ? Math.min(height, map_bonus_height) : height
+    );
+  switch (route) {
+    case "base":
+      return base_height;
+    case "minor_sd":
+      return capped(Math.min(base_height + 60, 2 * base_height));
+    case "major_sd":
+      return capped(major);
+    case "pdt":
+      return Math.max(base_height, map_bonus_height ?? major);
+  }
+}
+
+// Table 21-5.1 bars multi-unit dwelling in industrial districts; IPD-T lifts
+// that via the BMX-3 use import (§ 21-9.100-5(d)(1)). Under PD-T only IMX-1
+// may have dwellings: up to 10 per zoning lot above the ground floor, with a
+// special district permit (§ 21-9.100-7(c)).
+const INDUSTRIAL = ["I-1", "I-2", "I-3", "IMX-1"];
+export const IMX1_PDT_MAX_UNITS = 10;
+
+export type ResidentialUse = "permitted" | "discretionary" | "not_permitted";
+
+export function residentialUse(
+  zone_class: string,
+  regime: "pdt" | "ipdt"
+): ResidentialUse {
+  if (!INDUSTRIAL.includes(zone_class)) return "permitted";
+  if (regime === "ipdt") return "permitted"; // BMX-3 uses imported
+  return zone_class === "IMX-1" ? "discretionary" : "not_permitted";
+}
+
+// Community-benefit ceilings by precinct. A null falls back to the
+// § 21-9.100-5(e)(1)(A) formula, correct where a plan is silent.
+export interface TodPlanStandards {
+  /** core TOD Precinct, <= 1/4 mile */
+  core_max_far: number | null;
+
+  core_max_height: number | null;
+  /** TIZ Precinct, 1/4 to 1/2 mile */
+  tiz_max_far: number | null;
+  tiz_max_height: number | null;
+  /** figures came from the quarter-mile proxy, not the plan's own polygons */
+  approximate?: boolean;
+  source: string;
+}
+
+export const TOD_PLAN_STANDARDS: Record<string, TodPlanStandards> = {
+  // Figs. 5-3 / 5-4, quarter-mile proxy
+  "Ala Moana": {
+    core_max_far: 10.0,
+    core_max_height: 400,
+    tiz_max_far: 7.0,
+    tiz_max_height: 350,
+    approximate: true,
+    source:
+      "Ala Moana Neighborhood TOD Plan Figs. 5-3 / 5-4, quarter-mile proxy; corroborated by Res. 20-174 (KCR 10.0/400ft), 17-175 (9.95/400ft), 17-221 (9.215/400ft), 20-315 (7.0/400ft)",
+  },
+  // Figs. 2-6 / 2-7, same proxy.
+  Downtown: {
+    core_max_far: 7.5,
+    core_max_height: 400,
+    tiz_max_far: 4.5,
+    tiz_max_height: 250,
+    approximate: true,
+    source: "Downtown Neighborhood TOD Plan Figs. 2-6 / 2-7, quarter-mile proxy",
+  },
+  // Maps published but not yet read; parcels stay not_modeled.
+  // Fig. 2-7. FAR map not transcribed.
+  Kalihi: { core_max_far: null, core_max_height: 200, tiz_max_far: null, tiz_max_height: 150, approximate: true, source: "Kalihi Neighborhood TOD Plan Fig. 2-7, quarter-mile proxy" },
+  // no plan height map published; base height governs
+  Airport: { core_max_far: null, core_max_height: null, tiz_max_far: null, tiz_max_height: null, source: "no plan height map published; base height governs" },
+  // heights come per parcel from TOD_Zoning - Proposed
+  "East Kapolei": { core_max_far: null, core_max_height: null, tiz_max_far: null, tiz_max_height: null, source: "per-parcel heights from TOD_Zoning - Proposed" },
+  // PD-T: the § 21-9.100-8 ladders apply instead
+  Waipahu: { core_max_far: null, core_max_height: null, tiz_max_far: null, tiz_max_height: null, source: "PD-T; see § 21-9.100-8(a)(1)" },
+  "Aiea-Pearl City": { core_max_far: null, core_max_height: null, tiz_max_far: null, tiz_max_height: null, source: "PD-T; see § 21-9.100-8(a)(1)" },
+  Halawa: { core_max_far: null, core_max_height: null, tiz_max_far: null, tiz_max_height: null, source: "PD-T; see § 21-9.100-8(a)(1)" },
+};
+
+/** nulls where the plan is silent or untranscribed */
+export function todPlanCeiling(
+  station_area: string | null,
+  precinct: "core" | "tiz"
+): { far: number | null; height: number | null; approximate: boolean } {
+  const std = station_area ? TOD_PLAN_STANDARDS[station_area] : undefined;
+  if (!std) return { far: null, height: null, approximate: false };
+  const approximate = std.approximate === true;
+  return precinct === "core"
+    ? { far: std.core_max_far, height: std.core_max_height, approximate }
+    : { far: std.tiz_max_far, height: std.tiz_max_height, approximate };
+}
+
+// § 21-9.100-5(e)(2): where there is no draft neighborhood TOD plan, height may
+// be up to twice the underlying limit or 450 ft, whichever is lower. Where a
+// draft or approved plan exists its maximum governs, except that an existing
+// higher limit prevails.
+export function todHeightLimit(
+  zone_class: string,
+  lot_sqft: number,
+  base_height: number,
+  plan_height?: number
+): number {
+  if (!todEligible(zone_class, lot_sqft)) return base_height;
+  if (plan_height != null) return Math.max(plan_height, base_height);
+  return Math.max(base_height, Math.min(2 * base_height, TOD_MAX_HEIGHT_FT));
+}
+
 // calculate FAR based on bill 6 ordinanace (ONLY USE FOR BILL 6 PATH)
 export function calcFarBill6(zone_class: string): number {
+  // Ord. 26-7 changed the apartment districts only; business districts keep
+  // Table 21-3.4
+  if (zone_class in BUSINESS_FAR) return BUSINESS_FAR[zone_class];
   if (ZONE_GROUPS.lowDensity.includes(zone_class)) return 2.0;
-  if (zone_class === "A-2" || zone_class === "AMX-2" || zone_class === "B-2")
-    return 3.0;
+  if (zone_class === "A-2" || zone_class === "AMX-2") return 3.0;
   if (
     zone_class === "A-3" ||
     zone_class === "AMX-3" ||
-    zone_class === "BMX-3" ||
-    zone_class === "BMX-4" ||
     ZONE_GROUPS.waikiki.includes(zone_class)
   )
     return 4.0;
   return 0;
 }
+
+// ROH Table 21-3.4 base FAR
+const BUSINESS_FAR: Record<string, number> = {
+  "B-1": 1.0,
+  "B-2": 2.5,
+  "BMX-3": 2.5,
+  "BMX-4": 4.0,
+};
 
 const APARTMENT_ZONES = ["A-1", "A-2", "A-3", "AMX-1", "AMX-2", "AMX-3"];
 
@@ -1579,7 +2106,6 @@ export function constructionMonthsByZone(zone_class: string): number {
     zone_class === "A-2" ||
     zone_class === "AMX-2" ||
     zone_class === "B-2" ||
-    zone_class === "BMX-2" ||
     zone_class === "mid_rise"
   )
     return 24;
@@ -1622,7 +2148,6 @@ export function permittingMonthsByZone(zone_class: string): number {
     return Math.round(535 / 30);
   if (
     zone_class === "B-2" ||
-    zone_class === "BMX-2" ||
     zone_class === "BMX-3" ||
     zone_class === "BMX-4"
   )
@@ -1644,14 +2169,42 @@ export function setbackFootprint(
   return usable_width * usable_depth;
 }
 
+// footprint with separate yards, on the same 2:1 lot fronting its short side
+export function yardFootprint(
+  lot_sqft: number,
+  front: number,
+  rear: number,
+  side: number,
+  ratio = 2
+): number {
+  const width = Math.sqrt(lot_sqft / ratio);
+  const depth = ratio * width;
+  return Math.max(0, width - 2 * side) * Math.max(0, depth - front - rear);
+}
+
+// § 21-9.100-8(c)(1): no at-grade or ground-floor parking within this many
+// feet of the front lot line in a TOD special district
+export const PDT_FRONT_NO_PARKING_FT = 40;
+
+// ground inside the yards within `depth` ft of the front lot line, on the
+// same 2:1 lot fronting its short side
+export function frontStripSqft(
+  lot_sqft: number,
+  setback: number,
+  depth: number,
+  ratio = 2
+): number {
+  const width = Math.sqrt(lot_sqft / ratio);
+  return Math.max(0, width - 2 * setback) * Math.max(0, depth - setback);
+}
+
 // excavation depth by zone class
 export function excavationDepthByZone(zone_class: string): number {
   if (ZONE_GROUPS.lowDensity.includes(zone_class)) return 3;
   if (
     zone_class === "A-2" ||
     zone_class === "AMX-2" ||
-    zone_class === "B-2" ||
-    zone_class === "BMX-2"
+    zone_class === "B-2"
   )
     return 5;
   if (
@@ -1734,31 +2287,403 @@ export function stockpilingPermit(cubic_yards: number): number {
   return 70 + Math.ceil((cubic_yards - 1100) / 1000) * 15;
 }
 
-// parking: calculate required stalls
-export function parkingRequiredSpaces(buildable_sqft: number): number {
-  return Math.floor((buildable_sqft / 1000) * PARKING.parking_ratio);
+// height step-back ("wedding cake"), side and rear yards unless front is set
+export type StepBack = {
+  trigger_ft: number;
+  above_ft: number;
+  ft_per_10ft: number;
+  front?: boolean;
+};
+
+// LUO height setbacks: § 21-3.80-1(c), § 21-3.90-1(c), Ord. 17-55,
+// § 21-3.100-1(c), § 21-9.80-5(c). BMX-4 takes the BMX-3 rule in place of its
+// street-angle plane.
+const STEPBACK_ABOVE_40 = [
+  "A-2",
+  "A-3",
+  "AMX-2",
+  "AMX-3",
+  "B-2",
+  "BMX-3",
+  "BMX-4",
+  "IMX-1",
+];
+
+export function zoneStepBack(zone_class: string): StepBack | undefined {
+  if (STEPBACK_ABOVE_40.includes(zone_class))
+    return { trigger_ft: 40, above_ft: 40, ft_per_10ft: 1 };
+  if (zone_class === "Resort")
+    return { trigger_ft: 30, above_ft: 30, ft_per_10ft: 1 };
+  if (ZONE_GROUPS.waikiki.includes(zone_class))
+    return { trigger_ft: 40, above_ft: 40, ft_per_10ft: 1, front: true };
+  return undefined;
 }
 
-// parking: calculate surface parking cost
-export function calcSurfaceParkingCost(buildable_sqft: number): number {
-  const stalls = parkingRequiredSpaces(buildable_sqft);
-  const total_area = stalls * PARKING.stall_sqft;
-  return PARKING.surface_cost_per_sqft * total_area;
+// the sliders' step-back if set, otherwise the zone's own
+export function stepBackOf(
+  s: SliderInputs,
+  zone_default?: StepBack
+): StepBack | undefined {
+  if (s.stepback_trigger_ft == null) return zone_default;
+  return {
+    trigger_ft: s.stepback_trigger_ft,
+    above_ft: s.stepback_above_ft ?? 40,
+    ft_per_10ft: s.stepback_ft_per_10ft ?? 1,
+  };
+}
+
+// floor plate of each storey, ground first
+export function floorPlates(i: {
+  floors: number;
+  floor_height: number;
+  height_limit: number;
+  lot_sqft: number;
+  coverage_plate: number;
+  setback: number;
+  stepback?: StepBack;
+}): number[] {
+  const plates: number[] = [];
+  for (let k = 1; k <= i.floors; k++) {
+    let extra = 0;
+    if (i.stepback && i.height_limit > i.stepback.trigger_ft) {
+      const above = k * i.floor_height - i.stepback.above_ft;
+      if (above > 0)
+        extra = Math.ceil(above / 10 - 1e-9) * i.stepback.ft_per_10ft;
+    }
+    plates.push(
+      Math.max(
+        0,
+        Math.min(
+          i.coverage_plate,
+          yardFootprint(
+            i.lot_sqft,
+            i.setback + (i.stepback?.front ? extra : 0),
+            i.setback + extra,
+            i.setback + extra
+          )
+        )
+      )
+    );
+  }
+  return plates;
+}
+
+// smallest footprint that fits `area` within each storey's plate
+function slimFootprint(plates: number[], area: number): number {
+  const fits = (f: number) =>
+    plates.reduce((sum, p) => sum + Math.min(f, p), 0) >= area - 1e-6;
+  let lo = 0;
+  let hi = plates[0] ?? 0;
+  if (!fits(hi)) return hi;
+  for (let n = 0; n < 60; n++) {
+    const mid = (lo + hi) / 2;
+    if (fits(mid)) hi = mid;
+    else lo = mid;
+  }
+  return hi;
+}
+
+// building envelope with surface or podium parking; parking counts toward
+// height, not FAR
+export function podiumEnvelope(i: {
+  plates: number[];
+  far_cap: number;
+  // most ground-floor retail the zone allows (sqft); 0 for none
+  retail_cap: number;
+  retail_share: number;
+  unit_size: number;
+  parking_ratio: number;
+  // stalls required per sqft of ground-floor retail (Table 21-6.1); 0 for none
+  retail_stalls_per_sqft?: number;
+  // Table 21-6.2 rate when housing and retail share stalls and loading
+  joint_use?: number;
+  // § 21-6.110: reserve ground for the required loading spaces
+  loading?: boolean;
+  // § 21-6.40: reserve ground for the required bicycle parking
+  bicycle?: boolean;
+  // ground-floor area along the front where no stalls or loading may go
+  // (§ 21-9.100-8(c)); the building's frontage holds retail, lobby or housing
+  front_strip_sqft?: number;
+  // a legal cap on units (Bill 7)
+  max_units?: number;
+  // a cap on the unit count; only the floor area those units need is built
+  unit_cap?: number;
+}) {
+  const plates = i.plates;
+  const floors = plates.length;
+  const ground = plates[0] ?? 0;
+  const retail_sqft = Math.max(
+    0,
+    Math.min(i.retail_cap, i.retail_share * ground, i.far_cap)
+  );
+  const retail_stalls = retail_sqft * (i.retail_stalls_per_sqft ?? 0);
+  const parking = i.parking_ratio > 0 || retail_stalls > 0;
+  // housing and retail share the stalls (Table 21-6.2)
+  const joint =
+    i.parking_ratio > 0 && retail_stalls > 0 ? (i.joint_use ?? 1) : 1;
+  const stallsFor = (units: number) =>
+    roundHalfUp(joint * (i.parking_ratio * units + retail_stalls));
+  // most units whose stalls fit `capacity`; stallsFor rises with units
+  const unitsFor = (capacity: number) => {
+    if (stallsFor(0) > capacity) return 0;
+    if (i.parking_ratio <= 0) return Infinity;
+    let lo = 0;
+    let hi = 1;
+    while (stallsFor(hi) <= capacity) hi *= 2;
+    while (hi - lo > 1) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (stallsFor(mid) <= capacity) lo = mid;
+      else hi = mid;
+    }
+    return lo;
+  };
+  const above = new Array<number>(floors + 1).fill(0);
+  for (let j = floors - 1; j >= 0; j--) above[j] = above[j + 1] + plates[j];
+  // a unit-count cap limits the floor area, so only those units are built
+  if (i.unit_cap != null)
+    i = {
+      ...i,
+      far_cap: Math.min(
+        i.far_cap,
+        retail_sqft + (i.unit_cap * i.unit_size) / EFFICIENCY + 1e-6
+      ),
+    };
+  const stallsOn = (sqft: number) => Math.floor(sqft / PARKING.stall_sqft);
+
+  // loading spaces, sized for the most units the envelope holds
+  const most_units = Math.min(
+    Math.floor(
+      (Math.max(0, Math.min(i.far_cap, above[0]) - retail_sqft) * EFFICIENCY) /
+        i.unit_size
+    ),
+    i.max_units ?? Infinity
+  );
+  const loading_spaces = i.loading
+    ? loadingSpaces(most_units, retail_sqft, i.joint_use ?? 1)
+    : 0;
+  // § 21-6.40: bicycle parking, sized the same way
+  const bicycle = i.bicycle
+    ? bicycleSpaces(most_units, retail_sqft, retail_stalls)
+    : { short_term: 0, long_term: 0 };
+  // loading and bicycle parking take ground in the parking area
+  const loading_sqft =
+    loadingSqft(loading_spaces) +
+    (bicycle.short_term + bicycle.long_term) * BICYCLE_PARKING.sqft_per_space;
+  // the front strip keeps parking and loading behind the building's frontage
+  const front_strip = Math.min(ground, i.front_strip_sqft ?? 0);
+
+  // surface lot first: if every stall fits on the ground plate a slimmer
+  // building leaves open, no parking is built into the building
+  if (parking) {
+    const residential_sqft = Math.max(
+      0,
+      Math.min(i.far_cap, above[0]) - retail_sqft
+    );
+    const units = Math.min(
+      Math.floor((residential_sqft * EFFICIENCY) / i.unit_size),
+      i.max_units ?? Infinity
+    );
+    const stalls = stallsFor(units);
+    const footprint = slimFootprint(plates, residential_sqft + retail_sqft);
+    // the building fronts the street; open ground in the strip stays unpaved
+    const open = Math.max(0, ground - Math.max(footprint, front_strip));
+    if (
+      stalls <= Math.floor((open - loading_sqft) / PARKING.surface_stall_sqft)
+    ) {
+      const parking_sqft = stalls * PARKING.surface_stall_sqft + loading_sqft;
+      // the building only slims as far as the lot needs
+      const built = Math.max(
+        footprint,
+        Math.min(ground - parking_sqft, residential_sqft + retail_sqft)
+      );
+      const gross_sqft = residential_sqft + retail_sqft + parking_sqft;
+      let living_stories = 0;
+      for (
+        let j = 0, filled = 0;
+        j < floors && filled < residential_sqft - 1e-9;
+        j++
+      ) {
+        filled += Math.min(built, plates[j]);
+        living_stories++;
+      }
+      return {
+        residential_sqft,
+        retail_sqft,
+        lobby_sqft: 0,
+        units,
+        stalls,
+        surface_stalls: stalls,
+        ground_floor_stalls: 0,
+        podium_stalls: 0,
+        loading_spaces,
+        bicycle_short_term: bicycle.short_term,
+        bicycle_long_term: bicycle.long_term,
+        podium_levels: 0,
+        parking_sqft,
+        parking_cost: parking_sqft * PARKING.surface_cost_per_sqft,
+        parking_share: gross_sqft > 0 ? parking_sqft / gross_sqft : 0,
+        living_stories,
+      };
+    }
+  }
+
+  const firstResidential = (podium_levels: number) =>
+    parking ? Math.min(floors, 1 + podium_levels) : 0;
+  const residentialAt = (podium_levels: number) => {
+    const by_height = parking
+      ? above[firstResidential(podium_levels)]
+      : above[0] - retail_sqft - loading_sqft;
+    const residential_sqft = Math.max(
+      0,
+      Math.min(i.far_cap - retail_sqft, by_height)
+    );
+    const by_area = Math.floor((residential_sqft * EFFICIENCY) / i.unit_size);
+    const units = Math.min(by_area, i.max_units ?? Infinity);
+    return { residential_sqft, units };
+  };
+
+  // without a podium, the ground floor left after its stalls is housing when
+  // a unit fits there
+  const ground_stalls = parking
+    ? stallsOn(
+        Math.max(0, ground - loading_sqft - Math.max(retail_sqft, front_strip))
+      )
+    : 0;
+  const groundLeft = (stalls: number) =>
+    Math.max(
+      0,
+      ground - retail_sqft - loading_sqft - stalls * PARKING.stall_sqft
+    );
+  const groundHousing = (stalls: number) =>
+    groundLeft(stalls) >= i.unit_size / EFFICIENCY ? groundLeft(stalls) : 0;
+  const fit = (sqft: number) =>
+    Math.min(
+      Math.floor((sqft * EFFICIENCY) / i.unit_size),
+      i.max_units ?? Infinity
+    );
+
+  // units at a podium height: the fewer of what the floors hold and what
+  // the stalls allow, settled since stalls take ground-floor housing
+  const optionAt = (podium_levels: number, capacity: number) => {
+    const room = (stalls: number) =>
+      Math.max(
+        0,
+        Math.min(
+          i.far_cap - retail_sqft,
+          above[firstResidential(podium_levels)] +
+            (podium_levels === 0 ? groundHousing(stalls) : 0)
+        )
+      );
+    const by_stalls = unitsFor(capacity);
+    // the most units whose stalls leave room for them; more units need more
+    // stalls and so leave less room, so the test only fails above the answer
+    const fits = (u: number) => fit(room(stallsFor(u))) >= u;
+    let lo = 0;
+    let hi = Math.min(fit(room(0)), by_stalls);
+    if (fits(hi)) lo = hi;
+    while (hi - lo > 1) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (fits(mid)) lo = mid;
+      else hi = mid;
+    }
+    const units = lo;
+    const sqft = room(stallsFor(units));
+    const by_area = fit(sqft);
+    return {
+      units,
+      // build only the floor area the parked units need
+      residential_sqft:
+        units < by_area
+          ? Math.min(sqft, (units * i.unit_size) / EFFICIENCY)
+          : sqft,
+      stall_bound: units < by_area,
+    };
+  };
+
+  // keep the podium that yields the most units
+  let podium_levels = 0;
+  let res = residentialAt(0);
+  if (parking) {
+    let capacity = ground_stalls;
+    let best = -1;
+    for (let k = 0; k < Math.max(1, floors); k++) {
+      if (k > 0) capacity += stallsOn(plates[k]);
+      const option = optionAt(k, capacity);
+      if (option.units > best) {
+        best = option.units;
+        podium_levels = k;
+        res = option;
+      }
+      // once stalls stop limiting units, a taller podium only loses floors
+      if (!option.stall_bound) break;
+    }
+  }
+  const stalls = stallsFor(res.units);
+  const ground_housing =
+    parking && podium_levels === 0 ? groundHousing(stalls) : 0;
+
+  const ground_parking_sqft =
+    Math.min(stalls, ground_stalls) * PARKING.stall_sqft;
+  // podium floors are built whole, however full the top one is
+  const podium_sqft = parking
+    ? above[Math.min(1, floors)] - above[firstResidential(podium_levels)]
+    : 0;
+  // ground floor too small for a unit: lobby, loading, circulation
+  const lobby_sqft =
+    parking && ground_housing === 0
+      ? Math.max(0, ground - retail_sqft - loading_sqft - ground_parking_sqft)
+      : 0;
+  const parking_sqft = ground_parking_sqft + podium_sqft + loading_sqft;
+  const gross_sqft =
+    res.residential_sqft + retail_sqft + lobby_sqft + parking_sqft;
+
+  const storeys = [
+    ...(ground_housing > 0 ? [ground_housing] : []),
+    ...plates.slice(firstResidential(podium_levels)),
+  ];
+  let living_stories = 0;
+  for (
+    let j = 0, filled = 0;
+    j < storeys.length && filled < res.residential_sqft - 1e-9;
+    j++
+  ) {
+    filled += storeys[j];
+    living_stories++;
+  }
+
+  return {
+    residential_sqft: res.residential_sqft,
+    retail_sqft,
+    lobby_sqft,
+    units: res.units,
+    stalls,
+    surface_stalls: 0,
+    ground_floor_stalls: Math.min(stalls, ground_stalls),
+    podium_stalls: stalls - Math.min(stalls, ground_stalls),
+    loading_spaces,
+    bicycle_short_term: bicycle.short_term,
+    bicycle_long_term: bicycle.long_term,
+    podium_levels,
+    parking_sqft,
+    parking_cost: parking_sqft * PARKING.cost_per_sqft,
+    parking_share: gross_sqft > 0 ? parking_sqft / gross_sqft : 0,
+    living_stories,
+  };
 }
 
 // parking: calculate annual parking income
-export function calcParkingIncome(buildable_sqft: number): number {
-  const stalls = parkingRequiredSpaces(buildable_sqft);
+export function calcParkingIncome(stalls: number): number {
   return stalls * PARKING.monthly_rent_per_stall * 12;
 }
 
-// bicycle parking: calculate total cost
-export function calcBicycleParkingCost(num_units: number): number {
-  const st_spaces = Math.round(num_units * BICYCLE_PARKING.short_term.ratio);
-  const lt_spaces = Math.round(num_units * BICYCLE_PARKING.long_term.ratio);
+// bicycle parking: racks and lockers (their floor area is in the envelope)
+export function calcBicycleParkingCost(
+  short_term: number,
+  long_term: number
+): number {
   return (
-    st_spaces * BICYCLE_PARKING.short_term.cost_per_space +
-    lt_spaces * BICYCLE_PARKING.long_term.cost_per_space
+    short_term * BICYCLE_PARKING.short_term.cost_per_space +
+    long_term * BICYCLE_PARKING.long_term.cost_per_space
   );
 }
 
@@ -1844,6 +2769,20 @@ export function calcSoftCosts(i: SoftCostInputs): SoftCostBreakdown {
         ? market_units
         : i.max_units;
 
+  // the same toggle sets the BWS water charges, with the waiver capped per project
+  const water_chargeable_units =
+    i.waivable_fee_basis === "none"
+      ? 0
+      : i.waivable_fee_basis === "market_units"
+        ? i.max_units - Math.min(i.affordable_units, WSFC_WAIVER_UNIT_CAP)
+        : i.max_units;
+  const water = calcWaterFees({
+    max_units: i.max_units,
+    water_chargeable_units,
+    living_stories: i.living_stories,
+    fu_per_unit: i.fu_per_unit,
+  });
+
   // permit and plan review scale with construction value per unit.
   const per_unit_cost = i.hard_cost / Math.max(i.max_units, 1);
   const permit_fee = buildingPermitFee(per_unit_cost);
@@ -1864,6 +2803,8 @@ export function calcSoftCosts(i: SoftCostInputs): SoftCostBreakdown {
     building_permit: chargeable_units * permit_fee,
     plan_review: chargeable_units * plan_fee,
     wastewater: wastewaterFee(i.max_units, chargeable_units),
+    wsfc: water.wsfc,
+    water_meter: water.water_meter,
     temp_occupancy: FEES.administrative.temp_occupancy_cert,
     park_dedication,
     escp: FEES.civil.escp,
@@ -2218,7 +3159,9 @@ export function calcPermanentLoan(
     monthly_pmt: Math.round(monthly_pmt),
     annual_debt_svc: Math.round(annual_debt_svc),
     dscr: Math.round(dscr * 1000) / 1000,
-    is_bankable: dscr >= min_dscr,
+    // a DSCR-sized loan is set to exactly min_dscr, so the recomputed DSCR
+    // is different by the 8~9th decimal place, so use a small tolerance
+    is_bankable: dscr >= min_dscr - 1e-9,
     remaining_bal: Math.round(remaining_bal),
     equity_gap: Math.round(equity_gap),
   };
@@ -2241,6 +3184,9 @@ export function zeroOutput(
     net_commercial_sqft: 0,
     max_units: 0,
     parking_stalls: 0,
+    podium_levels: 0,
+    parking_sqft: 0,
+    parking_share: 0,
     affordable_units: 0,
     afd_rent_units: 0,
     mkt_rent_units: 0,
