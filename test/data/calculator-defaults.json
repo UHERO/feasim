@@ -1,5 +1,5 @@
 {
- "_source": "Calculator (Project View) slider inputs at each pathway's defaults, built from UHERO/analytics app/housing/policy/calculator at commit da45f2df (10/8/26), with land_cost moved to the new $130/sqft default.",
+ "_source": "Calculator (Project View) slider inputs at each pathway's defaults, built from UHERO/analytics app/housing/policy/calculator at commit da45f2df (10/8/26), with land_cost moved to the new $130/sqft default and Bill 7 given the calculator's new default zone, A-1.",
  "bill6": {
   "program": "bill6",
   "lot_sqft": 10000,
@@ -68,6 +68,7 @@
  },
  "bill7": {
   "program": "bill7",
+  "zone_class": "A-1",
   "setback": 10,
   "max_far": 4,
   "affordable_ami": "ami_80",
@@ -100,6 +101,7 @@
  },
  "bill7 with retail": {
   "program": "bill7",
+  "zone_class": "A-1",
   "setback": 10,
   "max_far": 4,
   "affordable_ami": "ami_80",

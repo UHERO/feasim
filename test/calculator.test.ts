@@ -21,6 +21,11 @@ import {
   type ProgramId,
   type SliderInputs,
 } from "../src";
+import {
+  constructionMonthsByZone,
+  excavationDepthByZone,
+  permittingMonthsByZone,
+} from "../src/calculations/calc-shared";
 import inputs from "./data/calculator-defaults.json";
 
 const { _source, ...CASES } = inputs as unknown as Record<string, SliderInputs>;
@@ -99,7 +104,7 @@ describe("calculator defaults", () => {
   it("builds retail only where the zone permits it", () => {
     for (const [name, inputs] of cases) {
       const r = calcSingle(inputs);
-      if (!inputs.include_retail || inputs.program === "bill7" || r.max_units === 0) continue;
+      if (!inputs.include_retail || r.max_units === 0) continue;
       if (permitsGroundFloorRetail(inputs.zone_class!)) expect(r.net_commercial_sqft, name).toBeGreaterThan(0);
       else expect(r.net_commercial_sqft, name).toBe(0);
     }
@@ -168,6 +173,47 @@ describe("calculator TOD", () => {
     const inputs = CASES["tod IPD-T industrial"];
     expect(inputs.zone_class).toBe("I-2");
     expect(calcSingle(inputs).max_units).toBe(0);
+  });
+});
+
+describe("calculator Bill 7 follows the zone", () => {
+  // the calculator's timing sliders left unset, so the zone supplies them
+  const base: SliderInputs = { ...CASES.bill7, permitting_months: undefined, const_months: undefined };
+  const ZONES = ["A-1", "A-2", "A-3", "AMX-1", "AMX-2", "AMX-3", "BMX-3", "BMX-4", "Apart", "ApartMix"];
+
+  it.each(ZONES)("%s takes its timing from the zone", (zone) => {
+    const r = calcSingle({ ...base, zone_class: zone });
+    expect(r.zone_class).toBe(zone);
+    expect(r.permitting_months).toBe(permittingMonthsByZone(zone));
+    expect(r.const_months).toBe(constructionMonthsByZone(zone));
+  });
+
+  it("digs to the zone's excavation depth", () => {
+    // excavation is a soft cost, so a deeper dig on the same lot costs more
+    const soft = (zone: string) => calcSingle({ ...base, zone_class: zone, const_months: 12 }).soft_cost;
+    expect(excavationDepthByZone("A-3")).toBeGreaterThan(excavationDepthByZone("A-1"));
+    expect(soft("A-3")).toBeGreaterThan(soft("A-1"));
+  });
+
+  it("steps back above 40 ft where the zone requires it", () => {
+    const at60 = (zone: string, s: Partial<SliderInputs> = {}) =>
+      calcSingle({ ...base, zone_class: zone, height_limit: 60, ...s }).buildable_sqft;
+    expect(at60("A-2")).toBeLessThan(at60("A-2", { stepback_trigger_ft: 1000 }));
+    expect(at60("A-1")).toBe(at60("A-1", { stepback_trigger_ft: 1000 }));
+  });
+
+  it("keeps Bill 7's FAR and unit density in every zone", () => {
+    for (const zone of ZONES) {
+      const r = calcSingle({ ...base, zone_class: zone, height_limit: 60 });
+      expect(r.buildable_sqft, zone).toBeLessThanOrEqual(BILL7_FAR * base.lot_sqft!);
+      expect(r.max_units, zone).toBeLessThanOrEqual(Math.floor((BILL7_FAR * base.lot_sqft!) / 800));
+    }
+  });
+
+  it("falls back to the height without a zone", () => {
+    const r = calcSingle({ ...base, zone_class: undefined });
+    expect(r.permitting_months).toBe(Math.round(425 / 30));
+    expect(r.const_months).toBe(12);
   });
 });
 
