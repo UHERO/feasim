@@ -295,7 +295,9 @@ export function pathwayEnvelope(
   if (program === "tod") return todEnvelope(parcel, opts);
   const height = parcel.height > 0 ? parcel.height : DEFAULT_HEIGHT[program];
   switch (program) {
+    // 201H builds on current zoning, so it takes the Ord. 26-7 FAR too
     case "bill6":
+    case "h201":
       return withOpenSpaceBonus(
         parcel.zone_class,
         height,
@@ -307,7 +309,6 @@ export function pathwayEnvelope(
         max_far: BILL7_FAR,
       };
     case "standard":
-    case "h201":
     default:
       return withOpenSpaceBonus(
         parcel.zone_class,

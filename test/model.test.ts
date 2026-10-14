@@ -300,7 +300,7 @@ describe("pathwayEnvelope", () => {
     expect(pathwayEnvelope("bill6", low).max_far).toBe(calcFarBill6("A-2"));
     expect(pathwayEnvelope("bill7", low).max_far).toBe(BILL7_FAR);
     expect(pathwayEnvelope("standard", low).max_far).toBe(calcFAR("A-2", 20000));
-    expect(pathwayEnvelope("h201", low).max_far).toBe(calcFAR("A-2", 20000));
+    expect(pathwayEnvelope("h201", low).max_far).toBe(calcFarBill6("A-2"));
     // no TOD regime on this parcel, so it keeps its base FAR (see "TOD pathway")
     expect(pathwayEnvelope("tod", low).max_far).toBe(baseFar("A-2", 20000));
   });

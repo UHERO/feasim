@@ -49,7 +49,7 @@ A pathway is a set of rules a project can be built under. Each pathway sets what
 | `"bill6"` | Before Ord. 26-7 | The FAR rules as they stood before Ordinance 26-7 |
 | `"bill7"` | Bill 7 | An affordable housing pathway in the A, AMX, BMX and Waikiki (Apart, ApartMix) districts, with FAR 4.0 and a 60 ft height cap, construction grants, waived impact fees, and no required parking. Timing, excavation and stepbacks follow the zone |
 | `"tod"` | Transit-oriented development | PD-T and IPD-T permits near rail stations (ROH § 21-9.100): FAR and height bonuses by tier, station area plan limits, no required parking |
-| `"h201"` | HRS § 201H | Exemptions for affordable housing projects. The defaults make 51% of units affordable at 120% of area median income (AMI); set `affordability` and `affordable_ami` to change that. |
+| `"h201"` | HRS § 201H | Exemptions for affordable housing projects, on current (Ord. 26-7) zoning FAR and lot coverage. The defaults make 51% of units affordable at 120% of area median income (AMI); set `affordability` and `affordable_ami` to change that. |
 
 ### Parcels
 

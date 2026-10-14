@@ -19,7 +19,7 @@ import {
   calcConstructionInterest,
   calcDevRLV,
   calcDscrMaxLoan,
-  calcFAR,
+  calcFarBill6,
   calcLeaseupCarry,
   calcParkArea,
   calcParkingIncome,
@@ -44,8 +44,8 @@ import {
   HOLD,
   INCOME,
   legalParkingRatio,
-  LOT_COVERAGE,
   lotAfterOpenSpace,
+  lotCoverageBill6,
   mixFixtureUnits,
   mixRentByAmi,
   mixUnitSize,
@@ -130,8 +130,9 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
   const floors = Math.floor(height_limit / 10);
   const open_space_bonus = sliders.open_space_bonus ?? 0;
   const far =
-    sliders.max_far ?? calcFAR(zone_class, lot_sqft) + open_space_bonus;
-  const coverage = LOT_COVERAGE[zone_class] ?? 0.6;
+    sliders.max_far ?? calcFarBill6(zone_class) + open_space_bonus;
+  // current (Ord. 26-7) zoning coverage, as on the Standard pathway
+  const coverage = lotCoverageBill6(zone_class);
   // waikiki precincts must keep 35–50% of the lot open; that and the coverage
   // cap are both measured on the zoning lot, so the stricter one governs
   const far_cap = far * lot_sqft;
