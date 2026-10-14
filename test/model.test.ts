@@ -1,4 +1,4 @@
-// Tests for @uhero-data/policy-simulator
+// Tests for @uhero/policy-simulator
 //
 // Snapshots pin every output of the model, so any change that moves a result
 // fails here, on purpose. If the change is intended, run `npx vitest run -u`,
