@@ -1,5 +1,5 @@
 {
- "_source": "Calculator (Project View) slider inputs at each pathway's defaults, built from UHERO/analytics app/housing/policy/calculator at commit da45f2df (10/8/26), with land_cost moved to the new $130/sqft default Bill 7 given the calculator's new default zone, A-1, and 201H's Max FAR moved to the Ord. 26-7 figure.",
+ "_source": "Calculator (Project View) slider inputs at each pathway's defaults, built from UHERO/analytics app/housing/policy/calculator at commit da45f2df (10/8/26), with land_cost moved to the new $130/sqft default Bill 7 given the calculator's new default zone, A-1, and 201H's Max FAR moved to the Ord. 26-7 figure its hard cost to $450/sqft and its rents to 80% / 120% AMI.",
  "bill6": {
   "program": "bill6",
   "lot_sqft": 10000,
@@ -293,12 +293,12 @@
   "hold_years": 8,
   "amort_years": 30,
   "min_dscr": 1.2,
-  "affordable_ami": "ami_120",
-  "market_ami": "ami_140",
+  "affordable_ami": "ami_80",
+  "market_ami": "ami_120",
   "permitting_months": 18,
   "const_months": 12,
   "leaseup_months": 9,
-  "hard_cost_per_sqft": 550
+  "hard_cost_per_sqft": 450
  },
  "h201 with retail": {
   "program": "h201",
@@ -327,12 +327,12 @@
   "hold_years": 8,
   "amort_years": 30,
   "min_dscr": 1.2,
-  "affordable_ami": "ami_120",
-  "market_ami": "ami_140",
+  "affordable_ami": "ami_80",
+  "market_ami": "ami_120",
   "permitting_months": 18,
   "const_months": 12,
   "leaseup_months": 9,
-  "hard_cost_per_sqft": 550
+  "hard_cost_per_sqft": 450
  },
  "tod IPD-T tier 0": {
   "program": "tod",

@@ -314,7 +314,7 @@ describe("pathwayEnvelope", () => {
   });
 
   it("falls back to the pathway's default height when none is recorded", () => {
-    const defaults = { bill6: 30, bill7: 30, standard: 30, h201: 60 };
+    const defaults = { bill6: 30, bill7: 30, standard: 30, h201: 30 };
     for (const program of ["bill6", "bill7", "standard", "h201"] as const) {
       expect(pathwayEnvelope(program, unknownHeight).height_limit, program).toBe(
         defaults[program]

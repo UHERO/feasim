@@ -1,17 +1,13 @@
 // 201H (HRS Chapter 201H) calculator
 //
-// Key 201H rules:
-//   - Base FAR (no bonus)
-//   - 50% + 1 of total units must be affordable (validation error otherwise)
-//   - User selects affordability % (≥ 50%+1 threshold)
-//   - Affordable units split proportionally between rental & sale
-//   - Surface car parking required (cost AND income)
-//   - Retail allowed only for AMX-1/2/3, BMX-3/4 zones
-//   - Impact fees are a user input (default $5,000/unit, vs $1,836 default elsewhere)
-//   - Full property tax from year 1 (no exemption, unlike Bill 7's 15-yr improvement exemption)
-//   - Permit/plan-review fees apply to MARKET units only (affordable exempt)
-//   - Cap rate derived from height (low_rise ≤30ft, else mid_rise)
-
+// Key rules:
+//   - Current (Ord. 26-7) zoning: FAR plus the open-space bonus, lot coverage
+//   - 100% rental; at least 50% + 1 of units affordable (throws below that)
+//   - Article 6 car parking, surface or podium, with its cost and income
+//   - Ground-floor retail only where the zone allows it
+//   - Permit, plan-review and park fees on market units only
+//   - Full property tax from year 1 (no exemption, unlike Bill 7)
+//   - Flat 5.1% cap rate unless set
 import {
   allocatePropertyTax,
   article6Parking,
@@ -68,18 +64,18 @@ import {
 // =========================================================
 // DEFAULTS
 // =========================================================
-export const H201_DEFAULT_HEIGHT_LIMIT = 60;
+export const H201_DEFAULT_HEIGHT_LIMIT = 30;
 export const H201_DEFAULT_ZONE_CLASS = "A-2";
 export const H201_DEFAULT_SALE_SPLIT = 0.4;
 export const H201_DEFAULT_AFFORDABILITY = 0.51;
 export const H201_DEFAULT_EQUITY = 0.3;
 export const H201_DEFAULT_LAND_COST = 130;
-export const H201_DEFAULT_PERMITTING_MO = 12;
+export const H201_DEFAULT_PERMITTING_MO = 18;
 export const H201_DEFAULT_PERMANENT_RATE = 0.0675;
 export const H201_DEFAULT_HOLD_YEARS = 10;
 export const H201_DEFAULT_RETAIL_RENT = 5;
 export const H201_DEFAULT_AFFORDABLE_AMI = "ami_80";
-export const H201_DEFAULT_MARKET_AMI = "ami_140";
+export const H201_DEFAULT_MARKET_AMI = "ami_120";
 
 // 201H regulatory floors
 const H201_MIN_AFD_FRAC = 0.5;

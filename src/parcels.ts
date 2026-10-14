@@ -375,10 +375,9 @@ export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
     h201: {
       ...standard,
       program: "h201",
-      affordable_ami: "ami_120",
-      market_ami: "ami_140",
+      affordable_ami: "ami_80",
+      market_ami: "ami_120",
       affordability: 0.51,
-      hard_cost_per_sqft: 550,
       // GET-exempt, so opex matches Bill 7
       opex_ratio: 0.19,
     },
