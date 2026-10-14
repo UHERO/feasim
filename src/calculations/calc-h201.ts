@@ -1,17 +1,13 @@
 // 201H (HRS Chapter 201H) calculator
 //
-// Key 201H rules:
-//   - Base FAR (no bonus)
-//   - 50% + 1 of total units must be affordable (validation error otherwise)
-//   - User selects affordability % (≥ 50%+1 threshold)
-//   - Affordable units split proportionally between rental & sale
-//   - Surface car parking required (cost AND income)
-//   - Retail allowed only for AMX-1/2/3, BMX-3/4 zones
-//   - Impact fees are a user input (default $5,000/unit, vs $1,836 default elsewhere)
-//   - Full property tax from year 1 (no exemption, unlike Bill 7's 15-yr improvement exemption)
-//   - Permit/plan-review fees apply to MARKET units only (affordable exempt)
-//   - Cap rate derived from height (low_rise ≤30ft, else mid_rise)
-
+// Key rules:
+//   - Current (Ord. 26-7) zoning: FAR plus the open-space bonus, lot coverage
+//   - 100% rental; at least 50% + 1 of units affordable (throws below that)
+//   - Article 6 car parking, surface or podium, with its cost and income
+//   - Ground-floor retail only where the zone allows it
+//   - Permit, plan-review and park fees on market units only
+//   - Full property tax from year 1 (no exemption, unlike Bill 7)
+//   - Flat 5.1% cap rate unless set
 import {
   allocatePropertyTax,
   article6Parking,
@@ -19,7 +15,7 @@ import {
   calcConstructionInterest,
   calcDevRLV,
   calcDscrMaxLoan,
-  calcFAR,
+  calcFarBill6,
   calcLeaseupCarry,
   calcParkArea,
   calcParkingIncome,
@@ -37,15 +33,14 @@ import {
   envelopeCoverage,
   equityFirstDraws,
   excavationDepthByZone,
-  EXPENSES,
   FEES,
   FINANCING,
   floorPlates,
   HOLD,
   INCOME,
   legalParkingRatio,
-  LOT_COVERAGE,
   lotAfterOpenSpace,
+  lotCoverageBill6,
   mixFixtureUnits,
   mixRentByAmi,
   mixUnitSize,
@@ -68,18 +63,18 @@ import {
 // =========================================================
 // DEFAULTS
 // =========================================================
-export const H201_DEFAULT_HEIGHT_LIMIT = 60;
+export const H201_DEFAULT_HEIGHT_LIMIT = 30;
 export const H201_DEFAULT_ZONE_CLASS = "A-2";
 export const H201_DEFAULT_SALE_SPLIT = 0.4;
 export const H201_DEFAULT_AFFORDABILITY = 0.51;
 export const H201_DEFAULT_EQUITY = 0.3;
-export const H201_DEFAULT_LAND_COST = 200;
-export const H201_DEFAULT_PERMITTING_MO = 12;
+export const H201_DEFAULT_LAND_COST = 130;
+export const H201_DEFAULT_PERMITTING_MO = 18;
 export const H201_DEFAULT_PERMANENT_RATE = 0.0675;
 export const H201_DEFAULT_HOLD_YEARS = 10;
 export const H201_DEFAULT_RETAIL_RENT = 5;
 export const H201_DEFAULT_AFFORDABLE_AMI = "ami_80";
-export const H201_DEFAULT_MARKET_AMI = "ami_140";
+export const H201_DEFAULT_MARKET_AMI = "ami_120";
 
 // 201H regulatory floors
 const H201_MIN_AFD_FRAC = 0.5;
@@ -109,7 +104,8 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
   // park dedication is only waived under Bill 7 (ROH 43-10.8); every other
   // pathway pays the in-lieu fee unless the caller says otherwise
   const park = sliders.park ?? "in_lieu";
-  const opex_ratio = sliders.opex_ratio ?? EXPENSES.opex_ratio;
+  // GET-exempt, so opex matches Bill 7
+  const opex_ratio = sliders.opex_ratio ?? 0.19;
   const construction_rate =
     sliders.construction_rate ?? FINANCING.construction_rate;
   const permitting_months =
@@ -130,8 +126,9 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
   const floors = Math.floor(height_limit / 10);
   const open_space_bonus = sliders.open_space_bonus ?? 0;
   const far =
-    sliders.max_far ?? calcFAR(zone_class, lot_sqft) + open_space_bonus;
-  const coverage = LOT_COVERAGE[zone_class] ?? 0.6;
+    sliders.max_far ?? calcFarBill6(zone_class) + open_space_bonus;
+  // current (Ord. 26-7) zoning coverage, as on the Standard pathway
+  const coverage = lotCoverageBill6(zone_class);
   // waikiki precincts must keep 35–50% of the lot open; that and the coverage
   // cap are both measured on the zoning lot, so the stricter one governs
   const far_cap = far * lot_sqft;
@@ -607,6 +604,7 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
     mkt_sale_units,
     hard_cost: Math.round(hard_cost),
     soft_cost: Math.round(soft_cost),
+    soft_cost_breakdown: soft,
     dev_cost: Math.round(dev_cost),
     total_financing_cost: Math.round(total_financing_cost),
     rlv_financing_cost: Math.round(rlv_financing_cost),

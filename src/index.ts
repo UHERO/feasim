@@ -1,4 +1,4 @@
-// @uhero-data/policy-simulator — public entry point.
+// @uhero/policy-simulator — public entry point.
 // Everything the package offers is exported from this file, and nothing else
 // is part of its API.
 // The model is copied from uhero_analytics (see README, "Source").
@@ -7,7 +7,12 @@
 export * from "./calculations";
 
 // constants and helpers the gauge and calculator use directly
-export { DEFAULT_TARGET_RETURN, GRANT, zoneName } from "./calculations/calc-shared";
+export {
+  DEFAULT_TARGET_RETURN,
+  GRANT,
+  zoneName,
+  type SoftCostBreakdown,
+} from "./calculations/calc-shared";
 
 // TOD rules (§ 21-9.100-5, -8, -10): eligibility, PD-T / IPD-T FAR and height,
 // station area plan ceilings, the IMX-1 unit cap; and the open-space bonus

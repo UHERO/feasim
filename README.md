@@ -23,12 +23,12 @@ npm install @uhero/policy-simulator
 ## Quick start
 
 ```ts
-import { calcParcel, overallLevel } from "@uhero-data/policy-simulator";
+import { calcParcel, overallLevel } from "@uhero/policy-simulator";
 
 // a 20,000 sqft lot zoned BMX-3 with a 150 ft height limit
 const parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 150 };
 
-const result = calcParcel("standard", parcel);
+const result = calcParcel("bill6", parcel);
 
 // this returns your results for these example fields
 result.max_units;     
@@ -45,11 +45,13 @@ A pathway is a set of rules a project can be built under. Each pathway sets what
 
 | `program` | Pathway | What it changes |
 | --- | --- | --- |
-| `"standard"` | Current zoning | The zone's FAR and height under the Land Use Ordinance, with the Article 6 parking minimums |
-| `"bill6"` | Before Ord. 26-7 | The FAR rules as they stood before Ordinance 26-7 |
-| `"bill7"` | Bill 7 | An affordable housing pathway with FAR 4.0 and a 60 ft height cap, construction grants, waived impact fees, and no required parking |
+| `"bill6"` | Standard (current zoning) | The zone's FAR (as set by Ordinance 26-7), lot coverage and height under the Land Use Ordinance, with the Article 6 parking minimums |
+| `"standard"` | Before Ord. 26-7 | The FAR and lot coverage rules as they stood before Ordinance 26-7, for comparison |
+| `"bill7"` | Bill 7 | An affordable housing pathway in the A, AMX, BMX and Waikiki (Apart, ApartMix) districts, with FAR 4.0 and a 60 ft height cap, construction grants, waived impact fees, and no required parking. Timing, excavation and stepbacks follow the zone |
 | `"tod"` | Transit-oriented development | PD-T and IPD-T permits near rail stations (ROH § 21-9.100): FAR and height bonuses by tier, station area plan limits, no required parking |
-| `"h201"` | HRS § 201H | Exemptions for affordable housing projects. The defaults make 51% of units affordable at 120% of area median income (AMI); set `affordability` and `affordable_ami` to change that. |
+| `"h201"` | HRS § 201H | Exemptions for affordable housing projects, on current (Ord. 26-7) zoning FAR and lot coverage. The defaults make 51% of units affordable at 80% of area median income (AMI), with market units at 120% AMI; set `affordability` and `affordable_ami` to change that. |
+
+**Note:** the ids are historical. `"bill6"` is current zoning, and `"standard"` is the rules before Ordinance 26-7.
 
 ### Parcels
 
@@ -73,7 +75,7 @@ Everything else comes from the pathway's defaults, `DEFAULT_INPUTS[program]`. "L
 `calcParcel(program, parcel, levers = {}, opts = {})`. Change any of them by passing levers as the third argument:
 
 ```ts
-calcParcel("standard", parcel, {
+calcParcel("bill6", parcel, {
   // $ per sqft of lot
   land_cost: 250,
   // construction, $ per sqft of building            
@@ -89,6 +91,21 @@ calcParcel("standard", parcel, {
 
 **Note:** `height_limit` and `max_far` override the pathway's envelope. Bill 7 still caps height at 60 ft. See the `SliderInputs` type for the full list, with units.
 
+### Input values
+
+The model doesn't check its inputs. A value it doesn't recognize falls back to a default or gives an empty result without an error, so use these exactly:
+
+| Input | Use | If it's wrong |
+| --- | --- | --- |
+| `program` | `"bill6"`, `"standard"`, `"bill7"`, `"tod"` or `"h201"`, lowercase | Anything else runs `"bill6"` |
+| `zone_class` | The district code as the Land Use Ordinance writes it, uppercase: `"A-2"`, `"AMX-3"`, `"BMX-4"`, `"B-2"`, `"I-2"`; Waikiki is `"Apart"` or `"ApartMix"` | `"a-2"` or an unknown code has no FAR, so `calcParcel` builds nothing; with your own `max_far` it builds, but without the zone's coverage, timing and retail rules |
+| `affordable_ami`, `market_ami` | `"ami_"` plus a bracket from 10 to 140 in steps of 10, such as `"ami_80"` | Other numbers (`"ami_85"`) are scaled from the 50% row and won't match the published HHFDC limits |
+| `unit_type` | `"studio_100"`, `"studio75_1br25"`, `"studio50_1br50"`, `"studio25_1br75"`, `"one_bb_100"`, `"one_br50_2br50"`, `"two_bb_100"` or `"third_each"` | Anything else is treated as all one-bedroom |
+| `affordability` (201H) | `0.51` or more | Below 50% + 1 of units, `calcSingle` throws |
+| `permanent_rate`, `amort_years` | Above `0` | `0` makes the IRR, equity multiple, profit and ROI `NaN` |
+
+With `calcSingle` and `"tod"`, pass a `max_far`, or the model can't run the project without the open-space bonus to compare (see Model notes). `calcParcel` always passes one.
+
 ### Results
 
 Every function returns a `ParcelOutput`. Some of its fields:
@@ -98,7 +115,7 @@ Every function returns a `ParcelOutput`. Some of its fields:
 | Building | `max_units`, `buildable_sqft`, `net_residential_sqft`, `net_commercial_sqft`, `height_limit` |
 | Units | `affordable_units`, `mkt_rent_units`, `afd_rent_units`, `mkt_sale_units`, `afd_sale_units` |
 | Parking | `parking_stalls`, split into `surface_stalls`, `ground_floor_stalls` and `podium_stalls`; `podium_levels`, `loading_spaces`, `bicycle_spaces` |
-| Costs | `hard_cost`, `soft_cost`, `dev_cost`, `total_financing_cost` |
+| Costs | `hard_cost`, `soft_cost` (itemized in `soft_cost_breakdown`: permits, fees, water charges, construction management), `dev_cost`, `total_financing_cost` |
 | Income | `egi` (effective gross income), `noi` (net operating income), `gdv` (gross development value) |
 | Returns | `dev_roc` (return on cost), `dev_levered_irr`, `dev_equity_multiple`, `dev_profit`, `dev_dscr` |
 | Land | `rlv` and `rlv_sqft`: the residual land value, or the most a developer could pay for the land and still hit their target return |
@@ -123,11 +140,11 @@ The project is **poor** if half or more of the metrics are poor, **strong** if n
 1. Compare pathways for one lot
 
 ```ts
-import { calcParcel, overallLevel, type ProgramId } from "@uhero-data/policy-simulator";
+import { calcParcel, overallLevel, type ProgramId } from "@uhero/policy-simulator";
 
 const parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 150 };
 
-for (const program of ["standard", "bill7", "h201", "tod"] as ProgramId[]) {
+for (const program of ["bill6", "bill7", "h201", "tod"] as ProgramId[]) {
   const r = calcParcel(program, parcel);
   console.log(program, r.max_units, r.dev_roc, overallLevel(r));
 }
@@ -137,7 +154,7 @@ for (const program of ["standard", "bill7", "h201", "tod"] as ProgramId[]) {
 
 ```ts
 for (const land_cost of [100, 200, 300]) {
-  const r = calcParcel("standard", parcel, { land_cost });
+  const r = calcParcel("bill6", parcel, { land_cost });
   console.log(land_cost, overallLevel(r));
 }
 ```
@@ -154,7 +171,7 @@ const feasibleUnits = results
 4. Change TOD permit tiers, the fourth argument picks the tier: `"base"`, `"minor_sd"`, `"major_sd"` or `"with_benefits"`
 
 ```ts
-import { calcParcel, todIneligibleReason } from "@uhero-data/policy-simulator";
+import { calcParcel, todIneligibleReason } from "@uhero/policy-simulator";
 
 const site = {
   lot_sqft: 20000, zone_class: "BMX-3", height: 150,
@@ -170,11 +187,11 @@ calcParcel("tod", site, {}, { tier: "with_benefits" });
 **Note:** `calcSingle` is the model itself: one flat set of inputs in, one result out. Use it when you want to set the FAR and height yourself instead of taking them from a pathway's rules.
 
 ```ts
-import { calcSingle, DEFAULT_INPUTS } from "@uhero-data/policy-simulator";
+import { calcSingle, DEFAULT_INPUTS } from "@uhero/policy-simulator";
 
 calcSingle({
-  ...DEFAULT_INPUTS.standard,
-  lot_sqft: 10000, zone_class: "A-2", height_limit: 40, max_far: 1.3,
+  ...DEFAULT_INPUTS.bill6,
+  lot_sqft: 10000, zone_class: "A-2", height_limit: 40, max_far: 3.0,
 });
 ```
 
@@ -200,6 +217,8 @@ The package also exports the rules behind the model, such as the zoning FAR tabl
   - The defaults are 100% rental. Set `rental_split` and `sale_split` to model for-sale units in later versions.
 - The model is designed to be a first pass feasibility screen, not an appraisal
   - The model estimates whether a typical project could pencil, it does not design a specific building.
+- The open-space FAR bonus is optional
+  - Where a zone offers one (B-2, BMX-3, BMX-4), `calcSingle` runs the project with and without it and keeps the one with the higher residual land value, or the bigger building when neither pencils. The bonus costs 1 sqft of public open space per 5 sqft of extra floor area, so it often isn't worth it on lower buildings. `open_space_bonus` on the result is the bonus taken.
 
 The model's logic and data sources are documented here:
 
@@ -240,7 +259,7 @@ UHERO's Policy Simulator dashboard is one application built on this model. Its s
 
 | Here | In `UHERO/analytics` |
 | --- | --- |
-| `src/calculations/*.ts` | `app/housing/policy/calculator/calculations/*.ts` (unchanged) |
+| `src/calculations/*.ts` | `app/housing/policy/calculator/calculations/*.ts` (unchanged, except that the output also returns `soft_cost_breakdown`) |
 | `src/feasibility.ts` | `app/housing/policy/shared/feasibility.ts` (import path only) |
 | `src/parcels.ts` | The Policy Gauge's pathway rules (`gauge/calculations/calc-*.ts`) and default assumptions (`gauge/dashboard.tsx`), as one module; identical results for every parcel |
 

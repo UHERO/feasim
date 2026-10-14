@@ -68,7 +68,7 @@ import {
 export const BILL6_DEFAULT_EQUITY = 0.3;
 export const BILL6_DEFAULT_HEIGHT_LIMIT = 30;
 export const BILL6_DEFAULT_FLOOR_HEIGHT = 10;
-export const BILL6_DEFAULT_LAND_COST = 200;
+export const BILL6_DEFAULT_LAND_COST = 130;
 export const BILL6_DEFAULT_PERMANENT_RATE = 0.0675;
 export const BILL6_DEFAULT_HOLD_YEARS = 10;
 
@@ -595,7 +595,7 @@ export function calcbill6Single(sliders: SliderInputs): ParcelOutput {
   const include_retail = sliders.include_retail ?? false;
   const retail_rent = sliders.retail_rent ?? 5;
   const affordable_ami = sliders.affordable_ami ?? "ami_50";
-  const market_ami = sliders.market_ami ?? "ami_50";
+  const market_ami = sliders.market_ami ?? "ami_120";
   const construction_rate =
     sliders.construction_rate ?? FINANCING.construction_rate;
   const leaseup_override = sliders.leaseup_months;
@@ -730,7 +730,8 @@ export function calcbill6Single(sliders: SliderInputs): ParcelOutput {
   const sale = { gross_sales: 0, afd_sales: 0, mkt_sales: 0 };
 
   // Step 6: Operating expenses
-  const opex_ratio = sliders.opex_ratio ?? EXPENSES.opex_ratio;
+  // market projects, property tax included (DEFAULT_INPUTS)
+  const opex_ratio = sliders.opex_ratio ?? 0.3;
   const opex = bill6Opex(rev.residential_egi, rev.retail_egi, opex_ratio);
 
   // Step 7: NOI & GDV
@@ -868,6 +869,7 @@ export function calcbill6Single(sliders: SliderInputs): ParcelOutput {
     mkt_sale_units: hard.mkt_sale_units,
     hard_cost: hard_cost,
     soft_cost,
+    soft_cost_breakdown: soft,
     dev_cost: loan.total_dev_cost,
     total_financing_cost,
     rlv_financing_cost,

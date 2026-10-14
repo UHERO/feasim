@@ -6,6 +6,9 @@
 // - $12k–$50k grants per affordable unit
 // - 15-year property tax exemption on improvements
 // - Height-based construction cost rate (not zone lookup)
+// - Timing, excavation depth and stepbacks follow the zone class when one is
+//   given, as in the other pathways; FAR, coverage and the 60 ft cap stay
+//   Bill 7's own
 
 import {
   allocatePropertyTax,
@@ -25,11 +28,10 @@ import {
   DEFAULT_RETAIL_SHARE,
   DEFAULT_TARGET_RETURN,
   DEFAULT_TARGET_SPREAD,
-  DEFAULT_UNIT_TYPE,
   EFFICIENCY,
   envelopeCoverage,
   equityFirstDraws,
-  EXPENSES,
+  excavationDepthByZone,
   FINANCING,
   floorPlates,
   GRANT,
@@ -39,8 +41,10 @@ import {
   mixRentByAmi,
   mixUnitSize,
   ParcelOutput,
+  permittingMonthsByZone,
   podiumEnvelope,
   resolveCapRate,
+  resolveConstMonths,
   RETAIL_CAP_SPREAD,
   RETAIL_PREMIUM,
   sizeConstructionLoan,
@@ -49,6 +53,7 @@ import {
   stepBackOf,
   VACANCY,
   zeroOutput,
+  zoneStepBack,
 } from "./calc-shared";
 
 // =========================================================
@@ -56,14 +61,14 @@ import {
 // =========================================================
 export const DEFAULT_RETAIL_RENT = 3;
 export const DEFAULT_HEIGHT_LIMIT = 30;
-export const DEFAULT_PERMANENT_RATE = 0.0675;
+export const DEFAULT_PERMANENT_RATE = 0.07;
 export const DEFAULT_HOLD_YEARS = 10;
-export const DEFAULT_LAND_COST = 200;
+export const DEFAULT_LAND_COST = 130;
 export const DEFAULT_GRANT_TYPE = "post_construct" as
   "none" | "pre_construct" | "post_construct";
 export const DEFAULT_INCLUDE_RETAIL = false;
 export const DEFAULT_AFFORDABLE_AMI = "ami_80";
-export const DEFAULT_MARKET_AMI = "ami_80";
+export const DEFAULT_MARKET_AMI = "ami_100";
 
 // =========================================================
 // MAIN ENTRY: calcBill7Single
@@ -72,7 +77,7 @@ export const DEFAULT_MARKET_AMI = "ami_80";
 export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   const lot_sqft = sliders.lot_sqft ?? 5000;
   const height_limit = sliders.height_limit ?? DEFAULT_HEIGHT_LIMIT;
-  const unit_type = sliders.unit_type ?? DEFAULT_UNIT_TYPE;
+  const unit_type = sliders.unit_type ?? "studio50_1br50";
   const equity = sliders.equity ?? 0.3;
   const land_cost = sliders.land_cost ?? DEFAULT_LAND_COST;
   const leaseup_override = sliders.leaseup_months;
@@ -80,7 +85,8 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   const hold_years = sliders.hold_years ?? DEFAULT_HOLD_YEARS;
   const amort_years = sliders.amort_years ?? HOLD.amort_years;
   const min_dscr = sliders.min_dscr ?? 1.15;
-  const opex_ratio = sliders.opex_ratio ?? EXPENSES.opex_ratio;
+  // GET-exempt affordable rental
+  const opex_ratio = sliders.opex_ratio ?? 0.19;
   const grant_type = sliders.grant_type ?? DEFAULT_GRANT_TYPE;
   const grant_amount =
     sliders.grant_amount ??
@@ -93,15 +99,20 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   const market_ami = sliders.market_ami ?? DEFAULT_MARKET_AMI;
   const construction_rate =
     sliders.construction_rate ?? FINANCING.construction_rate;
-  // Bill 7 applies across zones, so the calculator has no zone selector and
-  // falls back to a rise class. The gauge does know each parcel's real zone,
-  // so pass it through when supplied — this is a label only, nothing in this
-  // function computes off zone_class.
+  // Bill 7 applies in the apartment (A), apartment mixed-use (AMX), business
+  // mixed-use (BMX) and Waikiki districts. With a zone, timing, excavation and
+  // stepbacks follow it as in the other pathways (FAR, coverage and the height
+  // cap stay Bill 7's own); without one, they fall back to the height.
+  const has_zone = sliders.zone_class != null;
   const zone_class =
     sliders.zone_class ?? (height_limit <= 30 ? "low_rise" : "mid_rise");
   const permitting_months_val =
     sliders.permitting_months ??
-    (height_limit <= 30 ? Math.round(425 / 30) : Math.round(535 / 30));
+    (has_zone
+      ? permittingMonthsByZone(zone_class)
+      : height_limit <= 30
+        ? Math.round(425 / 30)
+        : Math.round(535 / 30));
   const hard_cost_per_sqft = sliders.hard_cost_per_sqft ?? 450;
   // Bill 7 projects are exempt from off-street parking (ROH 32-2.3)
   const parking_ratio = sliders.parking_ratio ?? 0;
@@ -132,7 +143,10 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     lot_sqft,
     coverage_plate: envelopeCoverage(zone_class, max_far, coverage) * lot_sqft,
     setback,
-    stepback: stepBackOf(sliders),
+    stepback: stepBackOf(
+      sliders,
+      has_zone ? zoneStepBack(zone_class) : undefined
+    ),
   });
 
   // ground-floor retail is only permitted where the base zone allows it
@@ -186,7 +200,9 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   const hard_cost_base = building_cost + parking_cost;
 
   // Resolve construction months early so cost inflation can use it.
-  const const_months_val = sliders.const_months ?? 12;
+  const const_months_val = has_zone
+    ? resolveConstMonths(zone_class, sliders.const_months)
+    : (sliders.const_months ?? 12);
   // Construction cost inflation: costs are spent throughout the build, so the average dollar lands at permitting + const/2.
   const cost_inflation_multiplier =
     FINANCING.cost_inflation **
@@ -202,7 +218,11 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     lot_sqft,
     max_units,
     affordable_units,
-    excavation_depth: height_limit <= 30 ? 3 : 5,
+    excavation_depth: has_zone
+      ? excavationDepthByZone(zone_class)
+      : height_limit <= 30
+        ? 3
+        : 5,
     park,
     // Park land is charged on market units only; §22-7.3(j)(1) exempts
     // affordable units, same rule as the other pathways.
@@ -643,6 +663,7 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     mkt_sale_units,
     hard_cost,
     soft_cost,
+    soft_cost_breakdown: soft,
     dev_cost: total_dev_cost,
     total_financing_cost,
     rlv_financing_cost,

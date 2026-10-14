@@ -1,4 +1,4 @@
-// Tests for @uhero-data/policy-simulator
+// Tests for @uhero/policy-simulator
 //
 // Snapshots pin every output of the model, so any change that moves a result
 // fails here, on purpose. If the change is intended, run `npx vitest run -u`,
@@ -71,6 +71,10 @@ import {
   zoneStepBack,
 } from "../src";
 import { calcSoftCosts, setbackFootprint } from "../src/calculations/calc-shared";
+import { calcbill6Single } from "../src/calculations/calc-bill6";
+import { calcH201Single } from "../src/calculations/calc-h201";
+import { calcStandardSingle } from "../src/calculations/calc-standard";
+import { calcTodSingle } from "../src/calculations/calc-tod";
 
 const PROGRAMS: ProgramId[] = ["bill6", "bill7", "standard", "tod", "h201"];
 
@@ -300,7 +304,7 @@ describe("pathwayEnvelope", () => {
     expect(pathwayEnvelope("bill6", low).max_far).toBe(calcFarBill6("A-2"));
     expect(pathwayEnvelope("bill7", low).max_far).toBe(BILL7_FAR);
     expect(pathwayEnvelope("standard", low).max_far).toBe(calcFAR("A-2", 20000));
-    expect(pathwayEnvelope("h201", low).max_far).toBe(calcFAR("A-2", 20000));
+    expect(pathwayEnvelope("h201", low).max_far).toBe(calcFarBill6("A-2"));
     // no TOD regime on this parcel, so it keeps its base FAR (see "TOD pathway")
     expect(pathwayEnvelope("tod", low).max_far).toBe(baseFar("A-2", 20000));
   });
@@ -314,7 +318,7 @@ describe("pathwayEnvelope", () => {
   });
 
   it("falls back to the pathway's default height when none is recorded", () => {
-    const defaults = { bill6: 30, bill7: 30, standard: 30, h201: 60 };
+    const defaults = { bill6: 30, bill7: 30, standard: 30, h201: 30 };
     for (const program of ["bill6", "bill7", "standard", "h201"] as const) {
       expect(pathwayEnvelope(program, unknownHeight).height_limit, program).toBe(
         defaults[program]
@@ -753,14 +757,18 @@ describe("TOD model", () => {
 
   it("builds less when the open-space bonus uses ground and coverage binds", () => {
     // low height so lot coverage, not FAR, sets the building
+    // the TOD calculator itself, which takes the bonus as given (calcSingle
+    // would choose; see "open-space bonus")
     const tight: SliderInputs = { ...site, height_limit: 30, max_far: 7 };
-    const without = calcSingle({ ...tight, open_space_bonus: 0 });
-    const withBonus = calcSingle({ ...tight, open_space_bonus: 1.5 });
+    const without = calcTodSingle({ ...tight, open_space_bonus: 0 });
+    const withBonus = calcTodSingle({ ...tight, open_space_bonus: 1.5 });
     expect(withBonus.buildable_sqft).toBeLessThan(without.buildable_sqft);
     // no bonus is the same as leaving it out
-    expect(calcSingle(tight)).toEqual(without);
+    expect(calcTodSingle(tight)).toEqual(without);
     // the bonus can't take more than the whole lot
-    expect(calcSingle({ ...tight, open_space_bonus: 100 }).buildable_sqft).toBe(0);
+    expect(calcTodSingle({ ...tight, open_space_bonus: 100 }).buildable_sqft).toBe(0);
+    // calcSingle keeps the bigger building here
+    expect(calcSingle({ ...tight, open_space_bonus: 1.5 }).open_space_bonus).toBe(0);
   });
 
   it("puts retail in industrial districts through the imported BMX-3 uses", () => {
@@ -1075,5 +1083,78 @@ describe("height step-backs", () => {
     // the sliders' own step-back overrides the zone's
     expect(stepBackOf({ ...site, stepback_trigger_ft: 75 } as SliderInputs, zoneStepBack("BMX-3"))?.trigger_ft).toBe(75);
     expect(stepBackOf(site, undefined)).toBeUndefined();
+  });
+});
+
+describe("open-space bonus", () => {
+  // each pathway's own calculator, which takes the bonus as given
+  const RUN = {
+    bill6: calcbill6Single,
+    standard: calcStandardSingle,
+    h201: calcH201Single,
+    tod: calcTodSingle,
+  } as const;
+  const site = (zone_class: string, height: number): Parcel => ({
+    lot_sqft: 20000,
+    zone_class,
+    height,
+    tod_regime: "ipdt",
+    slu_urban: true,
+    tod_precinct: "core",
+  });
+  const cases = (Object.keys(RUN) as (keyof typeof RUN)[]).flatMap((program) =>
+    ["BMX-3", "BMX-4", "B-2"].flatMap((zone) => [60, 350].map((height) => [program, zone, height] as const))
+  );
+
+  it.each(cases)("%s %s at %i ft keeps the better of with and without the bonus", (program, zone, height) => {
+    const inputs = parcelInputs(program, site(zone, height), {}, { tier: "with_benefits" });
+    const bonus = inputs.open_space_bonus ?? 0;
+    expect(bonus).toBeGreaterThan(0);
+    const withBonus = RUN[program](inputs);
+    const without = RUN[program]({
+      ...inputs,
+      open_space_bonus: 0,
+      max_far: inputs.far_without_bonus ?? inputs.max_far! - bonus,
+    });
+    const r = calcSingle(inputs);
+    // the higher residual land value where either pencils, else the bigger building
+    const pencils = withBonus.rlv > 0 || without.rlv > 0;
+    const keepWithout = pencils
+      ? without.rlv > withBonus.rlv
+      : without.buildable_sqft > withBonus.buildable_sqft ||
+        (without.buildable_sqft === withBonus.buildable_sqft && without.rlv > withBonus.rlv);
+    expect(r.rlv).toBe((keepWithout ? without : withBonus).rlv);
+    expect(r.open_space_bonus).toBe(keepWithout ? 0 : bonus);
+  });
+
+  it("keeps the bigger building where neither version pencils", () => {
+    // 10,000 sqft BMX-4 at 60 ft loses money either way; the bonus would give
+    // up 70% of the lot to open space for floor area the height can't hold
+    const r = calcParcel("bill6", { lot_sqft: 10000, zone_class: "BMX-4", height: 60 });
+    expect(r.rlv).toBeLessThan(0);
+    expect(r.open_space_bonus).toBe(0);
+    expect(r.max_units).toBeGreaterThanOrEqual(
+      calcParcel("bill6", { lot_sqft: 10000, zone_class: "BMX-3", height: 60 }).max_units
+    );
+  });
+
+  it("skips the bonus a 60 ft BMX-4 building can't use", () => {
+    const bmx4 = calcParcel("bill6", site("BMX-4", 60));
+    expect(bmx4.open_space_bonus).toBe(0);
+    expect(bmx4.max_units).toBeGreaterThanOrEqual(calcParcel("bill6", site("BMX-3", 60)).max_units);
+  });
+
+  it("takes the bonus where the height can use the floor area", () => {
+    expect(calcParcel("bill6", site("BMX-4", 350)).open_space_bonus).toBe(3.5);
+  });
+
+  it("uses the IPD-T formula's own FAR without the bonus", () => {
+    const env = pathwayEnvelope("tod", site("BMX-4", 60), { tier: "with_benefits" });
+    expect(env.far_without_bonus).toBe(calcFarTod("BMX-4", 20000, 0));
+  });
+
+  it("reports no bonus where none is offered", () => {
+    expect(calcParcel("bill6", site("A-2", 60)).open_space_bonus).toBe(0);
+    expect(calcParcel("bill7", site("BMX-4", 60)).open_space_bonus).toBe(0);
   });
 });

@@ -78,6 +78,8 @@ export interface Envelope {
   max_units?: number;
   /** FAR earned by public open space, its ground given up at 5:1 */
   open_space_bonus?: number;
+  /** FAR without that bonus, where it isn't max_far - open_space_bonus */
+  far_without_bonus?: number;
   /** PD-T: no ground-floor parking within this distance of the front, ft */
   front_no_parking_ft?: number;
 }
@@ -275,6 +277,11 @@ function todTierEnvelope(
     height_source: published != null ? "plan_cap" : "ipdt_doubling",
     status: "eligible",
     open_space_bonus: plan_far != null ? 0 : bonus,
+    // the IPD-T formula doubles the base before or after adding the bonus
+    far_without_bonus:
+      plan_far != null
+        ? undefined
+        : calcFarTod(parcel.zone_class, parcel.lot_sqft, 0),
   };
 }
 
@@ -295,7 +302,9 @@ export function pathwayEnvelope(
   if (program === "tod") return todEnvelope(parcel, opts);
   const height = parcel.height > 0 ? parcel.height : DEFAULT_HEIGHT[program];
   switch (program) {
+    // 201H builds on current zoning, so it takes the Ord. 26-7 FAR too
     case "bill6":
+    case "h201":
       return withOpenSpaceBonus(
         parcel.zone_class,
         height,
@@ -307,7 +316,6 @@ export function pathwayEnvelope(
         max_far: BILL7_FAR,
       };
     case "standard":
-    case "h201":
     default:
       return withOpenSpaceBonus(
         parcel.zone_class,
@@ -348,7 +356,7 @@ export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
     retail_rent: 5,
     retail_share: 0.1,
     hard_cost_per_sqft: 450,
-    land_cost: 200,
+    land_cost: 130,
     opex_ratio: 0.3,
     waivable_fee_basis: "market_units",
     park: "in_lieu",
@@ -374,10 +382,9 @@ export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
     h201: {
       ...standard,
       program: "h201",
-      affordable_ami: "ami_120",
-      market_ami: "ami_140",
+      affordable_ami: "ami_80",
+      market_ami: "ami_120",
       affordability: 0.51,
-      hard_cost_per_sqft: 550,
       // GET-exempt, so opex matches Bill 7
       opex_ratio: 0.19,
     },
@@ -393,7 +400,7 @@ export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
       grant_type: "post_construct",
       grant_amount: 12000,
       hard_cost_per_sqft: 450,
-      land_cost: 200,
+      land_cost: 130,
       opex_ratio: 0.19,
       // fees and park dedication waived (ROH 43-10.8)
       waivable_fee_basis: "none",
@@ -442,6 +449,8 @@ export function parcelInputs(
   if (program === "tod") {
     inputs.max_units = envelope.max_units;
     inputs.open_space_bonus = envelope.open_space_bonus ?? 0;
+    if (set.max_far == null)
+      inputs.far_without_bonus = envelope.far_without_bonus;
     inputs.front_no_parking_ft = envelope.front_no_parking_ft;
   } else if (envelope.open_space_bonus !== undefined) {
     inputs.open_space_bonus = envelope.open_space_bonus;
