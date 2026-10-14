@@ -33,7 +33,6 @@ import {
   envelopeCoverage,
   equityFirstDraws,
   excavationDepthByZone,
-  EXPENSES,
   FEES,
   FINANCING,
   floorPlates,
@@ -105,7 +104,8 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
   // park dedication is only waived under Bill 7 (ROH 43-10.8); every other
   // pathway pays the in-lieu fee unless the caller says otherwise
   const park = sliders.park ?? "in_lieu";
-  const opex_ratio = sliders.opex_ratio ?? EXPENSES.opex_ratio;
+  // GET-exempt, so opex matches Bill 7
+  const opex_ratio = sliders.opex_ratio ?? 0.19;
   const construction_rate =
     sliders.construction_rate ?? FINANCING.construction_rate;
   const permitting_months =

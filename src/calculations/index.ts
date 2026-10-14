@@ -138,7 +138,55 @@ export {
 // DISPATCH
 // =========================================================
 
+// The § 21-3.120-2 open-space bonus adds FAR but gives up ground at 5:1, so on
+// a lot whose height can't use the extra floor area it only costs space. A
+// developer takes it where it pays: run the project with and without it and
+// keep the one with the higher residual land value. Where neither pencils,
+// keep the bigger building, the one a developer would push to make work.
 export function calcSingle(sliders: SliderInputs): ParcelOutput {
+  const bonus = sliders.open_space_bonus ?? 0;
+  const with_bonus = calcProgram(sliders);
+  // TOD without a max_far takes calcFarTod's default, which already counts
+  // the bonus, so there is no FAR to compare against
+  if (
+    bonus <= 0 ||
+    sliders.program === "bill7" ||
+    (sliders.program === "tod" &&
+      sliders.max_far == null &&
+      sliders.far_without_bonus == null)
+  )
+    return { ...with_bonus, open_space_bonus: 0 };
+  const without_bonus = calcProgram({
+    ...sliders,
+    open_space_bonus: 0,
+    max_far:
+      sliders.far_without_bonus ??
+      (sliders.max_far != null
+        ? Math.max(0, sliders.max_far - bonus)
+        : undefined),
+  });
+  return prefersWithout(with_bonus, without_bonus)
+    ? { ...without_bonus, open_space_bonus: 0 }
+    : { ...with_bonus, open_space_bonus: bonus };
+}
+
+const rlvOf = (r: ParcelOutput) =>
+  Number.isFinite(r.rlv) ? r.rlv : -Infinity;
+
+/** whether the project without the bonus beats the one with it */
+function prefersWithout(
+  with_bonus: ParcelOutput,
+  without_bonus: ParcelOutput
+): boolean {
+  const a = rlvOf(with_bonus);
+  const b = rlvOf(without_bonus);
+  if (a > 0 || b > 0) return b > a;
+  if (without_bonus.buildable_sqft !== with_bonus.buildable_sqft)
+    return without_bonus.buildable_sqft > with_bonus.buildable_sqft;
+  return b > a;
+}
+
+function calcProgram(sliders: SliderInputs): ParcelOutput {
   switch (sliders.program) {
     case "standard":
       return calcStandardSingle(sliders);

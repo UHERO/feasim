@@ -1543,10 +1543,14 @@ export interface SliderInputs {
   target_return?: number;
   profit_margin?: number;
   affordable_ami?: string;
-  /** TOD/IPD-T only: § 21-3.120-2(b) open-space FAR bonus taken, in FAR. It
-   *  costs lot_sqft/5 of ground per 1.0 FAR, so it is both an uplift and a
-   *  land cost. */
+  /** § 21-3.120-2(b) open-space FAR bonus on offer, in FAR, included in
+   *  max_far. It costs lot_sqft/5 of ground per 1.0 FAR, so it is both an
+   *  uplift and a land cost; calcSingle takes it only if it raises the
+   *  residual land value. */
   open_space_bonus?: number;
+  /** FAR without the open-space bonus, for that comparison. Defaults to
+   *  max_far - open_space_bonus. */
+  far_without_bonus?: number;
   market_ami?: string;
   construction_rate?: number;
   equity?: number;
@@ -1601,6 +1605,8 @@ export interface ParcelOutput {
   lot_sqft: number;
   // effective height limit the envelope was built to
   height_limit: number;
+  // open-space FAR bonus taken; 0 when the project does better without it
+  open_space_bonus?: number;
   buildable_sqft: number;
   net_residential_sqft: number;
   net_commercial_sqft: number;

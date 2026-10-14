@@ -78,6 +78,8 @@ export interface Envelope {
   max_units?: number;
   /** FAR earned by public open space, its ground given up at 5:1 */
   open_space_bonus?: number;
+  /** FAR without that bonus, where it isn't max_far - open_space_bonus */
+  far_without_bonus?: number;
   /** PD-T: no ground-floor parking within this distance of the front, ft */
   front_no_parking_ft?: number;
 }
@@ -275,6 +277,11 @@ function todTierEnvelope(
     height_source: published != null ? "plan_cap" : "ipdt_doubling",
     status: "eligible",
     open_space_bonus: plan_far != null ? 0 : bonus,
+    // the IPD-T formula doubles the base before or after adding the bonus
+    far_without_bonus:
+      plan_far != null
+        ? undefined
+        : calcFarTod(parcel.zone_class, parcel.lot_sqft, 0),
   };
 }
 
@@ -442,6 +449,8 @@ export function parcelInputs(
   if (program === "tod") {
     inputs.max_units = envelope.max_units;
     inputs.open_space_bonus = envelope.open_space_bonus ?? 0;
+    if (set.max_far == null)
+      inputs.far_without_bonus = envelope.far_without_bonus;
     inputs.front_no_parking_ft = envelope.front_no_parking_ft;
   } else if (envelope.open_space_bonus !== undefined) {
     inputs.open_space_bonus = envelope.open_space_bonus;

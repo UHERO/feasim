@@ -28,12 +28,10 @@ import {
   DEFAULT_RETAIL_SHARE,
   DEFAULT_TARGET_RETURN,
   DEFAULT_TARGET_SPREAD,
-  DEFAULT_UNIT_TYPE,
   EFFICIENCY,
   envelopeCoverage,
   equityFirstDraws,
   excavationDepthByZone,
-  EXPENSES,
   FINANCING,
   floorPlates,
   GRANT,
@@ -63,14 +61,14 @@ import {
 // =========================================================
 export const DEFAULT_RETAIL_RENT = 3;
 export const DEFAULT_HEIGHT_LIMIT = 30;
-export const DEFAULT_PERMANENT_RATE = 0.0675;
+export const DEFAULT_PERMANENT_RATE = 0.07;
 export const DEFAULT_HOLD_YEARS = 10;
 export const DEFAULT_LAND_COST = 130;
 export const DEFAULT_GRANT_TYPE = "post_construct" as
   "none" | "pre_construct" | "post_construct";
 export const DEFAULT_INCLUDE_RETAIL = false;
 export const DEFAULT_AFFORDABLE_AMI = "ami_80";
-export const DEFAULT_MARKET_AMI = "ami_80";
+export const DEFAULT_MARKET_AMI = "ami_100";
 
 // =========================================================
 // MAIN ENTRY: calcBill7Single
@@ -79,7 +77,7 @@ export const DEFAULT_MARKET_AMI = "ami_80";
 export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   const lot_sqft = sliders.lot_sqft ?? 5000;
   const height_limit = sliders.height_limit ?? DEFAULT_HEIGHT_LIMIT;
-  const unit_type = sliders.unit_type ?? DEFAULT_UNIT_TYPE;
+  const unit_type = sliders.unit_type ?? "studio50_1br50";
   const equity = sliders.equity ?? 0.3;
   const land_cost = sliders.land_cost ?? DEFAULT_LAND_COST;
   const leaseup_override = sliders.leaseup_months;
@@ -87,7 +85,8 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   const hold_years = sliders.hold_years ?? DEFAULT_HOLD_YEARS;
   const amort_years = sliders.amort_years ?? HOLD.amort_years;
   const min_dscr = sliders.min_dscr ?? 1.15;
-  const opex_ratio = sliders.opex_ratio ?? EXPENSES.opex_ratio;
+  // GET-exempt affordable rental
+  const opex_ratio = sliders.opex_ratio ?? 0.19;
   const grant_type = sliders.grant_type ?? DEFAULT_GRANT_TYPE;
   const grant_amount =
     sliders.grant_amount ??

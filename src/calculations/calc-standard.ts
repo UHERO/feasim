@@ -602,7 +602,7 @@ export function calcStandardSingle(sliders: SliderInputs): ParcelOutput {
   const include_retail = sliders.include_retail ?? false;
   const retail_rent = sliders.retail_rent ?? 5;
   const affordable_ami = sliders.affordable_ami ?? "ami_50";
-  const market_ami = sliders.market_ami ?? "ami_50";
+  const market_ami = sliders.market_ami ?? "ami_120";
   const construction_rate =
     sliders.construction_rate ?? FINANCING.construction_rate;
   const impact_fee_per_unit = sliders.impact_fee ?? FEES.impact.per_dwelling;
@@ -736,7 +736,8 @@ export function calcStandardSingle(sliders: SliderInputs): ParcelOutput {
   const sale = { gross_sales: 0, afd_sales: 0, mkt_sales: 0 };
 
   // Step 6: Operating expenses
-  const opex_ratio = sliders.opex_ratio ?? EXPENSES.opex_ratio;
+  // market projects, property tax included (DEFAULT_INPUTS)
+  const opex_ratio = sliders.opex_ratio ?? 0.3;
   const opex = standardOpex(rev.residential_egi, rev.retail_egi, opex_ratio);
 
   // Step 7: NOI & GDV

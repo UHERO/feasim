@@ -33,7 +33,6 @@ import {
   envelopeCoverage,
   equityFirstDraws,
   excavationDepthByZone,
-  EXPENSES,
   FEES,
   FINANCING,
   floorPlates,
@@ -77,7 +76,7 @@ export const TOD_DEFAULT_PERMANENT_RATE = 0.0675;
 export const TOD_DEFAULT_HOLD_YEARS = 10;
 export const TOD_DEFAULT_RETAIL_RENT = 5;
 export const TOD_DEFAULT_AFFORDABLE_AMI = "ami_80";
-export const TOD_DEFAULT_MARKET_AMI = "ami_80";
+export const TOD_DEFAULT_MARKET_AMI = "ami_120";
 
 // =========================================================
 // MAIN ENTRY: calcTodSingle
@@ -110,7 +109,8 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   // pathway pays the in-lieu fee unless the caller says otherwise
   const park = sliders.park ?? "in_lieu";
   const const_months = resolveConstMonths(zone_class, sliders.const_months);
-  const opex_ratio = sliders.opex_ratio ?? EXPENSES.opex_ratio;
+  // market projects, property tax included (DEFAULT_INPUTS)
+  const opex_ratio = sliders.opex_ratio ?? 0.3;
   const hard_cost_per_sqft = sliders.hard_cost_per_sqft ?? 450;
   const parking_ratio = sliders.parking_ratio ?? PARKING.stalls_per_unit;
   const retail_share = sliders.retail_share ?? DEFAULT_RETAIL_SHARE;
