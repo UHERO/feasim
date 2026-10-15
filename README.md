@@ -1,4 +1,4 @@
-# @uhero/policy-simulator
+# @uhero/feasim
 
 A development feasibility model for housing on Oʻahu, from the University of Hawaiʻi Economic Research Organization (UHERO).
 
@@ -15,7 +15,7 @@ Some things you can use it for:
 ## Install
 
 ```sh
-npm install @uhero/policy-simulator
+npm install @uhero/feasim
 ```
 
 > Until the first release is on npm, install from source: clone this repo, run `npm install` and `npm run build` in it, then run `npm install /path/to/policy-simulator-package` from your project.
@@ -23,7 +23,7 @@ npm install @uhero/policy-simulator
 ## Quick start
 
 ```ts
-import { calcParcel, overallLevel } from "@uhero/policy-simulator";
+import { calcParcel, overallLevel } from "@uhero/feasim";
 
 // a 20,000 sqft lot zoned BMX-3 with a 150 ft height limit
 const parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 150 };
@@ -140,7 +140,7 @@ The project is **poor** if half or more of the metrics are poor, **strong** if n
 1. Compare pathways for one lot
 
 ```ts
-import { calcParcel, overallLevel, type ProgramId } from "@uhero/policy-simulator";
+import { calcParcel, overallLevel, type ProgramId } from "@uhero/feasim";
 
 const parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 150 };
 
@@ -171,7 +171,7 @@ const feasibleUnits = results
 4. Change TOD permit tiers, the fourth argument picks the tier: `"base"`, `"minor_sd"`, `"major_sd"` or `"with_benefits"`
 
 ```ts
-import { calcParcel, todIneligibleReason } from "@uhero/policy-simulator";
+import { calcParcel, todIneligibleReason } from "@uhero/feasim";
 
 const site = {
   lot_sqft: 20000, zone_class: "BMX-3", height: 150,
@@ -187,7 +187,7 @@ calcParcel("tod", site, {}, { tier: "with_benefits" });
 **Note:** `calcSingle` is the model itself: one flat set of inputs in, one result out. Use it when you want to set the FAR and height yourself instead of taking them from a pathway's rules.
 
 ```ts
-import { calcSingle, DEFAULT_INPUTS } from "@uhero/policy-simulator";
+import { calcSingle, DEFAULT_INPUTS } from "@uhero/feasim";
 
 calcSingle({
   ...DEFAULT_INPUTS.bill6,

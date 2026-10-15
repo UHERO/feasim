@@ -1,4 +1,4 @@
-// @uhero/policy-simulator — public entry point.
+// @uhero/feasim — public entry point.
 // Everything the package offers is exported from this file, and nothing else
 // is part of its API.
 // The model is copied from uhero_analytics (see README, "Source").
