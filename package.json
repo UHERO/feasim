@@ -24,7 +24,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "repository": "github:UHERO/policy-simulator-package",
+  "repository": "github:UHERO/feasim",
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean",
     "prepare": "npm run build",
