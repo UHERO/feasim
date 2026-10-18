@@ -71,7 +71,13 @@ import {
   yardFootprint,
   zoneStepBack,
 } from "../src";
-import { calcSoftCosts, setbackFootprint } from "../src/calculations/calc-shared";
+import {
+  calcSoftCosts,
+  mixPostGrant,
+  postGrantPerUnit,
+  setbackFootprint,
+  UNIT_SIZE,
+} from "../src/calculations/calc-shared";
 import { calcbill6Single } from "../src/calculations/calc-bill6";
 import { calcH201Single } from "../src/calculations/calc-h201";
 import { calcStandardSingle } from "../src/calculations/calc-standard";
@@ -269,6 +275,17 @@ describe("policy behaviour", () => {
     const at80 = calcSingle({ ...bill7, affordable_ami: "ami_80" });
     const at100 = calcSingle({ ...bill7, affordable_ami: "ami_100" });
     expect(at100.property_tax).toBeGreaterThan(at80.property_tax);
+  });
+
+  it("Bill 7's post-construction grant pays $40/sqft below 300 sqft and $12,000 at or above", () => {
+    expect(postGrantPerUnit(250)).toBe(10000);
+    expect(postGrantPerUnit(299)).toBe(11960);
+    expect(postGrantPerUnit(300)).toBe(12000);
+    expect(postGrantPerUnit(700)).toBe(12000);
+    // the built-in studio is exactly 300 sqft, so every preset mix gets the flat amount
+    expect(UNIT_SIZE.studio).toBe(300);
+    expect(mixPostGrant("studio_100")).toBe(GRANT.post_construct);
+    expect(mixPostGrant("third_each")).toBeCloseTo(GRANT.post_construct);
   });
 
   it("a longer amortization supports a larger, DSCR-sized permanent loan", () => {

@@ -3,7 +3,8 @@
 // - FAR=4, lot coverage=80% (ROH Chp 32)
 // - 80% affordable rental, no sale units
 // - Permit fees waived, park dedication waived, wastewater waived
-// - $12k–$50k grants per affordable unit
+// - $12k–$50k grants per affordable unit ($40/sqft post-construction for
+//   units under 300 sqft)
 // - 15-year property tax exemption on improvements
 // - Height-based construction cost rate (not zone lookup)
 // - Timing, excavation depth and stepbacks follow the zone class when one is
@@ -39,6 +40,7 @@ import {
   HOLD,
   INCOME,
   mixFixtureUnits,
+  mixPostGrant,
   mixRentByAmi,
   mixUnitSize,
   ParcelOutput,
@@ -89,11 +91,12 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   // GET-exempt affordable rental
   const opex_ratio = sliders.opex_ratio ?? 0.19;
   const grant_type = sliders.grant_type ?? DEFAULT_GRANT_TYPE;
+  // per affordable unit; post-construction pays $40/sqft below 300 sqft
   const grant_amount =
     sliders.grant_amount ??
     (grant_type === "pre_construct"
       ? GRANT.pre_construct
-      : GRANT.post_construct);
+      : mixPostGrant(unit_type));
   const include_retail = sliders.include_retail ?? false;
   const retail_rent = sliders.retail_rent ?? 3;
   const affordable_ami = sliders.affordable_ami ?? DEFAULT_AFFORDABLE_AMI;

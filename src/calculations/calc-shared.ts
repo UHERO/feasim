@@ -284,11 +284,31 @@ export const COMMERCIAL_COVERAGE = {
   commercial3: 0.6,
 };
 
-// bill 7 grant amounts per affordable unit
+// bill 7 grant amounts per affordable unit:
+// units under 300 sf get $40/sf of dwelling unit floor area
 export const GRANT = {
   pre_construct: 50000,
   post_construct: 12000,
+  small_unit_sqft: 300,
+  small_unit_per_sqft: 40,
 };
+
+// post-construction grant for one affordable unit of the given floor area
+export function postGrantPerUnit(unit_sqft: number): number {
+  return unit_sqft < GRANT.small_unit_sqft
+    ? unit_sqft * GRANT.small_unit_per_sqft
+    : GRANT.post_construct;
+}
+
+// blended post-construction grant per affordable unit for a mix key, sized
+// unit type by unit type
+export function mixPostGrant(mix_key: string): number {
+  const mix = UNIT_MIX[mix_key] ?? UNIT_MIX["one_bb_100"];
+  return mix.reduce(
+    (sum, m) => sum + postGrantPerUnit(UNIT_SIZE[m.type] ?? 500) * m.weight,
+    0
+  );
+}
 
 // parking
 export const PARKING = {
@@ -1555,8 +1575,6 @@ export interface SliderInputs {
   construction_rate?: number;
   equity?: number;
   grant_type?: "none" | "pre_construct" | "post_construct";
-  /** Bill 7 grant per affordable unit ($). Defaults to the grant_type's
-   *  amount in GRANT: $50,000 pre-construction, $12,000 post-construction. */
   grant_amount?: number;
   land_cost?: number;
   permanent_rate?: number;
