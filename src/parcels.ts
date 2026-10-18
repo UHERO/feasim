@@ -397,8 +397,9 @@ export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
       retail_rent: 3,
       retail_share: 0.1,
       building_area_per_unit: 800,
+      // no grant_amount: the model takes it from grant_type (GRANT), so a
+      // pre-construction run gets $50,000 rather than the post-construction $12,000
       grant_type: "post_construct",
-      grant_amount: 12000,
       hard_cost_per_sqft: 450,
       land_cost: 130,
       opex_ratio: 0.19,

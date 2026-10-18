@@ -10,6 +10,7 @@ import {
   BILL7_FAR,
   BILL7_MAX_HEIGHT,
   DEFAULT_INPUTS,
+  GRANT,
   baseFar,
   calcFAR,
   calcFarPdt,
@@ -402,6 +403,17 @@ describe("calcParcel", () => {
 
   it("keeps the model's own id when the parcel has no TMK", () => {
     expect(calcParcel("bill6", low).tmk).toBe(calcSingle(parcelInputs("bill6", low)).tmk);
+  });
+
+  it("gives each Bill 7 grant type its own default amount", () => {
+    const grant = (grant_type: SliderInputs["grant_type"]) => {
+      const r = calcParcel("bill7", tall, { grant_type });
+      return (r.pre_construction_subsidy + r.dev_post_grant) / r.affordable_units;
+    };
+    expect(grant("pre_construct")).toBe(GRANT.pre_construct);
+    expect(grant("post_construct")).toBe(GRANT.post_construct);
+    expect(calcParcel("bill7", tall, { grant_type: "pre_construct", grant_amount: 60000 }).pre_construction_subsidy)
+      .toBe(calcParcel("bill7", tall).affordable_units * 60000);
   });
 
   it("builds to the Bill 7 cap, not above it", () => {

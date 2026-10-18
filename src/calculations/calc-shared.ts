@@ -1555,6 +1555,8 @@ export interface SliderInputs {
   construction_rate?: number;
   equity?: number;
   grant_type?: "none" | "pre_construct" | "post_construct";
+  /** Bill 7 grant per affordable unit ($). Defaults to the grant_type's
+   *  amount in GRANT: $50,000 pre-construction, $12,000 post-construction. */
   grant_amount?: number;
   land_cost?: number;
   permanent_rate?: number;

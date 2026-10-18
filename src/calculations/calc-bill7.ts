@@ -8,7 +8,8 @@
 // - Height-based construction cost rate (not zone lookup)
 // - Timing, excavation depth and stepbacks follow the zone class when one is
 //   given, as in the other pathways; FAR, coverage and the 60 ft cap stay
-//   Bill 7's own
+//   Bill 7's own. DEFAULT_INPUTS sets permitting and construction months, so
+//   calcParcel runs keep 18/12 whatever the zone
 
 import {
   allocatePropertyTax,
@@ -102,7 +103,8 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   // Bill 7 applies in the apartment (A), apartment mixed-use (AMX), business
   // mixed-use (BMX) and Waikiki districts. With a zone, timing, excavation and
   // stepbacks follow it as in the other pathways (FAR, coverage and the height
-  // cap stay Bill 7's own); without one, they fall back to the height.
+  // cap stay Bill 7's own); without one, they fall back to the height. An
+  // explicit permitting_months or const_months (as DEFAULT_INPUTS sets) wins.
   const has_zone = sliders.zone_class != null;
   const zone_class =
     sliders.zone_class ?? (height_limit <= 30 ? "low_rise" : "mid_rise");

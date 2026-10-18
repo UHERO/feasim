@@ -47,7 +47,7 @@ A pathway is a set of rules a project can be built under. Each pathway sets what
 | --- | --- | --- |
 | `"bill6"` | Standard (current zoning) | The zone's FAR (as set by Ordinance 26-7), lot coverage and height under the Land Use Ordinance, with the Article 6 parking minimums |
 | `"standard"` | Before Ord. 26-7 | The FAR and lot coverage rules as they stood before Ordinance 26-7, for comparison |
-| `"bill7"` | Bill 7 | An affordable housing pathway in the A, AMX, BMX and Waikiki (Apart, ApartMix) districts, with FAR 4.0 and a 60 ft height cap, construction grants, waived impact fees, and no required parking. Timing, excavation and stepbacks follow the zone |
+| `"bill7"` | Bill 7 | An affordable housing pathway in the A, AMX, BMX and Waikiki (Apart, ApartMix) districts, with FAR 4.0 and a 60 ft height cap, construction grants, waived impact fees, and no required parking. Excavation and stepbacks follow the zone |
 | `"tod"` | Transit-oriented development | PD-T and IPD-T permits near rail stations (ROH § 21-9.100): FAR and height bonuses by tier, station area plan limits, no required parking |
 | `"h201"` | HRS § 201H | Exemptions for affordable housing projects, on current (Ord. 26-7) zoning FAR and lot coverage. The defaults make 51% of units affordable at 80% of area median income (AMI), with market units at 120% AMI; set `affordability` and `affordable_ami` to change that. |
 
@@ -90,6 +90,8 @@ calcParcel("bill6", parcel, {
 ```
 
 **Note:** `height_limit` and `max_far` override the pathway's envelope. Bill 7 still caps height at 60 ft. See the `SliderInputs` type for the full list, with units.
+
+**Note:** every pathway's defaults set 18 months of permitting and 12 of construction, so `calcParcel` uses that timing whatever the zone. To use the zone's timing, call `calcSingle` without `permitting_months` and `const_months`.
 
 ### Input values
 
