@@ -7,10 +7,7 @@
 //   units under 300 sqft)
 // - 15-year property tax exemption on improvements
 // - Height-based construction cost rate (not zone lookup)
-// - Timing, excavation depth and stepbacks follow the zone class when one is
-//   given, as in the other pathways; FAR, coverage and the 60 ft cap stay
-//   Bill 7's own. DEFAULT_INPUTS sets permitting and construction months, so
-//   calcParcel runs keep 18/12 whatever the zone
+// - excavation and stepbacks follow the zone; timing is 18/12 months unless set
 
 import {
   allocatePropertyTax,
@@ -38,16 +35,17 @@ import {
   floorPlates,
   GRANT,
   HOLD,
+  PREVAILING_WAGE,
   INCOME,
   mixFixtureUnits,
   mixPostGrant,
   mixRentByAmi,
   mixUnitSize,
   ParcelOutput,
-  permittingMonthsByZone,
+  DEFAULT_PERMITTING_MONTHS,
   podiumEnvelope,
   resolveCapRate,
-  resolveConstMonths,
+  DEFAULT_CONST_MONTHS,
   RETAIL_CAP_SPREAD,
   RETAIL_PREMIUM,
   sizeConstructionLoan,
@@ -103,21 +101,13 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   const market_ami = sliders.market_ami ?? DEFAULT_MARKET_AMI;
   const construction_rate =
     sliders.construction_rate ?? FINANCING.construction_rate;
-  // Bill 7 applies in the apartment (A), apartment mixed-use (AMX), business
-  // mixed-use (BMX) and Waikiki districts. With a zone, timing, excavation and
-  // stepbacks follow it as in the other pathways (FAR, coverage and the height
-  // cap stay Bill 7's own); without one, they fall back to the height. An
-  // explicit permitting_months or const_months (as DEFAULT_INPUTS sets) wins.
+  // bill 7 applies in A, AMX, BMX and waikiki districts; excavation and
+  // stepbacks follow the zone, or the height without one
   const has_zone = sliders.zone_class != null;
   const zone_class =
     sliders.zone_class ?? (height_limit <= 30 ? "low_rise" : "mid_rise");
   const permitting_months_val =
-    sliders.permitting_months ??
-    (has_zone
-      ? permittingMonthsByZone(zone_class)
-      : height_limit <= 30
-        ? Math.round(425 / 30)
-        : Math.round(535 / 30));
+    sliders.permitting_months ?? DEFAULT_PERMITTING_MONTHS;
   const hard_cost_per_sqft = sliders.hard_cost_per_sqft ?? 450;
   // Bill 7 projects are exempt from off-street parking (ROH 32-2.3)
   const parking_ratio = sliders.parking_ratio ?? 0;
@@ -205,14 +195,36 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   const hard_cost_base = building_cost + parking_cost;
 
   // Resolve construction months early so cost inflation can use it.
-  const const_months_val = has_zone
-    ? resolveConstMonths(zone_class, sliders.const_months)
-    : (sliders.const_months ?? 12);
+  const const_months_val = sliders.const_months || DEFAULT_CONST_MONTHS;
   // Construction cost inflation: costs are spent throughout the build, so the average dollar lands at permitting + const/2.
   const cost_inflation_multiplier =
     FINANCING.cost_inflation **
     ((permitting_months_val + const_months_val / 2) / 12);
-  const hard_cost = hard_cost_base * cost_inflation_multiplier;
+  // hard cost before any prevailing wage premium
+  const open_shop_hard_cost = hard_cost_base * cost_inflation_multiplier;
+
+  // post-construction pays per affordable unit, pre-construction per unit
+  const post_construction_grant =
+    grant_type === "post_construct" ? affordable_units * grant_amount : 0;
+  const is_pre = grant_type === "pre_construct";
+  // prevailing wage premium on on-site labor, pre-construction only
+  const pw_premium = is_pre
+    ? (sliders.prevailing_wage_premium ?? PREVAILING_WAGE.labor_premium)
+    : 0;
+  const onsite_labor =
+    (sliders.onsite_labor_share ?? PREVAILING_WAGE.onsite_labor_share) *
+    open_shop_hard_cost;
+  const pw_premium_cost = onsite_labor * pw_premium;
+  const hard_cost = open_shop_hard_cost + pw_premium_cost;
+  // subsidy can only pay on-site prevailing wages (ROH 32-5.2(c)(3))
+  const subsidy_labor_cap = onsite_labor + pw_premium_cost;
+  const subsidy_units =
+    sliders.grant_units === "affordable" ? affordable_units : max_units;
+  const subsidy_requested = is_pre ? subsidy_units * grant_amount : 0;
+  const pre_construction_subsidy = Math.min(
+    subsidy_requested,
+    subsidy_labor_cap
+  );
 
   // =========================================================
   // Step 2: Soft costs
@@ -246,34 +258,21 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   // =========================================================
   // Step 3: Financing
   // =========================================================
-  const pre_construction_subsidy =
-    grant_type === "pre_construct" ? affordable_units * grant_amount : 0;
-
   const construct_cost = hard_cost + soft_cost;
 
   // the loan is sized on full cost
   const hard_cost_contingency = hard_cost * FINANCING.contingency;
   const total_dev_cost = hard_cost_contingency + soft_cost;
-  // pre-construction grant is a source at closing that displaces equity
-  // (equity = cost + loan fee - loan - grant)
+  // equity = cost + loan fee - loan; grants come after closing
   const amount_to_finance = total_dev_cost;
   const land_cost_total = land_cost * lot_sqft;
-  const closing_grant =
-    grant_type === "pre_construct" ? pre_construction_subsidy : 0;
   // financing runs in two passes for RLV vs ROC & etc
   // RLV doesn't include land, the rest do
-  const financeAt = (
-    land_in_base: number,
-    loan_principal: number,
-    grant = 0
-  ) => {
+  const financeAt = (land_in_base: number, loan_principal: number) => {
     const base = amount_to_finance + land_in_base;
     const loan_fee = loan_principal * FINANCING.loan_fee;
     // the loan fee is due at closing and paid in equity
-    const equity_amount = Math.max(
-      0,
-      base + loan_fee - loan_principal - grant
-    );
+    const equity_amount = Math.max(0, base + loan_fee - loan_principal);
 
     // pre-dev equity (no compounding,IRR handles time cost)
     // drawn from the equity left after the land purchase
@@ -316,6 +315,15 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   const total_carry_months = ltc_pass.leaseup.total_carry_months;
   const total_months =
     permitting_months_val + const_months_val + total_carry_months;
+
+  // grant cash by month: pre-construction evenly over construction
+  // (ROH 32-5.2(8)), post-construction when construction ends (32-4.2(c))
+  const construction_end = permitting_months_val + const_months_val;
+  const grant_flows: number[] = new Array(total_months + 1).fill(0);
+  for (let m = permitting_months_val + 1; m <= construction_end; m++)
+    grant_flows[m] += pre_construction_subsidy / const_months_val;
+  grant_flows[construction_end] += post_construction_grant;
+  const total_grants = pre_construction_subsidy + post_construction_grant;
 
   // =========================================================
   // Step 4: Revenue
@@ -363,9 +371,10 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   // NOI is after property tax (bill 7: improvements exempt, land-only tax)
   // bill 7's 15yr improvement exemption applies only while the affordable rent is 80% AMI or less
   const tax_exempt = Number(String(affordable_ami).replace("ami_", "")) <= 80;
+  // taxed on hard cost without the wage premium
   const property_tax = calcPropertyTax(
     land_cost * lot_sqft,
-    hard_cost,
+    open_shop_hard_cost,
     tax_exempt
   );
   const tax = allocatePropertyTax(property_tax, residential_egi, retail_egi);
@@ -409,17 +418,12 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   ).total_financing_cost;
 
   const deal_base = amount_to_finance + land_cost_total;
-  const deal_ltc = financeAt(
-    land_cost_total,
-    deal_base * (1 - equity),
-    closing_grant
-  );
+  const deal_ltc = financeAt(land_cost_total, deal_base * (1 - equity));
   const sizing = sizeConstructionLoan(
     deal_base,
     equity,
     deal_ltc.leaseup.final_principal,
-    take_out,
-    closing_grant
+    take_out
   );
   const {
     equity_amount,
@@ -430,7 +434,7 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     leaseup,
     total_financing_cost,
   } = sizing.dscr_binds
-    ? financeAt(land_cost_total, sizing.loan_principal, closing_grant)
+    ? financeAt(land_cost_total, sizing.loan_principal)
     : deal_ltc;
 
   // =========================================================
@@ -442,13 +446,11 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     gdv,
     total_dev_cost,
     rlv_financing_cost,
-    affordable_units,
-    grant_type,
+    grant_flows,
     lot_sqft,
     total_months,
     target_return,
-    sliders.profit_margin ?? DEFAULT_PROFIT_MARGIN,
-    grant_amount
+    sliders.profit_margin ?? DEFAULT_PROFIT_MARGIN
   );
   // =========================================================
   // Step 8: Developer Feasibility
@@ -461,13 +463,10 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   if (hold_years === 0) {
     // DEV FLIP
     const selling_costs = gdv * FINANCING.disposition_cost;
-    let post_grant = 0;
-    if (grant_type === "post_construct")
-      post_grant = affordable_units * grant_amount;
-    const equity_out =
-      gdv - selling_costs - leaseup.final_principal + post_grant;
+    const post_grant = post_construction_grant;
+    const equity_out = gdv - selling_costs - leaseup.final_principal;
 
-    // monthly cashflow: predev spread across permitting, construction equity at close, exit at end
+    // monthly cashflow: equity draws, grants as paid, exit at end
     const cashflows = new Array(total_months + 1).fill(0);
     // equity first: land, then predev, then the balance at loan closing
     equityFirstDraws(
@@ -478,15 +477,19 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     ).forEach((d, m) => {
       cashflows[m] += d;
     });
-    cashflows[total_months] = equity_out;
+    grant_flows.forEach((g, m) => {
+      cashflows[m] += g;
+    });
+    cashflows[total_months] += equity_out;
 
     const levered_irr = solveIRR(cashflows, true);
-    const equity_multiple = equity_out / total_equity_invested;
-    const roi = (equity_out - total_equity_invested) / total_equity_invested;
+    const cash_in = equity_out + total_grants;
+    const equity_multiple = cash_in / total_equity_invested;
+    const roi = (cash_in - total_equity_invested) / total_equity_invested;
 
     const total_dev_cost_full =
       total_dev_cost + land_cost_total + total_financing_cost;
-    // grants are cash for developers: post-const at exit, pre-const at close
+    // grants count as developer cash
     const profit =
       gdv -
       selling_costs -
@@ -513,7 +516,7 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
       dev_roc: Math.round(roc * 10000) / 10000,
       dev_gdv: gdv,
       dev_selling_costs: Math.round(selling_costs),
-      dev_equity_out: Math.round(equity_out),
+      dev_equity_out: Math.round(cash_in),
       dev_loan_payoff: Math.round(leaseup.final_principal),
       dev_perm_principal: null,
       dev_perm_rate: null,
@@ -528,12 +531,10 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     };
   } else {
     // HOLD STRATEGY
-    let post_grant = 0;
-    if (grant_type === "post_construct")
-      post_grant = affordable_units * grant_amount;
+    const post_grant = post_construction_grant;
 
     const land_value = land_cost * lot_sqft;
-    const improvement_value = hard_cost;
+    const improvement_value = open_shop_hard_cost;
     const tax_rate = FINANCING.rpt_residential;
     // yr1: land only (exemption)
     const yr1_prop_tax = tax_exempt
@@ -556,7 +557,18 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     const hold_months = hold_years * 12;
     const total_with_hold = total_months + hold_months;
     const cf = new Array(total_with_hold + 1).fill(0);
-    cf[0] = -equity_amount;
+    // equity drawn as in the flip: land, predev, rest at closing
+    equityFirstDraws(
+      equity_amount,
+      land_cost_total,
+      predev.monthly_predev_spend,
+      permitting_months_val
+    ).forEach((d, m) => {
+      cf[m] += d;
+    });
+    grant_flows.forEach((g, m) => {
+      cf[m] += g;
+    });
 
     let current_egi = egi;
     let current_opex = operating_expenses;
@@ -578,8 +590,7 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
           : assessed_value * tax_rate;
 
       const current_noi = current_egi - current_opex - prop_tax;
-      let levered_cf = current_noi - perm.annual_debt_svc;
-      if (yr === 1 && post_grant > 0) levered_cf += post_grant;
+      const levered_cf = current_noi - perm.annual_debt_svc;
 
       const monthly_cf = levered_cf / 12;
       for (let mo = 1; mo <= 12; mo++) {
@@ -673,6 +684,9 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     total_financing_cost,
     rlv_financing_cost,
     pre_construction_subsidy,
+    pw_premium_cost,
+    subsidy_labor_cap: is_pre ? subsidy_labor_cap : 0,
+    subsidy_cap_binds: subsidy_requested > subsidy_labor_cap,
     equity_amount,
     dev_equity_pct_realized: sizing.equity_pct_realized,
     dev_dscr_binds: sizing.dscr_binds,
@@ -704,7 +718,7 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     gdv,
     // RLV
     rlv_selling_costs: rlv.selling_costs,
-    rlv_post_grant: rlv.post_construction_grant,
+    rlv_post_grant: post_construction_grant,
     rlv_profit: rlv.profit,
     rlv_project_cost: rlv.project_cost,
     rlv: rlv.rlv,

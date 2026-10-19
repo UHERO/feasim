@@ -50,10 +50,10 @@ import {
   mixRentByAmi,
   mixUnitSize,
   ParcelOutput,
-  permittingMonthsByZone,
+  DEFAULT_PERMITTING_MONTHS,
   podiumEnvelope,
   resolveCapRate,
-  resolveConstMonths,
+  DEFAULT_CONST_MONTHS,
   RETAIL_CAP_SPREAD,
   RETAIL_PREMIUM,
   sizeConstructionLoan,
@@ -453,6 +453,8 @@ function standardHold(
   total_predev_cost: number,
   hard_cost: number,
   total_months: number,
+  permitting_months: number,
+  monthly_predev_spend: number,
   land_cost_sqft: number,
   lot_sqft: number,
   permanent_rate: number,
@@ -500,8 +502,15 @@ function standardHold(
   const total_with_hold = total_months + hold_months;
   const cf = new Array(total_with_hold + 1).fill(0);
 
-  // land cost now included
-  cf[0] = -equity_amount;
+  // equity drawn as in the flip: land, predev, rest at closing
+  equityFirstDraws(
+    equity_amount,
+    land_cost,
+    monthly_predev_spend,
+    permitting_months
+  ).forEach((d, m) => {
+    cf[m] += d;
+  });
   // sale unit proceeds arrive at stabilization
   cf[total_months] += excess_sale_cash;
 
@@ -609,7 +618,7 @@ export function calcStandardSingle(sliders: SliderInputs): ParcelOutput {
   const waivable_fee_basis = sliders.waivable_fee_basis ?? "market_units";
   const floor_height = sliders.floor_height ?? STD_DEFAULT_FLOOR_HEIGHT;
   const permitting_months_val =
-    sliders.permitting_months ?? permittingMonthsByZone(zone_class);
+    sliders.permitting_months ?? DEFAULT_PERMITTING_MONTHS;
   const setback = sliders.setback ?? 10;
   const hard_cost_per_sqft = sliders.hard_cost_per_sqft ?? 450;
   // Article 6 minimum unless the lever is set (§ 21-6.20)
@@ -641,7 +650,7 @@ export function calcStandardSingle(sliders: SliderInputs): ParcelOutput {
     return zeroOutput("hypothetical", zone_class, lot_sqft, height_limit);
 
   // Construction cost inflation: costs are spent throughout the build, so the average dollar lands at permitting + const/2.
-  const const_months = resolveConstMonths(zone_class, sliders.const_months);
+  const const_months = sliders.const_months || DEFAULT_CONST_MONTHS;
   const cost_inflation_multiplier =
     FINANCING.cost_inflation **
     ((permitting_months_val + const_months / 2) / 12);
@@ -794,8 +803,7 @@ export function calcStandardSingle(sliders: SliderInputs): ParcelOutput {
     noi_result.gdv,
     loan.total_dev_cost,
     rlv_financing_cost,
-    0, // no affordable_units for grants in Standard
-    "none", // no grant_type
+    [], // no grants in Standard
     lot_sqft,
     total_months,
     sliders.target_return ?? DEFAULT_TARGET_RETURN,
@@ -832,6 +840,8 @@ export function calcStandardSingle(sliders: SliderInputs): ParcelOutput {
           predev.total_predev_cost,
           hard_cost,
           total_months,
+          permitting_months_val,
+          predev.monthly_predev_spend,
           land_cost,
           lot_sqft,
           permanent_rate,
@@ -910,7 +920,7 @@ export function calcStandardSingle(sliders: SliderInputs): ParcelOutput {
     cap_rate: noi_result.cap_rate,
     gdv: noi_result.gdv,
     rlv_selling_costs: rlv.selling_costs,
-    rlv_post_grant: rlv.post_construction_grant,
+    rlv_post_grant: 0,
     rlv_profit: rlv.profit,
     rlv_project_cost: rlv.project_cost,
     rlv: rlv.rlv,

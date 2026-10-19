@@ -48,7 +48,8 @@ import {
   PARKING_MINIMUM,
   podiumEnvelope,
   resolveCapRate,
-  resolveConstMonths,
+  DEFAULT_CONST_MONTHS,
+  DEFAULT_PERMITTING_MONTHS,
   RETAIL_CAP_SPREAD,
   RETAIL_PREMIUM,
   sizeConstructionLoan,
@@ -102,13 +103,14 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   const market_ami = sliders.market_ami ?? TOD_DEFAULT_MARKET_AMI;
   const construction_rate =
     sliders.construction_rate ?? FINANCING.construction_rate;
-  const permitting_months = sliders.permitting_months ?? 18;
+  const permitting_months =
+    sliders.permitting_months ?? DEFAULT_PERMITTING_MONTHS;
   const impact_fee_per_unit = sliders.impact_fee ?? FEES.impact.per_dwelling;
   const waivable_fee_basis = sliders.waivable_fee_basis ?? "market_units";
   // park dedication is only waived under Bill 7 (ROH 43-10.8); every other
   // pathway pays the in-lieu fee unless the caller says otherwise
   const park = sliders.park ?? "in_lieu";
-  const const_months = resolveConstMonths(zone_class, sliders.const_months);
+  const const_months = sliders.const_months || DEFAULT_CONST_MONTHS;
   // market projects, property tax included (DEFAULT_INPUTS)
   const opex_ratio = sliders.opex_ratio ?? 0.3;
   const hard_cost_per_sqft = sliders.hard_cost_per_sqft ?? 450;
@@ -381,8 +383,7 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
     gdv,
     dev_cost,
     rlv_financing_cost,
-    0,
-    "none",
+    [],
     lot_sqft,
     total_months,
     sliders.target_return ?? DEFAULT_TARGET_RETURN,
@@ -492,7 +493,15 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
     const hold_months = hold_years * 12;
     const total_with_hold = total_months + hold_months;
     const cf = new Array(total_with_hold + 1).fill(0);
-    cf[0] = -equity_amount;
+    // equity drawn as in the flip: land, predev, rest at closing
+    equityFirstDraws(
+      equity_amount,
+      land_cost_total,
+      predev.monthly_predev_spend,
+      permitting_months
+    ).forEach((d, m) => {
+      cf[m] += d;
+    });
     cf[total_months] += excess_sale_cash;
 
     let current_egi = egi,
@@ -641,7 +650,7 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
     cap_rate,
     gdv: Math.round(gdv),
     rlv_selling_costs: rlv.selling_costs,
-    rlv_post_grant: rlv.post_construction_grant,
+    rlv_post_grant: 0,
     rlv_profit: rlv.profit,
     rlv_project_cost: rlv.project_cost,
     rlv: rlv.rlv,
