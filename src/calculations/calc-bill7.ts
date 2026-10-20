@@ -3,8 +3,8 @@
 // - FAR=4, lot coverage=80% (ROH Chp 32)
 // - 80% affordable rental, no sale units
 // - Permit fees waived, park dedication waived, wastewater waived
-// - $12k–$50k grants per affordable unit ($40/sqft post-construction for
-//   units under 300 sqft)
+// - grants: $12k post-construction per affordable unit ($40/sqft under 300
+//   sqft), or a $50k pre-construction subsidy per unit with prevailing wages
 // - 15-year property tax exemption on improvements
 // - Height-based construction cost rate (not zone lookup)
 // - excavation and stepbacks follow the zone; timing is 18/12 months unless set
@@ -718,7 +718,8 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     gdv,
     // RLV
     rlv_selling_costs: rlv.selling_costs,
-    rlv_post_grant: post_construction_grant,
+    rlv_grants_pv: rlv.grants_pv,
+    rlv_land_carry: rlv.land_carry,
     rlv_profit: rlv.profit,
     rlv_project_cost: rlv.project_cost,
     rlv: rlv.rlv,

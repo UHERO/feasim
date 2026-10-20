@@ -284,8 +284,8 @@ export const COMMERCIAL_COVERAGE = {
   commercial3: 0.6,
 };
 
-// bill 7 grant amounts per affordable unit:
-// units under 300 sf get $40/sf of dwelling unit floor area
+// bill 7 grant amounts: post-construction per affordable unit (units under
+// 300 sf get $40/sf of floor area), pre-construction per unit
 export const GRANT = {
   pre_construct: 50000,
   post_construct: 12000,
@@ -1743,7 +1743,10 @@ export interface ParcelOutput {
   total_predev_cost: number;
   construction_equity: number;
   rlv_selling_costs: number;
-  rlv_post_grant: number;
+  // grants discounted to the land purchase at the target return
+  rlv_grants_pv: number;
+  // (1 + target return) ^ years to stabilization
+  rlv_land_carry: number;
   rlv_profit: number;
   rlv_project_cost: number;
   rlv: number;
@@ -2987,7 +2990,7 @@ export function calcDevRLV(
     grants_pv: Math.round(grants_pv),
     profit: Math.round(profit),
     project_cost: Math.round(project_cost),
-    land_carry: Math.round(land_carry * 10000) / 10000,
+    land_carry,
     rlv: Math.round(rlv),
     rlv_sqft: Math.round(rlv_sqft * 100) / 100,
   };
@@ -3234,7 +3237,8 @@ export function zeroOutput(
     total_predev_cost: 0,
     construction_equity: 0,
     rlv_selling_costs: 0,
-    rlv_post_grant: 0,
+    rlv_grants_pv: 0,
+    rlv_land_carry: 1,
     rlv_profit: 0,
     rlv_project_cost: 0,
     rlv: 0,

@@ -124,8 +124,8 @@ Every function returns a `ParcelOutput`. Some of its fields:
 | Costs | `hard_cost`, `soft_cost` (itemized in `soft_cost_breakdown`: permits, fees, water charges, construction management), `dev_cost`, `total_financing_cost` |
 | Bill 7 grants | `pre_construction_subsidy`, `dev_post_grant`; pre-construction runs also report `pw_premium_cost` (prevailing wage cost, included in `hard_cost`), `subsidy_labor_cap` and `subsidy_cap_binds` |
 | Income | `egi` (effective gross income), `noi` (net operating income), `gdv` (gross development value) |
-| Returns | `dev_roc` (return on cost), `dev_levered_irr`, `dev_equity_multiple`, `dev_profit`, `dev_dscr` |
-| Land | `rlv` and `rlv_sqft`: the residual land value, or the most a developer could pay for the land and still hit their target return |
+| Returns | `dev_roc` (return on cost: stabilized NOI over development cost net of grants, at face value), `dev_levered_irr`, `dev_equity_multiple`, `dev_profit`, `dev_dscr` |
+| Land | `rlv` and `rlv_sqft`: the residual land value, or the most a developer could pay for the land and still hit their target return. `rlv_grants_pv` (grants discounted to the land purchase) and `rlv_land_carry` (the discount factor to stabilization) split it: `rlv = (gdv - rlv_selling_costs - rlv_project_cost - rlv_profit) / rlv_land_carry + rlv_grants_pv` |
 
 **Note:** Rates are fractions, so `0.058` means 5.8% and money is in dollars.
 
