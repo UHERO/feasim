@@ -22,9 +22,9 @@ import {
   type SliderInputs,
 } from "../src";
 import {
-  constructionMonthsByZone,
+  DEFAULT_CONST_MONTHS,
+  DEFAULT_PERMITTING_MONTHS,
   excavationDepthByZone,
-  permittingMonthsByZone,
 } from "../src/calculations/calc-shared";
 import inputs from "./data/calculator-defaults.json";
 
@@ -176,16 +176,16 @@ describe("calculator TOD", () => {
   });
 });
 
-describe("calculator Bill 7 follows the zone", () => {
-  // the calculator's timing sliders left unset, so the zone supplies them
+describe("calculator Bill 7 and the zone", () => {
+  // timing sliders unset
   const base: SliderInputs = { ...CASES.bill7, permitting_months: undefined, const_months: undefined };
   const ZONES = ["A-1", "A-2", "A-3", "AMX-1", "AMX-2", "AMX-3", "BMX-3", "BMX-4", "Apart", "ApartMix"];
 
-  it.each(ZONES)("%s takes its timing from the zone", (zone) => {
+  it.each(ZONES)("%s keeps the default timing, whatever the zone", (zone) => {
     const r = calcSingle({ ...base, zone_class: zone });
     expect(r.zone_class).toBe(zone);
-    expect(r.permitting_months).toBe(permittingMonthsByZone(zone));
-    expect(r.const_months).toBe(constructionMonthsByZone(zone));
+    expect(r.permitting_months).toBe(DEFAULT_PERMITTING_MONTHS);
+    expect(r.const_months).toBe(DEFAULT_CONST_MONTHS);
   });
 
   it("digs to the zone's excavation depth", () => {
@@ -210,10 +210,10 @@ describe("calculator Bill 7 follows the zone", () => {
     }
   });
 
-  it("falls back to the height without a zone", () => {
+  it("keeps the default timing without a zone", () => {
     const r = calcSingle({ ...base, zone_class: undefined });
-    expect(r.permitting_months).toBe(Math.round(425 / 30));
-    expect(r.const_months).toBe(12);
+    expect(r.permitting_months).toBe(DEFAULT_PERMITTING_MONTHS);
+    expect(r.const_months).toBe(DEFAULT_CONST_MONTHS);
   });
 });
 

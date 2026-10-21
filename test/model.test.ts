@@ -10,6 +10,8 @@ import {
   BILL7_FAR,
   BILL7_MAX_HEIGHT,
   DEFAULT_INPUTS,
+  DEFAULT_TARGET_RETURN,
+  GRANT,
   baseFar,
   calcFAR,
   calcFarPdt,
@@ -70,7 +72,14 @@ import {
   yardFootprint,
   zoneStepBack,
 } from "../src";
-import { calcSoftCosts, setbackFootprint } from "../src/calculations/calc-shared";
+import {
+  calcSoftCosts,
+  mixPostGrant,
+  postGrantPerUnit,
+  PREVAILING_WAGE,
+  setbackFootprint,
+  UNIT_SIZE,
+} from "../src/calculations/calc-shared";
 import { calcbill6Single } from "../src/calculations/calc-bill6";
 import { calcH201Single } from "../src/calculations/calc-h201";
 import { calcStandardSingle } from "../src/calculations/calc-standard";
@@ -270,6 +279,79 @@ describe("policy behaviour", () => {
     expect(at100.property_tax).toBeGreaterThan(at80.property_tax);
   });
 
+  it("Bill 7's post-construction grant pays $40/sqft below 300 sqft and $12,000 at or above", () => {
+    expect(postGrantPerUnit(250)).toBe(10000);
+    expect(postGrantPerUnit(299)).toBe(11960);
+    expect(postGrantPerUnit(300)).toBe(12000);
+    expect(postGrantPerUnit(700)).toBe(12000);
+    // the built-in studio is exactly 300 sqft, so every preset mix gets the flat amount
+    expect(UNIT_SIZE.studio).toBe(300);
+    expect(mixPostGrant("studio_100")).toBe(GRANT.post_construct);
+    expect(mixPostGrant("third_each")).toBeCloseTo(GRANT.post_construct);
+  });
+
+  it("Bill 7 pays the post-construction grant when construction ends", () => {
+    const post = calcSingle({ ...bill7, grant_type: "post_construct" });
+    const none = calcSingle({ ...bill7, grant_type: "none" });
+    const end = post.permitting_months + post.const_months;
+    expect(post.rlv - none.rlv)
+      .toBeCloseTo(post.dev_post_grant / (1 + DEFAULT_TARGET_RETURN) ** (end / 12), -1);
+  });
+
+  describe("Bill 7 pre-construction subsidy", () => {
+    const pre: SliderInputs = { ...bill7, grant_type: "pre_construct" };
+    const noPremium = calcSingle({ ...pre, prevailing_wage_premium: 0 });
+
+    it("charges the prevailing wage premium on labor, and only for pre-construction", () => {
+      const r = calcSingle(pre);
+      const labor = PREVAILING_WAGE.onsite_labor_share * noPremium.hard_cost;
+      expect(r.pw_premium_cost).toBeCloseTo(labor * PREVAILING_WAGE.labor_premium);
+      expect(r.subsidy_labor_cap).toBeCloseTo(labor * (1 + PREVAILING_WAGE.labor_premium));
+      expect(r.hard_cost).toBeCloseTo(noPremium.hard_cost + (r.pw_premium_cost ?? 0));
+      expect(r.soft_cost).toBeGreaterThan(noPremium.soft_cost);
+      expect(noPremium.hard_cost).toBeCloseTo(calcSingle(bill7).hard_cost);
+      expect(calcSingle({ ...bill7, prevailing_wage_premium: 0.2 }).pw_premium_cost).toBe(0);
+    });
+
+    it("pays on every unit unless told to pay on affordable units", () => {
+      const r = calcSingle(pre);
+      expect(r.pre_construction_subsidy).toBe(r.max_units * GRANT.pre_construct);
+      expect(calcSingle({ ...pre, grant_units: "affordable" }).pre_construction_subsidy)
+        .toBe(r.affordable_units * GRANT.pre_construct);
+    });
+
+    it("never pays more than on-site prevailing wages", () => {
+      const capped = calcSingle({ ...pre, onsite_labor_share: 0.02, prevailing_wage_premium: 0.01 });
+      expect(capped.subsidy_cap_binds).toBe(true);
+      expect(capped.pre_construction_subsidy).toBeCloseTo(capped.subsidy_labor_cap ?? 0);
+      expect(calcSingle(pre).subsidy_cap_binds).toBe(false);
+    });
+
+    it("pays the subsidy over the construction months, not at closing", () => {
+      const at = (months: Partial<SliderInputs>) => {
+        const inputs = { ...pre, prevailing_wage_premium: 0, ...months };
+        const withGrant = calcSingle(inputs);
+        const noGrant = calcSingle({ ...inputs, grant_amount: 0 });
+        // subsidy doesn't replace equity
+        expect(withGrant.equity_amount).toBeCloseTo(noGrant.equity_amount);
+        const { permitting_months: p, const_months: c } = withGrant;
+        let pv = 0;
+        for (let m = p + 1; m <= p + c; m++)
+          pv += withGrant.pre_construction_subsidy / c / (1 + DEFAULT_TARGET_RETURN) ** (m / 12);
+        expect(withGrant.rlv - noGrant.rlv).toBeCloseTo(pv, -1);
+      };
+      at({});
+      // payouts follow the construction months
+      at({ permitting_months: 10, const_months: 24 });
+    });
+
+    it("leaves the property tax on the building, not the wages", () => {
+      const at100 = { ...pre, affordable_ami: "ami_100" };
+      expect(calcSingle(at100).property_tax)
+        .toBeCloseTo(calcSingle({ ...at100, prevailing_wage_premium: 0 }).property_tax);
+    });
+  });
+
   it("a longer amortization supports a larger, DSCR-sized permanent loan", () => {
     const yrs25 = calcSingle({ ...bill7, amort_years: 25 });
     const yrs30 = calcSingle({ ...bill7, amort_years: 30 });
@@ -402,6 +484,16 @@ describe("calcParcel", () => {
 
   it("keeps the model's own id when the parcel has no TMK", () => {
     expect(calcParcel("bill6", low).tmk).toBe(calcSingle(parcelInputs("bill6", low)).tmk);
+  });
+
+  it("gives each Bill 7 grant type its own default amount", () => {
+    // pre pays on every unit, post on affordable units
+    const pre = calcParcel("bill7", tall, { grant_type: "pre_construct" });
+    const post = calcParcel("bill7", tall, { grant_type: "post_construct" });
+    expect(pre.pre_construction_subsidy / pre.max_units).toBe(GRANT.pre_construct);
+    expect(post.dev_post_grant / post.affordable_units).toBe(GRANT.post_construct);
+    expect(calcParcel("bill7", tall, { grant_type: "pre_construct", grant_amount: 60000 }).pre_construction_subsidy)
+      .toBe(pre.max_units * 60000);
   });
 
   it("builds to the Bill 7 cap, not above it", () => {

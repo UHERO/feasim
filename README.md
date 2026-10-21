@@ -47,7 +47,7 @@ A pathway is a set of rules a project can be built under. Each pathway sets what
 | --- | --- | --- |
 | `"bill6"` | Standard (current zoning) | The zone's FAR (as set by Ordinance 26-7), lot coverage and height under the Land Use Ordinance, with the Article 6 parking minimums |
 | `"standard"` | Before Ord. 26-7 | The FAR and lot coverage rules as they stood before Ordinance 26-7, for comparison |
-| `"bill7"` | Bill 7 | An affordable housing pathway in the A, AMX, BMX and Waikiki (Apart, ApartMix) districts, with FAR 4.0 and a 60 ft height cap, construction grants, waived impact fees, and no required parking. Timing, excavation and stepbacks follow the zone |
+| `"bill7"` | Bill 7 | An affordable housing pathway in the A, AMX, BMX and Waikiki (Apart, ApartMix) districts, with FAR 4.0 and a 60 ft height cap, construction grants, waived impact fees, and no required parking. Excavation and stepbacks follow the zone |
 | `"tod"` | Transit-oriented development | PD-T and IPD-T permits near rail stations (ROH § 21-9.100): FAR and height bonuses by tier, station area plan limits, no required parking |
 | `"h201"` | HRS § 201H | Exemptions for affordable housing projects, on current (Ord. 26-7) zoning FAR and lot coverage. The defaults make 51% of units affordable at 80% of area median income (AMI), with market units at 120% AMI; set `affordability` and `affordable_ami` to change that. |
 
@@ -91,6 +91,8 @@ calcParcel("bill6", parcel, {
 
 **Note:** `height_limit` and `max_far` override the pathway's envelope. Bill 7 still caps height at 60 ft. See the `SliderInputs` type for the full list, with units.
 
+**Note:** every pathway takes 18 months of permitting and 12 of construction, whatever the zone. Set `permitting_months` and `const_months` to change them.
+
 ### Input values
 
 The model doesn't check its inputs. A value it doesn't recognize falls back to a default or gives an empty result without an error, so use these exactly:
@@ -98,11 +100,15 @@ The model doesn't check its inputs. A value it doesn't recognize falls back to a
 | Input | Use | If it's wrong |
 | --- | --- | --- |
 | `program` | `"bill6"`, `"standard"`, `"bill7"`, `"tod"` or `"h201"`, lowercase | Anything else runs `"bill6"` |
-| `zone_class` | The district code as the Land Use Ordinance writes it, uppercase: `"A-2"`, `"AMX-3"`, `"BMX-4"`, `"B-2"`, `"I-2"`; Waikiki is `"Apart"` or `"ApartMix"` | `"a-2"` or an unknown code has no FAR, so `calcParcel` builds nothing; with your own `max_far` it builds, but without the zone's coverage, timing and retail rules |
+| `zone_class` | The district code as the Land Use Ordinance writes it, uppercase: `"A-2"`, `"AMX-3"`, `"BMX-4"`, `"B-2"`, `"I-2"`; Waikiki is `"Apart"` or `"ApartMix"` | `"a-2"` or an unknown code has no FAR, so `calcParcel` builds nothing; with your own `max_far` it builds, but without the zone's coverage and retail rules |
 | `affordable_ami`, `market_ami` | `"ami_"` plus a bracket from 10 to 140 in steps of 10, such as `"ami_80"` | Other numbers (`"ami_85"`) are scaled from the 50% row and won't match the published HHFDC limits |
 | `unit_type` | `"studio_100"`, `"studio75_1br25"`, `"studio50_1br50"`, `"studio25_1br75"`, `"one_bb_100"`, `"one_br50_2br50"`, `"two_bb_100"` or `"third_each"` | Anything else is treated as all one-bedroom |
 | `affordability` (201H) | `0.51` or more | Below 50% + 1 of units, `calcSingle` throws |
 | `permanent_rate`, `amort_years` | Above `0` | `0` makes the IRR, equity multiple, profit and ROI `NaN` |
+| `grant_type` (Bill 7) | `"post_construct"` (default), `"pre_construct"` or `"none"` | Anything else pays no grant |
+| `grant_amount` (Bill 7) | Dollars per unit. Leave it out for the ordinance amount: $50,000 pre-construction; $12,000 post-construction, or $40/sqft for units under 300 sqft | A value you pass applies to every unit, overriding the small-unit rule |
+| `grant_units` (Bill 7) | `"all"` (default) or `"affordable"`: the units the pre-construction subsidy pays on. Post-construction always pays on affordable units | Anything else pays on all units |
+| `prevailing_wage_premium`, `onsite_labor_share` (Bill 7) | Fractions: the extra cost of on-site labor at prevailing wages (default `0.15`), and on-site labor as a share of hard cost (default `0.25`). Pre-construction runs only | `onsite_labor_share` also caps the subsidy, so setting it too low cuts the subsidy |
 
 With `calcSingle` and `"tod"`, pass a `max_far`, or the model can't run the project without the open-space bonus to compare (see Model notes). `calcParcel` always passes one.
 
@@ -116,9 +122,10 @@ Every function returns a `ParcelOutput`. Some of its fields:
 | Units | `affordable_units`, `mkt_rent_units`, `afd_rent_units`, `mkt_sale_units`, `afd_sale_units` |
 | Parking | `parking_stalls`, split into `surface_stalls`, `ground_floor_stalls` and `podium_stalls`; `podium_levels`, `loading_spaces`, `bicycle_spaces` |
 | Costs | `hard_cost`, `soft_cost` (itemized in `soft_cost_breakdown`: permits, fees, water charges, construction management), `dev_cost`, `total_financing_cost` |
+| Bill 7 grants | `pre_construction_subsidy`, `dev_post_grant`; pre-construction runs also report `pw_premium_cost` (prevailing wage cost, included in `hard_cost`), `subsidy_labor_cap` and `subsidy_cap_binds` |
 | Income | `egi` (effective gross income), `noi` (net operating income), `gdv` (gross development value) |
-| Returns | `dev_roc` (return on cost), `dev_levered_irr`, `dev_equity_multiple`, `dev_profit`, `dev_dscr` |
-| Land | `rlv` and `rlv_sqft`: the residual land value, or the most a developer could pay for the land and still hit their target return |
+| Returns | `dev_roc` (return on cost: stabilized NOI over development cost net of grants, at face value), `dev_levered_irr`, `dev_equity_multiple`, `dev_profit`, `dev_dscr` |
+| Land | `rlv` and `rlv_sqft`: the residual land value, or the most a developer could pay for the land and still hit their target return. `rlv_grants_pv` (grants discounted to the land purchase) and `rlv_land_carry` (the discount factor to stabilization) split it: `rlv = (gdv - rlv_selling_costs - rlv_project_cost - rlv_profit) / rlv_land_carry + rlv_grants_pv` |
 
 **Note:** Rates are fractions, so `0.058` means 5.8% and money is in dollars.
 
@@ -219,6 +226,8 @@ The package also exports the rules behind the model, such as the zoning FAR tabl
   - The model estimates whether a typical project could pencil, it does not design a specific building.
 - The open-space FAR bonus is optional
   - Where a zone offers one (B-2, BMX-3, BMX-4), `calcSingle` runs the project with and without it and keeps the one with the higher residual land value, or the bigger building when neither pencils. The bonus costs 1 sqft of public open space per 5 sqft of extra floor area, so it often isn't worth it on lower buildings. `open_space_bonus` on the result is the bonus taken.
+- Bill 7's pre-construction subsidy comes with prevailing wages
+  - ROH § 32-5.2(c)(3) lets the subsidy pay only prevailing wages to every on-site worker under HRS Chapter 104. The model counts 25% of hard cost as on-site labor, charges a 15% premium on it (3.75% of hard cost), and caps the subsidy at that labor at prevailing wages. The 25% comes from the 2022 Economic Census for Hawaiʻi (DBEDT State Data Book, Tables 21.05–21.06). The post-construction grant (§ 32-4.2) has no wage condition.
 
 The model's logic and data sources are documented here:
 
