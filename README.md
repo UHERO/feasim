@@ -262,6 +262,26 @@ The tests are in `test/`:
 
 Any change that moves a result fails the snapshot tests, on purpose. If the change is intended, run `npx vitest run -u`, review the snapshot diff in git, and commit it with the change.
 
+### Commits and releases
+
+Releases are automated with [release-please](https://github.com/googleapis/release-please). It reads the commit messages on `main` and opens a release PR that bumps the version in `package.json` and updates `CHANGELOG.md`. Merging that PR creates the GitHub Release and publishes the package to npm. Don't bump the version by hand.
+
+For this to work, write commit messages in the [Conventional Commits](https://www.conventionalcommits.org/) format: `type: short description`.
+
+| Prefix | Use for | Release |
+| --- | --- | --- |
+| `fix:` | a bug fix | patch (0.2.0 → 0.2.1) |
+| `feat:` | a new feature | minor (0.2.0 → 0.3.0) |
+| `feat!:`, `fix!:`, or a `BREAKING CHANGE:` footer | a change that breaks existing users | major (0.2.0 → 1.0.0) |
+| `docs:`, `chore:`, `ci:`, `test:`, `refactor:` | everything else | no release on their own |
+
+Examples: `feat: add pre-construction premiums`, `fix: correct the Bill 7 height cap`.
+
+- The bump is the highest level among the commits since the last release. Messages with no prefix are ignored, so they never trigger a release.
+- If a PR is squash-merged, the PR title becomes the commit message on `main`, so give the PR title the prefix.
+- Before version 1.0.0, release-please bumps more conservatively: a breaking change gives a minor bump and a `feat:` gives a patch bump.
+- To force a specific version, add `Release-As: 1.0.0` as a footer in a commit message.
+
 ### Where the model comes from
 
 UHERO's Policy Simulator dashboard is one application built on this model. Its source is in UHERO's private analytics repository, and this package is the public copy.
