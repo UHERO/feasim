@@ -1,0 +1,26 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          release-type: node
+      # Releases created with GITHUB_TOKEN don't trigger other workflows,
+      # so start the publish workflow explicitly.
+      - name: Trigger publish
+        if: steps.release.outputs.release_created
+        run: gh workflow run publish.yml --ref "${{ steps.release.outputs.tag_name }}" --repo "${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ github.token }}

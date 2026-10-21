@@ -3,6 +3,7 @@ name: Publish
 on:
   release:
     types: [published]
+  workflow_dispatch: # started by release.yml with --ref <tag>
 
 permissions:
   contents: read
@@ -21,5 +22,5 @@ jobs:
       - run: npm ci
       - name: Check tag matches package.json version
         run: |
-          test "v$(node -p "require('./package.json').version")" = "${{ github.event.release.tag_name }}"
+          test "v$(node -p "require('./package.json').version")" = "${{ github.ref_name }}"
       - run: npm publish
