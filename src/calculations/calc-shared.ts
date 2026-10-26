@@ -225,12 +225,10 @@ export const FINANCING = {
 // hold strategy assumptions
 export const HOLD = {
   amort_years: 30,
-  // affordable units stay AMI-capped, so track AMI growth
-  annual_affordable_rent_growth: 0.04,
-  // market units follow market rent (Apartments.com Honolulu YoY)
-  annual_market_rent_growth: 0.032,
-  // blended hold-period rent growth (affordable 4% / market 3.2%); see note
-  annual_rent_growth: 0.035,
+  // hold-period rent growth for all units: affordable caps track ami (4%/yr,
+  // honolulu mfi 2015-2025), and market rents grew about as fast (zillow
+  // honolulu 3.6%/yr since 2016, 4.2%/yr over the last 5 years)
+  annual_rent_growth: 0.04,
   // operating expenses trend on their own series rather than as a fixed share of EGI
   annual_opex_growth: 0.035,
   // 2%/yr is the property-tax escalation
@@ -298,8 +296,10 @@ export const PREVAILING_WAGE = {
   // on-site labor share of hard cost (2022 economic census, DBEDT data book
   // tables 21.05-21.06: 22-27%)
   onsite_labor_share: 0.25,
-  // prevailing wage premium on that labor (trey's memo; test 10% and 20%)
-  labor_premium: 0.15,
+  // prevailing wage premium on that labor: median of 11 trades, dlir bulletin
+  // 509 (basic + fringe) vs bls oews honolulu median wage plus 30% benefits
+  // (27-83% by trade; test 35% and 55%)
+  labor_premium: 0.45,
 };
 
 // post-construction grant for one affordable unit of the given floor area
