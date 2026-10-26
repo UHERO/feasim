@@ -280,8 +280,11 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   const project_years = total_months / 12;
 
   // 7. REVENUE
+  // affordable rent caps reset with each year's hud limits (roh 32-1.1 uses
+  // the current ami), so they escalate over permitting like market rents
   const afd_rent_multiplier =
-    FINANCING.ami_escalation ** ((const_months + total_carry_months) / 12);
+    FINANCING.ami_escalation **
+    ((permitting_months + const_months + total_carry_months) / 12);
   const mkt_rent_multiplier =
     FINANCING.ami_escalation **
     ((permitting_months + const_months + total_carry_months) / 12);

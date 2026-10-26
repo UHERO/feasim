@@ -108,7 +108,7 @@ The model doesn't check its inputs. A value it doesn't recognize falls back to a
 | `grant_type` (Bill 7) | `"post_construct"` (default), `"pre_construct"` or `"none"` | Anything else pays no grant |
 | `grant_amount` (Bill 7) | Dollars per unit. Leave it out for the ordinance amount: $50,000 pre-construction; $12,000 post-construction, or $40/sqft for units under 300 sqft | A value you pass applies to every unit, overriding the small-unit rule |
 | `grant_units` (Bill 7) | `"all"` (default) or `"affordable"`: the units the pre-construction subsidy pays on. Post-construction always pays on affordable units | Anything else pays on all units |
-| `prevailing_wage_premium`, `onsite_labor_share` (Bill 7) | Fractions: the extra cost of on-site labor at prevailing wages (default `0.15`), and on-site labor as a share of hard cost (default `0.25`). Pre-construction runs only | `onsite_labor_share` also caps the subsidy, so setting it too low cuts the subsidy |
+| `prevailing_wage_premium`, `onsite_labor_share` (Bill 7) | Fractions: the extra cost of on-site labor at prevailing wages (default `0.45`), and on-site labor as a share of hard cost (default `0.25`). Pre-construction runs only | `onsite_labor_share` also caps the subsidy, so setting it too low cuts the subsidy |
 
 With `calcSingle` and `"tod"`, pass a `max_far`, or the model can't run the project without the open-space bonus to compare (see Model notes). `calcParcel` always passes one.
 
@@ -227,7 +227,7 @@ The package also exports the rules behind the model, such as the zoning FAR tabl
 - The open-space FAR bonus is optional
   - Where a zone offers one (B-2, BMX-3, BMX-4), `calcSingle` runs the project with and without it and keeps the one with the higher residual land value, or the bigger building when neither pencils. The bonus costs 1 sqft of public open space per 5 sqft of extra floor area, so it often isn't worth it on lower buildings. `open_space_bonus` on the result is the bonus taken.
 - Bill 7's pre-construction subsidy comes with prevailing wages
-  - ROH § 32-5.2(c)(3) lets the subsidy pay only prevailing wages to every on-site worker under HRS Chapter 104. The model counts 25% of hard cost as on-site labor, charges a 15% premium on it (3.75% of hard cost), and caps the subsidy at that labor at prevailing wages. The 25% comes from the 2022 Economic Census for Hawaiʻi (DBEDT State Data Book, Tables 21.05–21.06). The post-construction grant (§ 32-4.2) has no wage condition.
+  - ROH § 32-5.2(c)(3) lets the subsidy pay only prevailing wages to every on-site worker under HRS Chapter 104. The model counts 25% of hard cost as on-site labor, charges a 45% premium on it (11.25% of hard cost), and caps the subsidy at that labor at prevailing wages. The 25% comes from the 2022 Economic Census for Hawaiʻi (DBEDT State Data Book, Tables 21.05–21.06). The 45% is the median across 11 building trades of DLIR prevailing rates (basic plus fringe, Bulletin 509, September 2025) over the BLS median wage for Urban Honolulu (OEWS, May 2025) plus 30% for open-shop benefits. The post-construction grant (§ 32-4.2) has no wage condition.
 
 The model's logic and data sources are documented here:
 
