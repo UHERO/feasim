@@ -18,7 +18,39 @@ Some things you can use it for:
 npm install @uhero/feasim
 ```
 
-> Until the first release is on npm, install from source: clone this repo, run `npm install` and `npm run build` in it, then run `npm install /path/to/policy-simulator-package` from your project.
+Or with another package manager: `yarn add @uhero/feasim`, `pnpm add @uhero/feasim` or `bun add @uhero/feasim`.
+
+### Requirements
+The package has no runtime dependencies. It runs in Node.js 18 or later, in the browser through any bundler (Vite, webpack, Next.js and so on), and in Bun.
+
+### Imports
+The package ships both an ES module and a CommonJS build, so either style works:
+
+```ts
+// ES modules / TypeScript
+import { calcParcel, overallLevel } from "@uhero/feasim";
+```
+
+```js
+// CommonJS
+const { calcParcel, overallLevel } = require("@uhero/feasim");
+```
+
+### TypeScript
+Type definitions are included, so there is no `@types` package to install. The main types are `ProgramId`, `SliderInputs` (every input) and `ParcelOutput` (every result).
+
+### Versions
+Model updates change results: a new premium, fee or rule moves the numbers even when the API stays the same. Pin the version (`npm install @uhero/feasim@0.2.1`, or an exact version in `package.json`) when you need results that stay put, and read [`CHANGELOG.md`](https://github.com/UHERO/feasim/blob/main/CHANGELOG.md) before upgrading. Run `npm ls @uhero/feasim` to see the installed version.
+
+### From source 
+To work on the model itself, clone the repository and see [Development](#development):
+
+```sh
+git clone https://github.com/UHERO/feasim.git
+cd feasim
+npm install
+npm test
+```
 
 ## Quick start
 
@@ -30,11 +62,11 @@ const parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 150 };
 
 const result = calcParcel("bill6", parcel);
 
-// this returns your results for these example fields
-result.max_units;     
-result.dev_roc;        
-result.rlv_sqft;       
-overallLevel(result); 
+// results for this lot at the default assumptions (v0.2.1)
+result.max_units;     // 112 units
+result.dev_roc;       // 0.0597, a 5.97% return on cost
+result.rlv_sqft;      // 64.45, residual land value in $ per sqft of lot
+overallLevel(result); // "marginal"
 ```
 
 ## Concepts
@@ -51,7 +83,7 @@ A pathway is a set of rules a project can be built under. Each pathway sets what
 | `"tod"` | Transit-oriented development | PD-T and IPD-T permits near rail stations (ROH § 21-9.100): FAR and height bonuses by tier, station area plan limits, no required parking |
 | `"h201"` | HRS § 201H | Exemptions for affordable housing projects, on current (Ord. 26-7) zoning FAR and lot coverage. The defaults make 51% of units affordable at 80% of area median income (AMI), with market units at 120% AMI; set `affordability` and `affordable_ami` to change that. |
 
-**Note:** the ids are historical. `"bill6"` is current zoning, and `"standard"` is the rules before Ordinance 26-7.
+**Note:** the ids are historical. `"bill6"` is current zoning, and `"standard"` is the rules before Ordinance 26-7
 
 ### Parcels
 
@@ -142,7 +174,7 @@ Every function returns a `ParcelOutput`. Some of its fields:
 
 The project is **poor** if half or more of the metrics are poor, **strong** if none are poor and at least three of the four are strong, and **marginal** otherwise. `rocLevel`, `rlvLevel`, `equityMultipleLevel` and `irrLevel` give each metric on its own.
 
-## Some Examples
+## Examples
 
 1. Compare pathways for one lot
 
@@ -218,7 +250,7 @@ The package also exports the rules behind the model, such as the zoning FAR tabl
 
 ## Model notes
 
-- The model is for only for Oahu as of 10/12/2026.
+- The model is only for Oʻahu, as of 10/28/2026.
   - The zoning, fees, rents, sale prices and costs are for the City and County of Honolulu.
 - Every pathway is rental by default
   - The defaults are 100% rental. Set `rental_split` and `sale_split` to model for-sale units in later versions.
@@ -226,22 +258,20 @@ The package also exports the rules behind the model, such as the zoning FAR tabl
   - The model estimates whether a typical project could pencil, it does not design a specific building.
 - The open-space FAR bonus is optional
   - Where a zone offers one (B-2, BMX-3, BMX-4), `calcSingle` runs the project with and without it and keeps the one with the higher residual land value, or the bigger building when neither pencils. The bonus costs 1 sqft of public open space per 5 sqft of extra floor area, so it often isn't worth it on lower buildings. `open_space_bonus` on the result is the bonus taken.
-- Bill 7's pre-construction subsidy comes with prevailing wages
-  - ROH § 32-5.2(c)(3) lets the subsidy pay only prevailing wages to every on-site worker under HRS Chapter 104. The model counts 25% of hard cost as on-site labor, charges a 45% premium on it (11.25% of hard cost), and caps the subsidy at that labor at prevailing wages. The 25% comes from the 2022 Economic Census for Hawaiʻi (DBEDT State Data Book, Tables 21.05–21.06). The 45% is the median across 11 building trades of DLIR prevailing rates (basic plus fringe, Bulletin 509, September 2025) over the BLS median wage for Urban Honolulu (OEWS, May 2025) plus 30% for open-shop benefits. The post-construction grant (§ 32-4.2) has no wage condition.
 
 The model's logic and data sources are documented here:
 
-- [Policy Simulator Documentation](https://docs.google.com/document/d/1HwELgrw0IncCjsLrZh_BB0OYnBjdNXKX-kQArnLvL5k/edit?usp=sharing): how the model works
-- [Pro-Forma Variables Spreadsheet V2](https://docs.google.com/spreadsheets/d/1qVd_1RI3wjlhwmG2LTzQK0v08qlD47YCn9gULIG-1-4/edit?usp=sharing): the variables in use and their sources
+- [Housing Policy Simulator documentation](https://github.com/UHERO/feasim/blob/main/docs/README.md): how the model works, pathway by pathway, and the sources behind its assumptions
+- [Housing Policy Simulator Variables Spreadsheet](https://docs.google.com/spreadsheets/d/1qVd_1RI3wjlhwmG2LTzQK0v08qlD47YCn9gULIG-1-4/edit?usp=sharing): the variables in use and their sources
 - [Assumptions Made Tracker](https://docs.google.com/spreadsheets/d/1QqSswndNPDVZwGPuKo3mlO7poFdPswB8rq8TlTXpmyo/edit?gid=0#gid=0): assumptions made in building the policy framework
 
 Background reading:
 
 - [201-H Process Summary](https://dbedt.hawaii.gov/hhfdc/files/2023/05/2023-05-18-201H-Process-FINAL.pdf): 201H and its requirements
 - [Parcels & Zoning Dashboard](https://cchnl.maps.arcgis.com/apps/webappviewer/index.html?id=96d4994d61cc495fa1a8524b3b116eee): an interactive map of Oʻahu's parcels
-- [Honolulu Inclusionary Housing Flowchart](https://miro.com/app/board/uXjVJaPZAJQ=/)
+- [Honolulu Inclusionary Housing Flowchart](https://miro.com/app/board/uXjVJaPZAJQ=/): flowchart of Oʻahu's affordability regulations
 - [Development Flowchart](https://miro.com/app/live-embed/uXjVJDi57jk=/?embedMode=view_only_without_ui&moveToViewport=-2298%2C-1870%2C3822%2C2086&embedId=247174178665): the housing development process
-- [Pro Forma Variables Spreadsheet V1](https://docs.google.com/spreadsheets/d/1_sSlavakP_3b8Ssv547RV-63rOuHqrqrIfim9JED3XU/edit?usp=sharing): the older version, with every variable and its source
+- [Pro Forma Variables Spreadsheet V1](https://docs.google.com/spreadsheets/d/1_sSlavakP_3b8Ssv547RV-63rOuHqrqrIfim9JED3XU/edit?usp=sharing): the older version of the variables spreadsheet, with every variable and its source
 
 ## Development
 
@@ -281,15 +311,3 @@ Examples: `feat: add pre-construction premiums`, `fix: correct the Bill 7 height
 - If a PR is squash-merged, the PR title becomes the commit message on `main`, so give the PR title the prefix.
 - Before version 1.0.0, release-please bumps more conservatively: a breaking change gives a minor bump and a `feat:` gives a patch bump.
 - To force a specific version, add `Release-As: 1.0.0` as a footer in a commit message.
-
-### Where the model comes from
-
-UHERO's Policy Simulator dashboard is one application built on this model. Its source is in UHERO's private analytics repository, and this package is the public copy.
-
-| Here | In `UHERO/analytics` |
-| --- | --- |
-| `src/calculations/*.ts` | `app/housing/policy/calculator/calculations/*.ts` (unchanged, except that the output also returns `soft_cost_breakdown`) |
-| `src/feasibility.ts` | `app/housing/policy/shared/feasibility.ts` (import path only) |
-| `src/parcels.ts` | The Policy Gauge's pathway rules (`gauge/calculations/calc-*.ts`) and default assumptions (`gauge/dashboard.tsx`), as one module; identical results for every parcel |
-
-**Note:** Currently copied from analytics commit `c7d7774b` (branch `gauge-v11-sakura`, 10/9/26). Until analytics uses this package directly, make any model change in both places.
