@@ -6,6 +6,8 @@ How the model works and where its numbers come from. The [README](../README.md) 
 
 [Housing Policy Simulator logic](simulator-logic.md): the pipeline every pathway runs, from the building envelope through costs, financing, revenue and residual land value to the verdict.
 
+[Variables](variables.md): every lever, constant and calculation function in the code, with its value, source and how often to review it.
+
 ## Pathways
 
 Each pathway page describes only what differs from the shared [Housing Policy Simulator logic](simulator-logic.md). The code name is the pathway's `program` id. The ids are historical: `bill6` is current zoning and `standard` is the rules before Ordinance 26-7.

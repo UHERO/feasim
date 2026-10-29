@@ -1,6 +1,6 @@
 # Housing Policy Simulator logic
 
-This page documents the logic every pathway runs on. All pathways follow the same pipeline and call the same helper functions in `src/calculations/calc-shared.ts`; only the inputs and a handful of pathway-specific rules change. Each [pathway page](README.md#pathways) describes only what differs from this baseline.
+This page documents the logic every pathway runs on. All pathways follow the same pipeline and call the same helper functions in `src/calculations/calc-shared.ts`; only the inputs and a handful of pathway-specific rules change. Each [pathway page](README.md#pathways) describes only what differs from this baseline, and [Variables](variables.md) lists every constant in the code with its value and source.
 
 # Pipeline
 
