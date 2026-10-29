@@ -18,22 +18,22 @@ In the code the steps are numbered slightly differently (sale value and RLV have
 
 # Shared Inputs
 
-Physical inputs (lot size, height, zone class) are user sliders in the Project View but read from parcel records in the Citywide View; every financial and policy input is user-adjustable in both.
+Physical inputs (lot size, height, zone class) are user sliders in the Project View but read from parcel records in the Citywide View; every financial and policy input is user-adjustable in both. These are the shared defaults; where a pathway uses a different value, its page lists it under Default assumptions.
 
 | Input | Default | Notes |
 | --- | --- | --- |
 | Hard cost | $450 per sq ft | Residential construction; retail adds $15 per sq ft |
 | Land cost | $130 per sq ft of lot |  |
 | Developer equity | 30% | A floor: the realized share rises when the DSCR take-out limits the loan |
-| Permanent loan rate | 6.75% (Bill 7: 7.0%) |  |
+| Permanent loan rate | 6.75% |  |
 | Amortization | 30 years |  |
-| Minimum DSCR | 1.20 (Bill 7: 1.15) |  |
+| Minimum DSCR | 1.20 |  |
 | Market cap rate | 5.1% | The same for every zone |
 | Target return (land carry) | 11.5% |  |
-| Hold period | 8 years (Bill 7: 10) | 0 years selects the dev flip strategy |
+| Hold period | 8 years | 0 years selects the dev flip strategy |
 | Permitting, construction, lease-up | 18, 12 and 9 months | The same for every pathway and zone, in the Project View and the package (no longer set by zone) |
-| Operating expense ratio | 30% of EGI (Bill 7 and 201H: 19%) |  |
-| Unit mix | All one-bedroom (Bill 7: half studio, half one-bedroom) | Unit sizes: studio 300, one-bedroom 500, two-bedroom 700 sq ft |
+| Operating expense ratio | 30% of EGI |  |
+| Unit mix | All one-bedroom | Unit sizes: studio 300, one-bedroom 500, two-bedroom 700 sq ft |
 
 ***Note:*** when the user chooses AMI 30% for both affordable and market for-sale units, we use the prices listed in HHFDC 2025's [Honolulu County Income, Rent, and Sales Price Guidelines](https://www.dbedt.hawaii.gov/hhfdc/files/2025/05/Honolulu-County-2025.pdf) for AMI 50%, as that is the lowest AMI level listed for sale units.
 
@@ -62,15 +62,7 @@ The envelope is the building the lot allows: the number of floors the height lim
 
 ### Lot coverage
 
-| Zones | Standard (post Ord. 26-7), 201H | Before Ord. 26-7 | TOD | Bill 7 |
-| --- | --- | --- | --- | --- |
-| A-1, AMX-1 | 60% | 60% under 7,500 sq ft, 50% to 20,000 sq ft, 40% above | 60% | 80% |
-| A-2, AMX-2 | 60% | Same lot-size scale | 50% | 80% |
-| A-3, AMX-3 | 60% | Same lot-size scale | 40% | 80% |
-| B-1, B-2, BMX-3, BMX-4 | 100% | 100% | 100% | 80% |
-| Waikiki Apartment Precinct and Mixed Use Subprecinct | 100%, less the required open space | Same | Same | 80% |
-
-**Note:** In the Waikiki precincts, 35% of the lot (50% when FAR is 1.5 or more) must stay open, and the stricter of that and the coverage cap governs.
+Each pathway sets its own lot coverage limit, listed in the Envelope section of its pathway page. The Waikiki precincts also keep part of the lot open (see [Special districts](pathways/special-districts.md)).
 
 ### Retail space
 
@@ -83,26 +75,41 @@ Ground-floor retail is off by default and is turned on with the Use Mix toggle. 
 | AMX-3, BMX-3, BMX-4, Waikiki Apartment Mixed Use | 60% of lot area |
 | A-1, A-2, A-3, B-1, B-2 | None |
 
-Retail built = the smallest of that cap, the Ground-Floor Retail share (default 10%) of the ground floor, and the FAR cap. Retail rent is entered in $ per sq ft per month (default $5; Bill 7 $3) and earns on its net area. Under TOD IPD-T, retail follows BMX-3 uses (§ 21-9.100-5(d)(1)).
+Retail built = the smallest of that cap, the Ground-Floor Retail share (default 10%) of the ground floor, and the FAR cap. Retail rent is entered in $ per sq ft per month (default $5) and earns on its net area.
 
 ### Setbacks
 
-The Setbacks slider (default 10 ft) sets the front, side and rear yards. Step-backs above 40 ft add to the side and rear yards (see Height Setbacks). TOD special districts also keep parking out of the front 40 ft (see [TOD](pathways/tod.md)).
+The Setbacks slider (default 10 ft) sets the front, side and rear yards. Step-backs above 40 ft add to the side and rear yards (see Height Setbacks).
 
 ### Floor Area Ratio (FAR)
 
-Each pathway has its own FAR rule; the Max FAR slider shows it and can override it.
+Each pathway has its own FAR rule, set out in the Envelope section of its pathway page; the Max FAR slider shows it and can override it.
 
-| Pathway | FAR |
-| --- | --- |
-| Standard (post Ord. 26-7) and 201H | Table 21-3.3 as amended by Ord. 26-7: A-1/AMX-1 2.0; A-2/AMX-2 3.0; A-3/AMX-3 and Waikiki 4.0. Business districts keep Table 21-3.4 |
-| Before Ord. 26-7 | The older lot-size formulas: FAR rises with lot area up to a cap (A-1/AMX-1 0.9; A-2/AMX-2 1.9; A-3/AMX-3 2.8; Waikiki 1.9). Business districts use Table 21-3.4 |
-| Bill 7 | 4.0 |
-| TOD | The tier's FAR (see [TOD](pathways/tod.md)) |
-| Business districts (Table 21-3.4) | B-1 1.0; B-2 2.5; BMX-3 2.5; BMX-4 4.0; plus the open-space bonus |
+### Open-space bonus
 
-#### Open-space bonus (§ 21-3.120-2(c))
-B-2, BMX-3 and BMX-4 lots can raise FAR to 3.5, 3.5 and 7.5 by giving up ground as a public plaza. The model takes the full bonus by default in Standard, Before Ord. 26-7, 201H and TOD IPD-T (not PD-T, where the bonus does not apply), and sets aside one sq ft of plaza for every five sq ft of bonus floor area. Example: a 20,000 sq ft BMX-4 lot gets FAR 7.5 and gives up 14,000 sq ft of plaza.
+B-2, BMX-3 and BMX-4 lots can raise their FAR by giving up ground as public open space (§ 21-3.110-1(c), § 21-3.120-2(c)). The model applies the full bonus by default in every pathway that allows it, and charges the ground it costs. Each pathway page says whether the bonus applies.
+
+**How it is computed.** The bonus fills the gap between the pathway's own FAR and the district's ceiling, and is never negative:
+
+```math
+\text{bonus} = \max(0,\ \text{ceiling} - \text{pathway FAR})
+```
+
+| Zone | Ceiling FAR | Business district FAR (Table 21-3.4) + bonus |
+| --- | --- | --- |
+| B-2 | 3.5 | 2.5 + 1.0 = 3.5 |
+| BMX-3 | 3.5 | 2.5 + 1.0 = 3.5 |
+| BMX-4 | 7.5 | 4.0 + 3.5 = 7.5 |
+
+Apartment, AMX, B-1, industrial and IMX-1 zones have no bonus in the model.
+
+**The ground it costs.** The model sets aside open space at 5:1, one square foot of plaza for every five square feet of bonus floor area, and builds the coverage footprint on what remains:
+
+```math
+\text{plaza} = \frac{\text{bonus} \times \text{lot}}{5}
+```
+
+Example: a 20,000 sq ft BMX-4 lot gets 3.5 bonus FAR, gives up 14,000 sq ft of plaza and builds on the remaining 6,000 sq ft. The plaza stays set aside even when the user overrides Max FAR.
 
 ### Unit type and unit mix
 
@@ -114,34 +121,13 @@ The Unit Mix lever picks a blend of unit types; the unit size is the blend's ave
 | One-bedroom | 500 |
 | Two-bedroom | 700 |
 
-Units = net residential area ÷ average unit size, rounded down. Bill 7 also caps units at lot area × 4.0 ÷ the building area per unit (default 800 sq ft), and TOD caps IMX-1 at 10 units under PD-T.
+Units = net residential area ÷ average unit size, rounded down. Some pathways also cap the unit count; their pages give the cap.
 
 ## Height Setbacks 
 
 Several zoning districts require buildings to step back as they get taller. Above a set height, the side and rear setbacks (and in Waikiki the front setback too) grow by 1 ft for every 10 ft of additional height. The model applies this storey by storey, so upper floors get smaller and the building takes a stepped shape. The step-back applies to everything built at that height: ground-floor and podium parking as well as residential floors.
 
-### Rules by zone
-
-| Zone | Rule | Yards affected | Source |
-| --- | --- | --- | --- |
-| A-2, A-3 | Above 40 ft: +1 ft per 10 ft of height or portion | Side and rear | ROH § 21-3.80-1(c)(2) |
-| AMX-2, AMX-3 | Above 40 ft: +1 ft per 10 ft | Side and rear | ROH § 21-3.90-1(c) |
-| B-2, BMX-3, IMX-1 | Above 40 ft: +1 ft per 10 ft | Side and rear | Ord. 17-55 |
-| BMX-4 | Modeled with the BMX-3 rule | Side and rear | The LUO uses a 65° street-angle plane instead (§ 21-3.120-2(c)); see deviations |
-| Resort | Above 30 ft: +1 ft per 10 ft | Side and rear | ROH § 21-3.100-1(c)(3) |
-| Waikiki Apartment Precinct and Apartment Mixed Use Subprecinct | Above 40 ft: +1 ft per 10 ft | Front, side and rear | ROH § 21-9.80-5(c)(2) |
-| A-1, AMX-1 | None | — | LUO Table 21-3.3 |
-
-
-### By pathway
-
-| Pathway | Height setback |
-| --- | --- |
-| Standard (post Ord. 26-7) | The zone's rule |
-| Before Ord. 26-7 | The zone's rule |
-| TOD | The underlying zone's rule |
-| 201H | The underlying zone's rule |
-| Bill 7 (ROH Ch. 32) | None. Chapter 32's development standards set "Height setbacks: None" (Ord. 19-8); the pending Bill 72 (2025) keeps this |
+Which zones step back, and by how much, is on the pathway pages: the zone rules are in [Standard](pathways/bill6.md#height-setbacks), the pathways that build to the underlying zone use the same rules, Bill 7 has none, and the Waikiki precincts also step back the front yard (see [Special districts](pathways/special-districts.md#height-setbacks)).
 
 ### How it is modeled
 
@@ -164,10 +150,7 @@ With no parking and FAR not limiting the building, the step-back reduces the pro
 
 ### Deviations and what is not modeled
 
-- BMX-4 uses the BMX-3 step-back in place of its actual 65° street-angle plane.
 - Transitional setbacks next to residential or apartment lots are not modeled; they depend on each parcel's neighbors.
-- Waikiki coastal height setbacks (no structures within 100 ft of the certified shoreline, then a 1:1 plane) are not modeled; the parcel data has no shoreline distance.
-- TOD and 201H modifications are not modeled. Council can modify or exempt height setbacks for IPD-T/PD-T and 201H projects, but the model applies the underlying zone's rule.
 - The Bill 18 draft rule (step-back above 40 ft on buildings over 75 ft) is not current law. Bill 18 scenarios can still be run by setting the step-back inputs directly.
 - Lot shape is always assumed to be twice as deep as it is wide, with frontage on the short side.
 
@@ -191,32 +174,16 @@ The model has no separate general-contractor fee line: contractor overhead and p
 
 The model builds the off-street parking and loading that ROH Chapter 21, Article 6 requires, and places it where a typical developer would: a surface lot if the stalls fit beside the building, otherwise the ground floor, then whole podium floors. Parking counts toward the height limit but not toward FAR, so when height is the limit podium floors replace homes, and when FAR is the limit parking mainly adds cost.
 
-### Requirements by pathway
+### Requirements
 
-| Pathway | Housing stalls | Retail stalls | Joint use | Loading spaces | Basis |
-| --- | --- | --- | --- | --- | --- |
-| Standard (post Ord. 26-7) | 1 per 1,000 sq ft of dwelling area | 1 per 500 sq ft | 90% when both | Yes, lots over 7,500 sq ft | § 21-6.20, Tables 21-6.1, 21-6.2, 21-6.5 |
-| Before Ord. 26-7 | 1 per 1,000 sq ft of dwelling area | 1 per 500 sq ft | 90% when both | Yes, lots over 7,500 sq ft | Same |
-| 201H | 1 per 1,000 sq ft of dwelling area | 1 per 500 sq ft | 90% when both | Yes, lots over 7,500 sq ft | Same: no exemption assumed, since HRS § 201H-38 exemptions are granted project by project |
-| TOD (IPD-T and PD-T) | None | None | Loading only | Yes, lots over 7,500 sq ft | § 21-6.20(a): no parking within 0.5 miles of a rail station or in a TOD special district; loading is not exempted |
-| Bill 7 (ROH Ch. 32) | None | None | n/a | None, but loading and garbage storage must fit on site | Ord. 19-8, § 32-2.3 |
+The rules below are the ROH Chapter 21, Article 6 minimum. Each pathway page says which of them apply: Standard, Before Ord. 26-7 and 201H apply the full minimum, TOD requires loading but no car parking, and Bill 7 requires neither.
 
 #### Exempt parcels
-§ 21-6.20(a) requires no parking in the Primary Urban Center and Ewa development plan areas (except residential, agricultural and preservation districts) or within 0.5 miles of a rail station. Each Standard, Before Ord. 26-7 and 201H parcel in the Citywide View carries `parking_exempt`; 6,998 of 9,444 are exempt. An exempt parcel needs no housing or retail stalls but still needs loading (§ 21-6.110 is not exempted). "Residential districts" means R-3.5 to R-20 only; apartment and apartment mixed-use are separate district classes, so no modeled parcel falls into the carve-out. The Project View has no parcel, so it always applies the minimum.
+§ 21-6.20(a) requires no parking in the Primary Urban Center and Ewa development plan areas (except residential, agricultural and preservation districts) or within 0.5 miles of a rail station. Each parcel in the Citywide View carries `parking_exempt`, and the pathways that apply the Article 6 minimum read it. An exempt parcel needs no housing or retail stalls but still needs loading (§ 21-6.110 is not exempted). "Residential districts" means R-3.5 to R-20 only; apartment and apartment mixed-use are separate district classes, so no modeled parcel falls into the carve-out. The Project View has no parcel, so it always applies the minimum.
 
 Retail uses the Commercial 1 rate (retail and sales, eating and drinking, offices). The model builds only housing and ground-floor retail, so the industrial (1 per 2,000 sq ft), Commercial 2 (1 per 1,000 sq ft), hotel and assembly rates in Table 21-6.1 are not used; housing in resort and industrial zones takes the residential rate.
 
-#### Impact of the exemption
-Citywide View totals at default levers, retail off, with the Article 6 minimum applied to every parcel and then with the § 21-6.20(a) exemption applied:
-
-| Pathway | Parcels | Stalls without → with exemption | Units without → with exemption | Parcels rated strong without → with exemption |
-| --- | --- | --- | --- | --- |
-| Standard (post Ord. 26-7) | 9,444 | 623,728 → 120,384 | 1,243,569 → 1,444,875 | 176 → 5,159 |
-| Before Ord. 26-7 | 9,444 | 445,399 → 78,049 | 886,336 → 1,022,077 | 93 → 1,987 |
-| 201H | 9,444 | 623,825 → 120,384 | 1,243,743 → 1,444,863 | 59 → 4,211 |
-| TOD (Base) | 2,810 | 0 (no minimum) | 509,445 | 1,474 |
-
-Dropping stalls from the 74% of parcels that are exempt frees ground and podium floors for units, and each stall costs more to build than its $100 monthly rent repays, so the exemption moves thousands of parcels into strong. TOD requires no car parking, so it has no exemption to apply.
+Dropping stalls from the exempt parcels frees ground and podium floors for units, and each stall costs more to build than its $100 monthly rent repays, so the exemption moves thousands of parcels into strong. Each pathway page gives its totals with and without the exemption.
 
 ### Counting stalls
 
@@ -256,7 +223,7 @@ Lots over 7,500 sq ft reserve ground for these spaces, with the same 90% joint-u
 
 ### Bicycle parking (§ 21-6.40, Table 21-6.3)
 
-Bicycle parking is required in the apartment, AMX, business, BMX, resort and Waikiki districts (§ 21-6.40(a)), so the model adds it in Standard, Before Ord. 26-7, 201H and TOD, except on industrial-zoned TOD parcels. Bill 7 is exempt (Ord. 19-8). The § 21-6.20(a) parking exemption covers car parking only, so exempt parcels still provide bicycle parking.
+Bicycle parking is required in the apartment, AMX, business, BMX, resort and Waikiki districts (§ 21-6.40(a)); each pathway page says whether it applies. The § 21-6.20(a) parking exemption covers car parking only, so exempt parcels still provide bicycle parking.
 
 | Use | Short-term | Long-term |
 | --- | --- | --- |
@@ -285,8 +252,7 @@ the Industrial and Hotel rows of Table 21-6.3 (the model builds no industrial of
 1. **Surface lot first:** The building is made as slim as the floor area allows. If every stall and the loading fit on the open part of the ground plate, they become a surface lot and the building keeps all its units. Surface parking stays inside the yards and the lot-coverage area (§ 21-6.80(a)).
 2. **Then inside the building:** Retail (when on) takes its share of the ground floor, then stalls at 330 sq ft each. A leftover ground floor at least one unit's gross size becomes housing; anything smaller is lobby, charged at the residential hard cost.
 3. **Podium floors:** Stalls that don't fit go on whole podium floors above. For each podium height the model finds the most units whose stalls still fit, and keeps the arrangement with the most units. More parking therefore never produces more units. The unit count is found by a direct search for the most units whose stalls still leave room for them; an earlier version stepped down from an upper bound and could stop short (one 248,815 sq ft A-2 lot showed 597 units where 628 fit), and the fix raised units 0.1–0.6% depending on the pathway.
-4. **TOD special districts (PD-T):** No stalls or loading within 40 ft of the front lot line (§ 21-9.100-8(c)); see [TOD](pathways/tod.md).
-5. **Income:** Stalls × $100 per month × 12, added to potential gross income.
+4. **Income:** Stalls × $100 per month × 12, added to potential gross income.
 
 Ground-floor and podium stalls cost the same per square foot. What separates them is housing: ground-floor stalls take space that could be a unit or lobby, and podium floors take whole floors under the height limit.
 
@@ -317,7 +283,7 @@ The Parking lever follows the legal minimum until the user moves it, and a lever
 
 # Soft Costs
 
-Soft costs are every development cost that is not construction: permits, plan review, water and wastewater charges, school impact fees, civil permits, park dedication, and construction management. They are summed in `calcSoftCosts`.
+Soft costs are every development cost that is not construction: permits, plan review, water and wastewater charges, school impact fees, civil permits, park dedication, and construction management. They are summed in `calcSoftCosts`. Fees that only one pathway pays, such as TOD's permit fees, are on that pathway's page.
 
 | Line | How it is calculated |
 | --- | --- |
@@ -333,7 +299,6 @@ Soft costs are every development cost that is not construction: permits, plan re
 | School impact fee | Set to $0 (see below) |
 | Park dedication | See below |
 | Construction management | 3% of hard cost |
-| TOD only: zoning application and special district permit | $15,000, plus $1,200 plus $300 per acre (at most $15,400) |
 
 ## Fee waivers
 
@@ -341,15 +306,15 @@ Fee waivers are implemented by charging fees on a reduced chargeable unit count 
 
 | Toggle | Units charged |
 | --- | --- |
-| Market Units Only (default except Bill 7) | Market units; affordable units are waived |
+| Market Units Only | Market units; affordable units are waived |
 | All | Every unit |
-| Exempt (Bill 7 default) | None |
+| Exempt | None |
 
-Bill 7's building permit and plan review waiver, for example, is proportional to the affordable share. Each pathway's waivers are listed on its [pathway page](README.md#pathways).
+Each pathway's default setting and its waivers are listed on its [pathway page](README.md#pathways).
 
 ### Park dedication
 
-Park land is charged only on units not exempt under § 22-7.3(j); in other words only market units count toward the park dedication requirement. The requirement is the lesser of 110 sq ft per unit and 10% of floor area. The Park Dedication toggle sets how it is paid: in lieu (a $200 application fee plus the land value of the required area at the land cost) or exempt (no cost). Bill 7 units are fully exempt from park dedication (ROH 43-10.8).
+Park land is charged only on units not exempt under § 22-7.3(j); in other words only market units count toward the park dedication requirement. The requirement is the lesser of 110 sq ft per unit and 10% of floor area. The Park Dedication toggle sets how it is paid: in lieu (a $200 application fee plus the land value of the required area at the land cost) or exempt (no cost).
 
 ### Wastewater system facility charges
 
@@ -464,9 +429,9 @@ BWS may waive WSFC and new meter charges for affordable or homeless dwelling uni
 | --- | --- | --- |
 | Market Units Only | Charged on market units; affordable units are waived, up to 500 units per project | Charged on the market units' share of all units |
 | All | Charged on every unit | Charged in full |
-| Exempt | Waived on every unit (Bill 7 default) | Waived |
+| Exempt | Waived on every unit | Waived |
 
-Bill 7 defaults to Exempt. If its toggle is set to All, Bill 7 projects pay both charges in full. The two charges are waived on different bases:
+The two charges are waived on different bases:
 
 - WSFC is waived on the fixture units of the waived units.
 - The meter charge is waived in proportion to the waived units' share of total units. For example, with 25% of units waived, the project pays 75% of the meter charge.
@@ -559,9 +524,9 @@ When construction finishes the building is not yet at full income. Lease-up carr
 At stabilization, hold-strategy projects refinance the construction loan into a permanent loan. The permanent loan is the smaller of:
 
 - **The construction loan balance** to be retired, and
-- **The debt-service-coverage limit:** year-one NOI (after property tax) ÷ annual debt service must be at least the minimum DSCR (default 1.20; Bill 7 1.15).
+- **The debt-service-coverage limit:** year-one NOI (after property tax) ÷ annual debt service must be at least the minimum DSCR (default 1.20).
 
-Debt service uses a 30-year amortization at a 6.75% permanent rate (Bill 7: 7.0%), both user inputs. DSCR is a financeability gate, not a return: it sets the most debt the project can carry. When the permanent loan falls short of the construction balance, the developer funds the gap with more equity. The construction loan is sized so its balance at stabilization does not exceed this take-out, which is why the realized equity share can exceed the slider.
+Debt service uses a 30-year amortization at a 6.75% permanent rate, both user inputs. DSCR is a financeability gate, not a return: it sets the most debt the project can carry. When the permanent loan falls short of the construction balance, the developer funds the gap with more equity. The construction loan is sized so its balance at stabilization does not exceed this take-out, which is why the realized equity share can exceed the slider.
 
 **Entry cap:** The market cap rate (default 5.1% for every zone) values the building at stabilization. It anchors gross development value and the return-on-cost benchmark.
 
@@ -579,7 +544,7 @@ Debt service uses a 30-year amortization at a 6.75% permanent rate (Bill 7: 7.0%
 
 - **Each year:** NOI minus permanent debt service. Rents grow 4% a year, affordable and market alike (see [Rent growth](#rent-growth)), operating expenses 3.5%, and assessed value 2%.
 - **At exit:** the next year's NOI ÷ exit cap, less 3.5% selling costs and the remaining loan balance.
-- **Bill 7 and TOD** pay property tax on land only for the first 15 years (see Property Tax).
+- **Property tax exemptions:** a pathway with a 15-year improvement exemption pays tax on land only for those years (see Property Tax).
 
 ## Revenue
 
@@ -601,25 +566,15 @@ Every rent in the model, affordable or market, is an AMI-based rent from the HHF
 Each unit is either affordable or market:
 
 - **Affordable units:** rent at the Affordable Unit Rent level (default 80% AMI).
-- **Market units:** rent at the Market Unit Rent level, which stands in for market rent (default 120% AMI; Bill 7 100%).
+- **Market units:** rent at the Market Unit Rent level, which stands in for market rent (default 120% AMI).
 
-| Pathway | Affordable share of units |
-| --- | --- |
-| Bill 7 | 80% |
-| 201H | The Affordability input, at least 50% + 1 unit (default 51%) |
-| Standard, Before Ord. 26-7, TOD | 0%: the model is rental only, and the Chapter 29 requirement applies to for-sale projects (see each [pathway page](README.md#pathways)) |
+Each pathway sets its affordable share of units, listed in the Affordability section of its pathway page.
 
 ### Rent growth
 
 Affordable and market rents both grow 4% a year: Honolulu's HUD income limits, which set the affordable rent caps, grew 4.4% a year from 2015 to 2026, and market rents grew 3.6% to 4.3% a year. The constants are `FINANCING.ami_escalation` (to lease-up) and `HOLD.annual_rent_growth` (over the hold) in `src/calculations/calc-shared.ts`.
 
-#### The Chapter 32 rent cap moves every year
-[ROH § 32-1.1](https://dbedt.hawaii.gov/hhfdc/files/2023/12/2023-1214-III.F.-Ch-32_Affordable-Rental-Housing-Program-SECURED.pdf) requires that "for a period of at least 15 years after a certificate of occupancy is issued … the affordable units are rented at or below the rental rate limits established by [HUD] for households earning 100 percent of the AMI." It defines AMI as "the current AMI determined by [HUD] annually." Nothing ties the cap to the year of application or permit, so it rises while a project waits in permitting. The 15-year restriction outlasts the model's 10-year hold, so the cap applies for the whole hold. The model's rent formula matches DPP's published maximums:
-
-| 100% AMI, DPP 2026 | Income limit | Maximum rent (DPP) | 30% × income ÷ 12 |
-| --- | --- | --- | --- |
-| Studio (1 person) | $107,800 | $2,695 | $2,695 |
-| One-bedroom (1–2 persons) | $115,500 (average) | $2,887 | $2,887 |
+Bill 7's affordable rent cap is tied to HUD's current limits, so it rises every year (see [Bill 7](pathways/bill7.md#affordability)).
 
 **Affordable rents follow HUD income limits:** Honolulu's median family income grew 4.05% a year from 2015 ($86,900) to 2025 ($129,300), and the income limits that set rent caps grew 4.4% a year from 2015 to 2026. The 2026 increase of 1.3% followed a 9.2% year. HUD caps any single year's increase at 10%, and the limits used for these projects don't fall. Since 2020, growth has averaged 3.4% a year.
 
@@ -637,21 +592,17 @@ Residential income (rents, parking, admin) loses 7.4% to vacancy; retail loses 1
 
 ## Operating Expenses
 
-Operating expenses are modeled as a percentage of effective gross income, and represent the cost of management, insurance, maintenance, etc. after stabilization. In Honolulu, 19–20% is typical for affordable projects with a GET exemption (4.712% burden); 24–25% is more typical of market projects. The model's default is 30% of EGI, and 19% for Bill 7 and 201H. The ratio is a user slider and excludes property tax, which is modeled separately.
+Operating expenses are modeled as a percentage of effective gross income, and represent the cost of management, insurance, maintenance, etc. after stabilization. In Honolulu, 19–20% is typical for affordable projects with a GET exemption (4.712% burden); 24–25% is more typical of market projects. The model's default is 30% of EGI; pathways that assume the GET exemption use 19%. The ratio is a user slider and excludes property tax, which is modeled separately.
 
 **General Excise Tax (GET) exemption:** GET is a tax on gross business receipts; it is charged on the seller, the contractor, architect, lender, property manager, and typically passed through in the price. On Oahu it is 4.5% (4% state plus the 0.5% county surcharge), with a maximum visible pass-on rate of about 4.712%.
 
 HRS § 237-29 is the GET exemption; the certification gate is § 201H-36 (HHFDC) or § 46-15.1 (the counties). A qualified entity receiving gross income for the planning, design, financing, construction, sale or lease of a housing project certified or approved under § 46-15.1 or § 201H-36 may file Form G-37, with a separate form for each project. Section 46-15.1 gives counties the same authorities as HHFDC for developing low to moderate income housing, and provides that county projects get the GET exemption in the same manner as HHFDC projects.
 
-***Note:*** Bill 7 and 201H are modeled at 19% operating expenses because we assume they apply for and are granted the GET exemption and certificate.
-
 ## Property Tax
 
 Real property tax is 0.35% a year of assessed value (land plus improvements, the improvements valued at hard cost). NOI is after property tax, which is split between the residential and retail NOI in proportion to their EGI. Over a hold the assessed value grows 2% a year.
 
-- **Bill 7:** improvements are exempt for 15 years (land-only tax) while the affordable rent is 80% AMI or less.
-- **TOD:** improvements are exempt for 15 years.
-- **Standard, Before Ord. 26-7, 201H:** full tax from year one.
+Some pathways exempt the improvements for a period; each pathway page gives its treatment under Fees, waivers and taxes.
 
 ## NOI and Gross Development Value
 
@@ -681,7 +632,7 @@ The residual land value is the most a developer could pay for the land and still
 - **Project cost:** development cost (1.1 × hard + soft) plus financing cost, with the loan sized on construction cost only.
 - **Profit:** 15% of project cost.
 - **Target return:** 11.5% a year, the carry on the land from purchase to stabilization.
-- **Grants (Bill 7 only):** each grant payment is discounted from the month it is paid (grant_m): the pre-construction subsidy evenly over the construction months, the post-construction grant when construction ends. The package reports the parts as rlv_land_carry (the divisor) and rlv_grants_pv (the grants term), so RLV rebuilds from them to within $1.
+- **Grants ([Bill 7](pathways/bill7.md#grants) only):** each grant payment is discounted from the month it is paid (grant_m): the pre-construction subsidy evenly over the construction months, the post-construction grant when construction ends. The package reports the parts as rlv_land_carry (the divisor) and rlv_grants_pv (the grants term), so RLV rebuilds from them to within $1.
 
 RLV per sq ft = RLV ÷ lot area, compared against the land cost per sq ft.
 
@@ -705,5 +656,3 @@ The flip and hold strategies (see Financing) each produce monthly equity cash fl
 **Overall verdict:** The four scored metrics vote: the project is poor if at least half are poor, strong if none are poor and at least three quarters are strong, and marginal otherwise. The same verdict colors the Citywide View's map (red, yellow, green), the parcel card and the Project View's viability panel.
 
 ***Note:*** return on cost is a ratio, so anything that shrinks the denominator can raise it. Shorter buildings frequently post a higher return on cost than taller ones simply because they cost less, which does not make them better policy outcomes. Levered IRR is the better metric when the question involves timing (permitting delay, construction duration, lease-up).
-
-***Note:*** return on cost takes Bill 7 grants off the development cost at face value, undiscounted. That is the convention: return on cost is one stabilized year of NOI over cost, with no timing, so the grants' timing shows up in the residual land value (discounted) and the levered IRR (monthly cash flows) instead. The Project View's hint reads "Stabilized NOI ÷ Total Development Cost, net of grants".
