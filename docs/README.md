@@ -21,7 +21,7 @@ Each pathway page describes only what differs from the shared [Housing Policy Si
 
 ## Contributing
 
-[Developer guide](development.md): where to make a change, and how to keep the package in sync with UHERO's Housing Policy Simulator.
+[Developer guide](development.md): setup, where to make a change, the tests, and how commits and releases work.
 
 ## Project and Citywide view
 

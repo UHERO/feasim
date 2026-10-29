@@ -43,7 +43,7 @@ Type definitions are included, so there is no `@types` package to install. The m
 Model updates change results: a new premium, fee or rule moves the numbers even when the API stays the same. Pin the version (`npm install @uhero/feasim@0.2.1`, or an exact version in `package.json`) when you need results that stay put, and read [`CHANGELOG.md`](https://github.com/UHERO/feasim/blob/main/CHANGELOG.md) before upgrading. Run `npm ls @uhero/feasim` to see the installed version.
 
 ### From source 
-To work on the model itself, clone the repository and see [Development](#development):
+To work on the model itself, clone the repository and see the [Developer guide](docs/development.md):
 
 ```sh
 git clone https://github.com/UHERO/feasim.git
@@ -275,39 +275,4 @@ Background reading:
 
 ## Development
 
-```sh
-npm install          # install dev dependencies
-npm test             # run the tests
-npx vitest run -u    # re-record the pinned results after a deliberate change
-npm run build        # build dist
-```
-
-### Tests
-
-The tests are in `test/`:
-
-- **`model.test.ts`** pins every output of the model for each pathway: its defaults, scenarios that exercise its branches (grants, the Bill 7 tax exemption, park dedication, retail, impact fees, financing, the envelope), and a sample of Oahu parcels (every zone, with the smallest, median and largest lot and the tallest height). It also checks rules that must hold whatever the numbers. For example, the same inputs give the same outputs, inputs are never modified, unit counts are whole and consistent, and policy rules such as Bill 7's 60 ft cap, its park waiver and the TOD permit tiers.
-- **`calculator.test.ts`** runs single hypothetical lots through `calcSingle` (`test/data/calculator-defaults.json`): each pathway's defaults, with retail on and off and under each TOD regime and tier. It checks the Article 6 parking defaults, and that the FAR and height match what `pathwayEnvelope` gives the same lot.
-- **`gauge.test.ts`** runs 287 Oahu parcels through `calcParcel` (`test/data/gauge-parcels.json`), including TOD parcels in every regime, station area and industrial district, PD-T parcels with bonus heights, and parcels with and without the parking exemption. It pins the per-parcel results and totals, and checks the rules on every parcel: exempt parcels build no stalls and the rest the legal minimum, bicycle parking outside industrial zones, no loading on lots of 7,500 sqft or less, the PD-T 40 ft front strip, the IMX-1 unit cap, and the TOD status of industrial land.
-
-Any change that moves a result fails the snapshot tests, on purpose. If the change is intended, run `npx vitest run -u`, review the snapshot diff in git, and commit it with the change.
-
-### Commits and releases
-
-Releases are automated with [release-please](https://github.com/googleapis/release-please). It reads the commit messages on `main` and opens a release PR that bumps the version in `package.json` and updates `CHANGELOG.md`. Merging that PR creates the GitHub Release and publishes the package to npm. Don't bump the version by hand.
-
-For this to work, write commit messages in the [Conventional Commits](https://www.conventionalcommits.org/) format: `type: short description`.
-
-| Prefix | Use for | Release |
-| --- | --- | --- |
-| `fix:` | a bug fix | patch (0.2.0 → 0.2.1) |
-| `feat:` | a new feature | minor (0.2.0 → 0.3.0) |
-| `feat!:`, `fix!:`, or a `BREAKING CHANGE:` footer | a change that breaks existing users | major (0.2.0 → 1.0.0) |
-| `docs:`, `chore:`, `ci:`, `test:`, `refactor:` | everything else | no release on their own |
-
-Examples: `feat: add pre-construction premiums`, `fix: correct the Bill 7 height cap`.
-
-- The bump is the highest level among the commits since the last release. Messages with no prefix are ignored, so they never trigger a release.
-- If a PR is squash-merged, the PR title becomes the commit message on `main`, so give the PR title the prefix.
-- Before version 1.0.0, release-please bumps more conservatively: a breaking change gives a minor bump and a `feat:` gives a patch bump.
-- To force a specific version, add `Release-As: 1.0.0` as a footer in a commit message.
+To work on the model itself, see the [Developer guide](docs/development.md): setup, where to make a change, the tests, and how commits and releases work.
