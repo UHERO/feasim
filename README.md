@@ -10,7 +10,7 @@ Some things you can use it for:
 - **Test assumptions:** How do land cost, construction cost, interest rates or a subsidy change the answer?
 - **Run many parcels:** Map or total the housing a policy would make feasible across a district or the whole island.
 
-**Note:** The model code is in plain TypeScript with no runtime dependencies, so it runs in Node or the browser.
+For more information, visit the [Housing Policy Simulator documentation](https://github.com/UHERO/feasim/blob/main/docs/README.md): how the model works, pathway by pathway, and the sources behind its assumptions.
 
 ## Install
 
@@ -75,15 +75,15 @@ overallLevel(result); // "marginal"
 
 A pathway is a set of rules a project can be built under. Each pathway sets what can be built on the lot and carries its own default assumptions.
 
-| `program` | Pathway | What it changes |
+| `program` | Pathway | In brief |
 | --- | --- | --- |
-| `"bill6"` | Standard (current zoning) | The zone's FAR (as set by Ordinance 26-7), lot coverage and height under the Land Use Ordinance, with the Article 6 parking minimums |
-| `"standard"` | Before Ord. 26-7 | The FAR and lot coverage rules as they stood before Ordinance 26-7, for comparison |
-| `"bill7"` | Bill 7 | An affordable housing pathway in the A, AMX, BMX and Waikiki (Apart, ApartMix) districts, with FAR 4.0 and a 60 ft height cap, construction grants, waived impact fees, and no required parking. Excavation and stepbacks follow the zone |
-| `"tod"` | Transit-oriented development | PD-T and IPD-T permits near rail stations (ROH § 21-9.100): FAR and height bonuses by tier, station area plan limits, no required parking |
-| `"h201"` | HRS § 201H | Exemptions for affordable housing projects, on current (Ord. 26-7) zoning FAR and lot coverage. The defaults make 51% of units affordable at 80% of area median income (AMI), with market units at 120% AMI; set `affordability` and `affordable_ami` to change that. |
+| `"bill6"` | [Standard (current zoning)](docs/pathways/bill6.md) | Current zoning, as amended by Ord. 26-7 |
+| `"standard"` | [Before Ord. 26-7](docs/pathways/standard.md) | Zoning before Ord. 26-7, for comparison |
+| `"bill7"` | [Bill 7](docs/pathways/bill7.md) | Affordable rental housing under ROH Chapter 32, with grants and no required parking |
+| `"tod"` | [Transit-oriented development](docs/pathways/tod.md) | PD-T and IPD-T permits near rail stations, with FAR and height bonuses by tier |
+| `"h201"` | [HRS § 201H](docs/pathways/h201.md) | State affordable housing exemptions, with at least 51% of units affordable |
 
-**Note:** the ids are historical. `"bill6"` is current zoning, and `"standard"` is the rules before Ordinance 26-7
+***Note:*** the ids are historical. `"bill6"` is current zoning, and `"standard"` is the rules before Ordinance 26-7.
 
 ### Parcels
 
@@ -121,10 +121,6 @@ calcParcel("bill6", parcel, {
 });
 ```
 
-**Note:** `height_limit` and `max_far` override the pathway's envelope. Bill 7 still caps height at 60 ft. See the `SliderInputs` type for the full list, with units.
-
-**Note:** every pathway takes 18 months of permitting and 12 of construction, whatever the zone. Set `permitting_months` and `const_months` to change them.
-
 ### Input values
 
 The model doesn't check its inputs. A value it doesn't recognize falls back to a default or gives an empty result without an error, so use these exactly:
@@ -142,7 +138,7 @@ The model doesn't check its inputs. A value it doesn't recognize falls back to a
 | `grant_units` (Bill 7) | `"all"` (default) or `"affordable"`: the units the pre-construction subsidy pays on. Post-construction always pays on affordable units | Anything else pays on all units |
 | `prevailing_wage_premium`, `onsite_labor_share` (Bill 7) | Fractions: the extra cost of on-site labor at prevailing wages (default `0.45`), and on-site labor as a share of hard cost (default `0.25`). Pre-construction runs only | `onsite_labor_share` also caps the subsidy, so setting it too low cuts the subsidy |
 
-With `calcSingle` and `"tod"`, pass a `max_far`, or the model can't run the project without the open-space bonus to compare (see Model notes). `calcParcel` always passes one.
+With `calcSingle` and `"tod"`, pass a `max_far`, or the model can't run the project without the open-space bonus to compare (see [Open-space bonus](docs/simulator-logic.md#open-space-bonus)). `calcParcel` always passes one.
 
 ### Results
 
@@ -159,7 +155,7 @@ Every function returns a `ParcelOutput`. Some of its fields:
 | Returns | `dev_roc` (return on cost: stabilized NOI over development cost net of grants, at face value), `dev_levered_irr`, `dev_equity_multiple`, `dev_profit`, `dev_dscr` |
 | Land | `rlv` and `rlv_sqft`: the residual land value, or the most a developer could pay for the land and still hit their target return. `rlv_grants_pv` (grants discounted to the land purchase) and `rlv_land_carry` (the discount factor to stabilization) split it: `rlv = (gdv - rlv_selling_costs - rlv_project_cost - rlv_profit) / rlv_land_carry + rlv_grants_pv` |
 
-**Note:** Rates are fractions, so `0.058` means 5.8% and money is in dollars.
+***Note:*** rates are fractions, so `0.058` means 5.8% and money is in dollars.
 
 ### The verdict
 
@@ -223,7 +219,7 @@ calcParcel("tod", site, {}, { tier: "with_benefits" });
 ```
 
 5. A hypothetical lot, with no parcel.
-**Note:** `calcSingle` is the model itself: one flat set of inputs in, one result out. Use it when you want to set the FAR and height yourself instead of taking them from a pathway's rules.
+***Note:*** `calcSingle` is the model itself: one flat set of inputs in, one result out. Use it when you want to set the FAR and height yourself instead of taking them from a pathway's rules.
 
 ```ts
 import { calcSingle, DEFAULT_INPUTS } from "@uhero/feasim";
@@ -247,32 +243,3 @@ calcSingle({
 | `todIneligibleReason(parcel)`, `todNotApplicableReason(parcel, tier)` | Why a lot can't use a TOD permit, or can't have housing at a tier |
 
 The package also exports the rules behind the model, such as the zoning FAR tables, the TOD rules, the parking and loading requirements, and the water charges, for use in your own calculations. Their TypeScript types document each one.
-
-## Model notes
-
-- The model is only for Oʻahu, as of 10/28/2026.
-  - The zoning, fees, rents, sale prices and costs are for the City and County of Honolulu.
-- Every pathway is rental by default
-  - The defaults are 100% rental. Set `rental_split` and `sale_split` to model for-sale units in later versions.
-- The model is designed to be a first pass feasibility screen, not an appraisal
-  - The model estimates whether a typical project could pencil, it does not design a specific building.
-- The open-space FAR bonus is optional
-  - Where a zone offers one (B-2, BMX-3, BMX-4), `calcSingle` runs the project with and without it and keeps the one with the higher residual land value, or the bigger building when neither pencils. The bonus costs 1 sqft of public open space per 5 sqft of extra floor area, so it often isn't worth it on lower buildings. `open_space_bonus` on the result is the bonus taken.
-
-The model's logic and data sources are documented here:
-
-- [Housing Policy Simulator documentation](https://github.com/UHERO/feasim/blob/main/docs/README.md): how the model works, pathway by pathway, and the sources behind its assumptions
-- [Housing Policy Simulator Variables Spreadsheet](https://docs.google.com/spreadsheets/d/1qVd_1RI3wjlhwmG2LTzQK0v08qlD47YCn9gULIG-1-4/edit?usp=sharing): the variables in use and their sources
-- [Assumptions Made Tracker](https://docs.google.com/spreadsheets/d/1QqSswndNPDVZwGPuKo3mlO7poFdPswB8rq8TlTXpmyo/edit?gid=0#gid=0): assumptions made in building the policy framework
-
-Background reading:
-
-- [201-H Process Summary](https://dbedt.hawaii.gov/hhfdc/files/2023/05/2023-05-18-201H-Process-FINAL.pdf): 201H and its requirements
-- [Parcels & Zoning Dashboard](https://cchnl.maps.arcgis.com/apps/webappviewer/index.html?id=96d4994d61cc495fa1a8524b3b116eee): an interactive map of Oʻahu's parcels
-- [Honolulu Inclusionary Housing Flowchart](https://miro.com/app/board/uXjVJaPZAJQ=/): flowchart of Oʻahu's affordability regulations
-- [Development Flowchart](https://miro.com/app/live-embed/uXjVJDi57jk=/?embedMode=view_only_without_ui&moveToViewport=-2298%2C-1870%2C3822%2C2086&embedId=247174178665): the housing development process
-- [Housing Policy Simulator Variables Spreadsheet V1](https://docs.google.com/spreadsheets/d/1_sSlavakP_3b8Ssv547RV-63rOuHqrqrIfim9JED3XU/edit?usp=sharing): the older version of the variables spreadsheet, with every variable and its source
-
-## Development
-
-To work on the model itself, see the [Developer guide](docs/development.md): setup, where to make a change, the tests, and how commits and releases work.

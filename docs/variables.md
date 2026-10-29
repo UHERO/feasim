@@ -4,6 +4,8 @@ Every input, constant and calculation function in the model, grouped by what it 
 
 **Review** is how often the value should be checked against its source.
 
+The end of the page keeps the [assumption history](#assumption-history): assumptions the model no longer makes and loopholes the model does not cover.
+
 ## Contents
 
 - [Levers](#levers)
@@ -31,6 +33,9 @@ Every input, constant and calculation function in the model, grouped by what it 
 - [Pathway fallback constants](#pathway-fallback-constants)
 - [Feasibility](#feasibility)
 - [Defined but not used](#defined-but-not-used)
+- [Assumption history](#assumption-history)
+  - [Retired assumptions](#retired-assumptions)
+  - [Loopholes](#loopholes)
 
 ## Levers
 
@@ -224,7 +229,7 @@ Levers are user inputs. The default for each pathway is set in `DEFAULT_INPUTS` 
 | Name | Kind | Value | What it is | Source | Review | File |
 | --- | --- | --- | --- | --- | --- | --- |
 | `stabilization` | Constant | 3 | **xyz** puts 3 months for stabilization period for rental units. Also the minimum carry when no units lease or sell. | **xyz** |  | calc-shared.ts |
-| `target_occupancy` | Constant | 0.9 | **xyz** aims for 90% occupied for rental units. | **xyz** |  | calc-shared.ts |
+| `target_occupancy` | Constant | 0.9 | 90% occupancy for rental units. | Developer interviews |  | calc-shared.ts |
 | `absorption_units_per_month` | Constant | 20 | **xyz** does 20 units per month. Lease-up = ceil(90% of rentals / 20) + 3, unless the leaseup_months lever is set. | **xyz** |  | calc-shared.ts |
 | `monthly_sale_cap` | Constant | 20 | **xyz** does 20 units per month. | **xyz** |  | calc-shared.ts |
 | `permitting_months` / `const_months` / `leaseup_months` | Lever | 18 / 12 / 9 | Overrides for the timing functions above. |  |  | parcels.ts |
@@ -394,7 +399,7 @@ Each pathway file keeps fallbacks for when a lever is not set. `DEFAULT_INPUTS` 
 | `rlvLevel` | Function | 0.9 / 1.1 | RLV per sq ft / land price: poor below 90%, marginal 90-110%, strong 110%+. |  |  | feasibility.ts |
 | `equityMultipleLevel` | Function | 2 / 2.5 | Development-grade equity multiple bands. |  |  | feasibility.ts |
 | `irrLevel` | Function | 0.08 / 0.12 | Levered IRR over the hold. |  |  | feasibility.ts |
-| `overallLevel` | Function |  | Verdict from the four scored metrics: poor if at least half are poor; strong if none are poor and at least 75% are strong; else marginal. Replaces **xyz**'s capped Poisson probability. |  |  | feasibility.ts |
+| `overallLevel` | Function |  | Verdict from the four scored metrics: poor if at least half are poor; strong if none are poor and at least 75% are strong; else marginal. |  |  | feasibility.ts |
 | `LEVEL_COLOR` | Table | 3 colors | poor #ef4444, marginal #facc15, strong #22c55e. |  |  | feasibility.ts |
 
 ## Defined but not used
@@ -409,10 +414,48 @@ These are still in the code but nothing reads them. They are kept for reference 
 | `COST_PER_ZONE` | Construction | A-1 170.5 ... AMX-2 266.91 | Assigned the RLB Q4 2025 data to the closest description of each A-AMX building standard. Unused since 2026-08-05; replaced by hard_cost_per_sqft. | calc-shared.ts |
 | `setbackFootprint` | Building envelope |  | Older single-setback footprint. Defined but no longer called (replaced by yardFootprint). | calc-shared.ts |
 | `home` | Vacancy | 0.01 | Homeowner vacancy. Not read. | calc-shared.ts |
-| `equity` | Financing | 0.1 | **xyz** 10% equity share. Not read; the equity lever (default 0.3) is used and acts as a floor once the loan is sized to the DSCR take-out. | calc-shared.ts |
-| `dev_fee` | Financing | 0.1 | **xyz**'s 10% developer fee. Not read; developer profit is now DEFAULT_PROFIT_MARGIN. | calc-shared.ts |
+| `equity` | Financing | 0.1 | 10% equity share. Not read; the equity lever (default 0.3) is used and acts as a floor once the loan is sized to the DSCR take-out. | calc-shared.ts |
+| `dev_fee` | Financing | 0.1 | 10% developer fee. Not read; developer profit is now DEFAULT_PROFIT_MARGIN. | calc-shared.ts |
 | `property_mgmt_rate` | Operating expenses | 0.15 | Property management fees are 15% of total rent yearly. Not read since opex_ratio. | calc-shared.ts |
 | `property_insurance_unit` | Operating expenses | 1000 | Property insurance is $1000 per unit. Not read. | calc-shared.ts |
 | `liability_insurance_unit` | Operating expenses | 150 | Liability insurance is $150 per unit yearly. Not read. | calc-shared.ts |
 | `monitor_unit` | Operating expenses | 60 | Affordable unit monitoring fee per unit. Not read. | calc-shared.ts |
 | `H201_DEFAULT_SALE_SPLIT` | Pathway fallback constants | 0.4 | Exported but not read (no sale units). | calc-h201.ts |
+
+# Assumption history
+
+This part keeps the record of assumptions the model no longer makes, the open questions behind some of its choices, and loopholes. The current behavior is documented in [Housing Policy Simulator logic](simulator-logic.md) and the [pathway pages](README.md#pathways); this part only explains how it got there.
+
+## Retired assumptions
+
+Earlier versions of the model made these assumptions. Each row gives what the model does now and where that is documented.
+
+| Earlier assumption | Modeled now | Documented in |
+| --- | --- | --- |
+| TOD (IPD-T / PD-T) projects pay no zoning permit fee. | TOD pays a $15,000 zoning application fee and the special district permit fee ($1,200 plus $300 per acre, at most $15,400), at every tier including Base. | [TOD: Fees, waivers and taxes](pathways/tod.md#fees-waivers-and-taxes) |
+| Every project in a special district applies for the major permit; minor permits are not considered. | Special district permit fees are charged only in TOD, as one fee whether the project would need a minor or a major permit. Outside TOD they are not modeled. | [TOD: Fees, waivers and taxes](pathways/tod.md#fees-waivers-and-taxes), [Special districts](pathways/special-districts.md) |
+| Grading and stockpiling permits are sized on the buildable area. | Grubbing is sized on the whole lot area; grading and stockpiling on the excavated volume, lot area × the zone's excavation depth. | [Soft cost assumptions](simulator-logic.md#soft-cost-assumptions) |
+| The Rental Housing Revolving Fund is a funding source alongside the Bill 7 grants. | The only public funding modeled is the Bill 7 grants. The Rental Housing Revolving Fund is not modeled, because how its awards are distributed is not published. | [Model-wide Assumptions](simulator-logic.md#model-wide-assumptions) |
+| Parking stalls are counted from the buildable area, because there are no blueprints showing how much floor area parking takes. | Stalls are counted from the unit mix and the retail area, and are physically placed on the lot (a surface lot if the stalls fit beside the building, otherwise the ground floor, then podium floors), so parking takes up envelope space as well as cost. | [Parking and Loading](simulator-logic.md#parking-and-loading) |
+| Every pathway uses the same parking ratio, 1 stall per 1,000 sq ft (ROH Chapter 12, Table 12-6.1), and parking is a cost only, with no physical footprint. | Requirements follow LUO Table 21-6.1 and differ by pathway: Bill 7 and TOD require no car parking, and parcels exempt under § 21-6.20(a) (Primary Urban Center, Ewa, or within 0.5 miles of a rail station) need no stalls in the Citywide View. TOD still provides bicycle parking. | [Parking and Loading](simulator-logic.md#parking-and-loading), each pathway's Parking and loading section |
+| A TOD developer builds one project at a time, so the "off-site, same area" affordable housing case is not modeled. | Still true, and it now holds model-wide: each lot is one project by one developer. The off-site affordability cases themselves no longer apply, because Chapter 29 is not applied. | [Model-wide Assumptions](simulator-logic.md#model-wide-assumptions) |
+| On-site, off-site same area and off-site different area affordability (ROH Chapter 29) are treated the same, using the highest unit share and affordability period in each category, without the marketing-period differences. | Chapter 29 is not applied. The model builds rental housing only, and each pathway sets its own affordable share. | Each pathway's Affordability section |
+| Bill 7 and Chapter 29 parcels are mutually exclusive when the Citywide View's parcel table is built. | No longer relevant, because Chapter 29 is not applied. Each run is a single pathway. | [Model-wide Assumptions](simulator-logic.md#model-wide-assumptions) |
+| Lot width and depth are both the square root of the lot area (a square lot). | The lot is twice as deep as it is wide. | [Buildable area](simulator-logic.md#buildable-area) |
+| Utility connection is a flat $50 per unit. | $245 per unit: the $195 trench permit for the first 20 lineal ft plus the $50 service connection (ROH Chapter 14). | [Soft cost assumptions](simulator-logic.md#soft-cost-assumptions) |
+| The only impact fees are the "Impact Fees by Land Use" (ROH Chapter 33A), with A and AMX parcels charged as residential multi-family. | City impact fees by land use are not modeled. The school impact fee (HRS Chapter 302A) is set to $0 per unit for now, and the Impact Fee input can set a value. | [School impact fees](simulator-logic.md#school-impact-fees) |
+| Construction cost is the RLB Q4 2025 average for Oʻahu, by zone. | A single hard cost rate, $450 per sq ft by default, set with the construction cost lever. The by-zone table is still in the code but unused. | [Construction costs](simulator-logic.md#construction-costs), [Variables](variables.md) |
+| Every Bill 7 unit is affordable; the up to 20% of units allowed for owners and their relatives is ignored. | 80% of Bill 7 units are affordable and 20% are rented at market. | [Bill 7: Affordability](pathways/bill7.md#affordability) |
+| Only parcels in A and AMX zones are included. | Apartment (A), apartment mixed use (AMX), business (B), business mixed use (BMX), Waikiki special district and, in TOD, industrial zones are included. | [Pathways](README.md#pathways), [TOD: Industrial zones](pathways/tod.md#industrial-zones) |
+| All parcels in IPD-T zones go through the PD-T permit pathway. | PD-T and IPD-T are separate regimes with their own rules. | [TOD: Regimes](pathways/tod.md#regimes) |
+| When the user picks 30% AMI for sale units, sale prices use HHFDC's 50% AMI sale price, the lowest level HHFDC publishes for sale units. | The model builds rental housing only, so AMI sale prices are not used. Rents for AMI levels HHFDC does not publish are scaled from the 50% AMI row. | [AMI unit rent](simulator-logic.md#ami-unit-rent) |
+| Operating expenses grow 2.7% a year during the hold, following general CPI. | 3.5% a year, the expense escalation rate California's TCAC requires in LIHTC cash flows (4 CCR § 10327(g)(1)). | [Cash flow by developer strategy](simulator-logic.md#cash-flow-by-developer-strategy) |
+| Market rents grow 3.2% a year (Honolulu CPI), and hold-period rents grow at a blended 3.5% (affordable 4%, market 3.2%). | All rents, affordable and market, grow 4% a year, the compound growth of HHFDC's Honolulu County median income. | [Rent growth](simulator-logic.md#rent-growth) |
+| The Bill 7 pre-construction grant pays a 15% prevailing wage premium on the whole hard cost, based on developer interviews and outside studies. | A 45% premium on the labor portion only. Labor is 25% of hard cost, so the premium is 11.25% of hard cost. The 45% is the average gap between Oʻahu prevailing wage rates and Honolulu market wages. | [Bill 7: Prevailing wage premium](pathways/bill7.md#prevailing-wage-premium) |
+| Park dedication has two routes: build a park (the $300 application fee plus the cost of building a public or private park), or pay the $200 in-lieu fee plus the fair market value of the land. | Two options: **in lieu** (the application fee plus the fair market value of the park land) and **exempt** (no park dedication cost). The park construction route was removed; its unused cost code is still in the code. | [Park dedication](simulator-logic.md#park-dedication) |
+
+## Loopholes
+
+| Loophole | Status |
+| --- | --- |
+| A project that meets the requirements of both Bill 7 and 201H can stack their grants and subsidies (ROH Chapter 32, Articles 4 and 5). | **Not modeled.** Each run is a single pathway. See [Model-wide Assumptions](simulator-logic.md#model-wide-assumptions), [Bill 7](pathways/bill7.md) and [201H](pathways/h201.md). |

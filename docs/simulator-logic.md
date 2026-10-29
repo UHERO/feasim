@@ -49,15 +49,19 @@ Both are modeled because they represent genuinely different capital sources, and
 
 These hold in every pathway:
 
-- **One pathway per project.** Each run is a single pathway. In practice some projects have combined Bill 7 and 201H, and a project that qualifies for both could stack their grants and subsidies; the model does not combine them.
-- **One project per lot.** Each lot is developed alone, as one project, by one developer. The model does not combine adjacent lots or model a developer building several projects at once.
-- **Good standing.** The developer is in good standing with the City, so no fines or penalties apply.
-- **Funding.** The only public funding modeled is the Bill 7 grants. Other city and state programs, such as LIHTC, the Rental Housing Revolving Fund, Hula Mae Multi-Family (HMMF) and the Dwelling Unit Revolving Fund (DURF), are not included.
-- **Housing types.** Multi-family rental buildings only. Cluster housing and planned development housing (ROH Chapter 21) are not modeled.
+- **Oʻahu only:** The zoning, fees, rents, sale prices and costs are for the City and County of Honolulu, as of 10/28/2026.
+- **A first-pass screen:** The model estimates whether a typical project could pencil. It is not an appraisal and does not design a specific building.
+- **One pathway per project:** Each run is a single pathway. In practice some projects have combined Bill 7 and 201H, and a project that qualifies for both could stack their grants and subsidies; the model does not combine them.
+- **One project per lot:** Each lot is developed alone, as one project, by one developer. The model does not combine adjacent lots or model a developer building several projects at once.
+- **Good standing:** The developer is in good standing with the City, so no fines or penalties apply.
+- **Funding:** The only public funding modeled is the Bill 7 grants. Other city and state programs, such as LIHTC, the Rental Housing Revolving Fund, Hula Mae Multi-Family (HMMF) and the Dwelling Unit Revolving Fund (DURF), are not included.
+- **Housing types:** Multi-family rental buildings only. Every pathway's defaults are 100% rental (`rental_split` 1, `sale_split` 0); for-sale units are planned for later versions. Cluster housing and planned development housing (ROH Chapter 21) are not modeled.
 
 # Envelope and Hard Costs
 
 The envelope is the building the lot allows: the number of floors the height limit permits, each floor's footprint, and the floor area FAR allows. The model fills it with ground-floor retail, parking and homes, then prices the construction.
+
+***Note:*** `height_limit` and `max_far` override the pathway's envelope. Bill 7 still caps height at 60 ft. See the `SliderInputs` type for the full list, with units.
 
 ## Buildable area
 
@@ -99,9 +103,9 @@ Each pathway has its own FAR rule, set out in the Envelope section of its pathwa
 
 ### Open-space bonus
 
-B-2, BMX-3 and BMX-4 lots can raise their FAR by giving up ground as public open space (§ 21-3.110-1(c), § 21-3.120-2(c)). The model applies the full bonus by default in every pathway that allows it, and charges the ground it costs. Each pathway page says whether the bonus applies.
+B-2, BMX-3 and BMX-4 lots can raise their FAR by giving up ground as public open space (§ 21-3.110-1(c), § 21-3.120-2(c)). The bonus is optional, the way it is for a developer: `calcSingle` runs the project with and without it and keeps the one with the higher residual land value, or the bigger building when neither pencils. The bonus costs ground, so it often isn't worth it on lower buildings that can't use the extra floor area. `open_space_bonus` on the result is the bonus taken (0 when the project is better without it). Each pathway page says whether the bonus applies.
 
-**How it is computed.** The bonus fills the gap between the pathway's own FAR and the district's ceiling, and is never negative:
+**How it is computed:** The bonus fills the gap between the pathway's own FAR and the district's ceiling, and is never negative:
 
 ```math
 \text{bonus} = \max(0,\ \text{ceiling} - \text{pathway FAR})
@@ -115,13 +119,15 @@ B-2, BMX-3 and BMX-4 lots can raise their FAR by giving up ground as public open
 
 Apartment, AMX, B-1, industrial and IMX-1 zones have no bonus in the model.
 
-**The ground it costs.** The model sets aside open space at 5:1, one square foot of plaza for every five square feet of bonus floor area, and builds the coverage footprint on what remains:
+**The ground it costs:** The model sets aside open space at 5:1, one square foot of plaza for every five square feet of bonus floor area, and builds the coverage footprint on what remains:
 
 ```math
 \text{plaza} = \frac{\text{bonus} \times \text{lot}}{5}
 ```
 
-Example: a 20,000 sq ft BMX-4 lot gets 3.5 bonus FAR, gives up 14,000 sq ft of plaza and builds on the remaining 6,000 sq ft. The plaza stays set aside even when the user overrides Max FAR.
+***Example:*** a 20,000 sq ft BMX-4 lot gets 3.5 bonus FAR, gives up 14,000 sq ft of plaza and builds on the remaining 6,000 sq ft. The plaza stays set aside even when the user overrides Max FAR.
+
+***Note:*** Bill 7 never takes the bonus. In TOD the comparison runs only when the FAR without the bonus is known: when the user sets Max FAR, or in the Citywide View, where the parcel's TOD envelope supplies it. Otherwise the TOD tier's FAR, which already includes the bonus, is used as is.
 
 ### Unit type and unit mix
 
@@ -205,8 +211,8 @@ Dropping stalls from the exempt parcels frees ground and podium floors for units
 \text{stalls} = \operatorname{round}\left(j \times \left(r \times \text{units} + \frac{\text{retail sq ft}}{500}\right)\right)
 ```
 
-- **r:**, stalls per unit, is the Parking lever. Its default is the legal minimum: the unit mix's average private dwelling area ÷ 1,000. Common areas and accessory recreation areas are excluded (§ 21-6.20(b)(2)(A)), so the unit sizes alone count: studio 300, one-bedroom 500, two-bedroom 700 sq ft.
-- **j:** is 0.9 when housing and retail both need stalls (Table 21-6.2, residential with retail/commercial), else 1.
+- **r:** stalls per unit, set by the Parking lever. Its default is the legal minimum: the unit mix's average private dwelling area ÷ 1,000. Common areas and accessory recreation areas are excluded (§ 21-6.20(b)(2)(A)), so the unit sizes alone count: studio 300, one-bedroom 500, two-bedroom 700 sq ft.
+- **j:** 0.9 when housing and retail both need stalls (Table 21-6.2, residential with retail/commercial), else 1.
 - A fraction of 0.5 or more rounds up (§ 21-6.20(b)(1)).
 
 | Unit mix | Average private area (sq ft) | Minimum stalls per unit |
@@ -220,7 +226,7 @@ Dropping stalls from the exempt parcels frees ground and podium floors for units
 | Half one-bedroom, half two-bedroom | 600 | 0.60 |
 | All two-bedroom | 700 | 0.70 |
 
-**Example:** 40 one-bedroom units over 2,000 sq ft of retail need 0.9 × (20 + 4) = 21.6, so 22 stalls.
+***Example:*** 40 one-bedroom units over 2,000 sq ft of retail need 0.9 × (20 + 4) = 21.6, so 22 stalls.
 
 ### Loading spaces (§ 21-6.110, Table 21-6.5)
 
@@ -249,7 +255,7 @@ Bicycle parking is required in the apartment, AMX, business, BMX, resort and Wai
 - **Space size:** 2 ft × 6 ft plus the 5 ft clear zone on the 2 ft access side, 22 sq ft per space (§ 21-6.40(d)(1)). The area is set aside in the parking area with the loading spaces and costed as parking.
 - **Count basis:** like loading, the count is sized for the most units the lot can hold, so it can run a few percent above the units built.
 
-**Example:** 40 one-bedroom units over 2,000 sq ft of retail need 5 short-term and 21 long-term spaces, 572 sq ft and $27,375 of racks and lockers.
+***Example:*** 40 one-bedroom units over 2,000 sq ft of retail need 5 short-term and 21 long-term spaces, 572 sq ft and $27,375 of racks and lockers.
 
 
 #### Deviation and what is not modeled
@@ -376,7 +382,7 @@ The rate depends on the number of residential stories built. BWS has two multi-f
 | Multi-family, low rise (3 stories or fewer) | $117.14 | $55.46 | $98.67 | $271.27 |
 | Multi-family, high rise (4 stories or more) | $88.14 | $41.73 | $74.25 | $204.12 |
 
-- **Minimum:** BWS charges at least 20 fixture units per application. This only binds on very small projects (two units or fewer).
+***Note:*** BWS charges at least 20 fixture units per application. This only binds on very small projects (two units or fewer).
 
 ### 2. Fixture units per dwelling unit
 
@@ -455,10 +461,29 @@ BWS may waive WSFC and new meter charges for affordable or homeless dwelling uni
 | All | Charged on every unit | Charged in full |
 | Exempt | Waived on every unit | Waived |
 
-The two charges are waived on different bases:
+#### Why the two charges are waived differently
 
-- WSFC is waived on the fixture units of the waived units.
-- The meter charge is waived in proportion to the waived units' share of total units. For example, with 25% of units waived, the project pays 75% of the meter charge.
+The two charges are waived on different bases, because BWS's [rate schedule](https://www.boardofwatersupply.com/customer-service/water-rates/rate-schedule-fy-2024-to-fy-2029/) words them differently:
+
+- **WSFC:** "Waiver of the Water System Facilities Charge will apply only to fixture units associated with the certified dwelling units." The model subtracts the waived units' fixture units from the project total and charges the rest.
+- **New meter cost:** "The amount of the meter waiver shall be calculated as a percentage of the number of certified dwelling units" to all dwelling units in the project. The model charges the meter in proportion to the units that are not waived.
+
+The wording follows what each charge pays for. WSFC is priced per fixture unit, and every fixture unit belongs to a particular dwelling unit or to a common area, so BWS can waive exactly the fixtures that serve the certified units. A meter serves the whole building and can't be split by unit, so the only way to waive part of it is by share.
+
+```math
+\text{WSFC} = (\text{total FU} - \text{waived units} \times \text{FU per unit}) \times \text{rate}
+```
+
+```math
+\text{meter cost} = \text{meter charge} \times \frac{\text{chargeable units}}{\text{total units}}
+```
+
+***Example:*** a 100-unit one-bedroom building (7.5 FU per unit) with 25 certified units and a 6" fire meter ($12,100). WSFC is charged on 750 − 25 × 7.5 = 562.5 FU. The meter is charged at 75%, or $9,075.
+
+Two consequences follow from the WSFC wording:
+
+- **Fixtures not tied to a unit stay charged.** Common-area fixtures and the 20 FU minimum belong to no certified unit, so they are never waived. Common-area fixtures are set to zero in the model (see What is not modeled), so in practice this matters only for the minimum on very small projects. Under the Exempt setting nothing is charged.
+- **Every unit has the same fixture units.** The model uses one FU per unit figure for the whole mix (see Fixture units per dwelling unit), so a waived unit removes the same fixture units whatever its type.
 
 The waiver covers the facilities charge and meter cost only. The monthly customer and quantity charges have no waiver, so a waived project pays nothing up front but the full water bill for the life of the building. The model assumes the meter waiver reaches the fire meter, since that is the only meter charge BWS publishes; if it covers only the domestic meter, the difference is about $121 per unit on a 100-unit building with a 6" fire meter.
 
@@ -482,7 +507,7 @@ WSFC has been flat for over a decade, so neither charge is escalated. The model'
 - **The islandwide 500-unit annual pool:** BWS's affordable waiver is limited to 500 dwelling units per fiscal year (July 1 to June 30) across all projects islandwide, and BWS testified that the year's allocation had already been used up. The model instead applies the 500 units as a cap per project and assumes the project secures an allocation.
 - **Deferral when the pool is exhausted:** Once the allocation is gone, BWS may defer WSFC and installation fees until the meter is installed (BWS Rules §§ 1-102, 2-202) instead of waiving them. A deferral is worth only the carrying-cost savings. It is not modeled.
 - **Waiver sunset (June 30, 2029):** The model has no permit submission date, so the waiver is always treated as available.
-- **Single-family WSFC rate ($185.33 per FU).** Not used; every project is priced at the multi-family rates, including projects in industrial districts, because every pathway produces multi-family housing.
+- **Single-family WSFC rate ($185.33 per FU):** Not used; every project is priced at the multi-family rates, including projects in industrial districts, because every pathway produces multi-family housing.
 - **Common-area fixtures:** Lobby restrooms, janitor sinks and amenity areas are set to zero, matching BWS's worked examples. A real permit application lists every fixture, so a high-rise with common-area restrooms would pay more.
 - **Adaptive reuse and conversions:** These pay WSFC only on new fixture units added. The model covers new construction only.
 
