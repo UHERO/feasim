@@ -312,35 +312,10 @@ Caveats:
 - A California study using the same method found "just under 22 percent" of hard cost (CAFWD, 2016). Its authors are carpenters' union analysts.
 - Estimates of 35–40% of hard cost match total construction payroll, including office staff, not on-site labor.
 
-### How this compares with other estimates
-
-Our 11% of hard cost sits at the low end of the studies that find an effect. Those studies measure total construction cost, so they also pick up compliance paperwork and thinner bidding, which our wage-only estimate leaves out.
-
-| Estimate | Setting | Effect |
-| --- | --- | --- |
-| **This analysis** | Oʻahu, DLIR vs. BLS, Bill 7 project | **45% of on-site labor, about 11% of hard cost** |
-| Developer interviews | Oʻahu | About 30% of labor; near 0% for a union contractor, which already pays about prevailing wages |
-| [Dunn, Quigley & Rosenthal (2005)](https://ideas.repec.org/a/sae/ilrrev/v59y2005i1p141-157.html), *ILR Review* | California subsidized housing | 9–32% of construction cost |
-| [Terner Center (2020)](https://ternercenter.berkeley.edu/wp-content/uploads/2020/08/Hard_Construction_Costs_March_2020.pdf) | California subsidized housing | 13% of construction cost, about $50,000 per unit; projected costs; unions dispute it |
-| [Terner Center (2024)](https://ternercenter.berkeley.edu/wp-content/uploads/2024/08/Low-Income-Housing-Tax-Credit-Construction-Costs-An-Analysis-of-Prevailing-Wages-August-2024.pdf) | 859 California LIHTC awards, 2020–23 | $94,000 per new-construction unit (90% CI $84,800–106,700), about 24% of construction cost; projected, not actual, costs |
-| [NYC Independent Budget Office (2016, corrected)](https://a860-gpp.nyc.gov/downloads/k0698779f?locale=en) | NYC 421-a affordable housing | 23%, about $80,000 per unit |
-| [Hinkel & Belman (2022)](https://faircontracting.org/wp-content/uploads/2020/01/Should-Prevailing-Wages-Prevail.pdf), *British Journal of Industrial Relations* | Re-analysis of the California data | No causal effect |
-| [Hawaiʻi HB741 testimony (2025)](https://data.capitol.hawaii.gov/sessions/Session2025/Testimony/HB741_HD1_TESTIMONY_FIN_02-25-25_.PDF) | Habitat for Humanity; Hawaiʻi Community Lending | 15–20% per home; up to $150,000 per home (no method given) |
-
-No peer-reviewed study measures the premium in Hawaiʻi. At a 25% labor share, each labor premium maps to a hard cost premium:
-
-| Labor premium | Hard cost premium | Use |
-| --- | --- | --- |
-| 15% | 3.75% | Earlier default, for reference |
-| 30% | 7.5% | Developer interview figure, for reference |
-| 35% | 8.75% | Low end of the sensitivity range |
-| 45% | 11.25% | Default |
-| 55% | 13.75% | High end of the sensitivity range |
-
 ### Caveats
 
 - **Conservative for small contractors.** BLS medians include union workers, so the true open-shop wage is lower and the premium higher.
-- **Wages only.** The 45% leaves out compliance costs and thinner bidding, which the studies above include.
+- **Wages only.** The 45% leaves out compliance costs and thinner bidding, which studies of total construction cost also pick up.
 - **Benefit share is assumed.** 30% is a national figure plus a Hawaiʻi adjustment, not an Oʻahu measurement.
 - **Union contractors pay almost no premium.** A developer that already uses a union general contractor would see close to zero.
 - **Overtime is not quantified.** HRS § 104-2(c) requires daily and weekend overtime; no estimate was found.

@@ -208,7 +208,7 @@ Dropping stalls from the exempt parcels frees ground and podium floors for units
 ### Counting stalls
 
 ```math
-\text{stalls} = \operatorname{round}\left(j \times \left(r \times \text{units} + \frac{\text{retail sq ft}}{500}\right)\right)
+\text{stalls} = \mathrm{round}\left(j \times \left(r \times \text{units} + \frac{\text{retail sq ft}}{500}\right)\right)
 ```
 
 - **r:** stalls per unit, set by the Parking lever. Its default is the legal minimum: the unit mix's average private dwelling area ÷ 1,000. Common areas and accessory recreation areas are excluded (§ 21-6.20(b)(2)(A)), so the unit sizes alone count: studio 300, one-bedroom 500, two-bedroom 700 sq ft.
