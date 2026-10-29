@@ -8,6 +8,8 @@ How the model works and where its numbers come from. The [README](../README.md) 
 
 [Variables](variables.md): every lever, constant and calculation function in the code, with its value, source and how often to review it.
 
+[Miscellaneous](misc.md): retired assumptions and what the model does now, open questions, and future work.
+
 ## Pathways
 
 Each pathway page describes only what differs from the shared [Housing Policy Simulator logic](simulator-logic.md). The code name is the pathway's `program` id. The ids are historical: `bill6` is current zoning and `standard` is the rules before Ordinance 26-7.
