@@ -89,6 +89,8 @@ Bill 7 waives several government fees; these waivers apply to the affordable por
 | Fee waivers | Building permit, plan review, wastewater, park dedication and BWS charges (above) |
 | No parking | No stalls, no loading spaces, no bicycle parking |
 
+**Not modeled:** stacking Bill 7 grants with 201H or other subsidies. A project that meets both programs' requirements could combine them (ROH Chapter 32, Articles 4 and 5), but each run is a single pathway.
+
 ## Grants
 
 A Bill 7 project can take one of two city grants: the post-construction grant (ROH § 32-4.2) or the pre-construction subsidy (ROH § 32-5.2).

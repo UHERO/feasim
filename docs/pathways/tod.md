@@ -152,7 +152,7 @@ Table 29-1.4 (see [Standard](bill6.md#affordability)) requires IPD-T, PD-T and T
 
 **Wastewater system facility charges:** waived for affordable dwelling units provided pursuant to a planned development-transit permit (§ 21-9.100-10) or an interim planned development-transit permit (§ 21-9.100-5).
 
-**TOD permit fees:** a $15,000 zoning application fee and the special district permit fee ($1,200 plus $300 per acre, at most $15,400), added to soft costs.
+**TOD permit fees:** a $15,000 zoning application fee and the special district permit fee ($1,200 plus $300 per acre, at most $15,400), added to soft costs. Both are charged at every tier, including Base, and the model charges one special district fee whether the project would need a minor or a major permit.
 
 **Building permit, plan review and BWS water charges:** charged on market units under the default Impact Fees toggle (Market Units Only).
 

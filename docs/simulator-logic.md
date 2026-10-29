@@ -45,6 +45,16 @@ Physical inputs (lot size, height, zone class) are user sliders in the Project V
 
 Both are modeled because they represent genuinely different capital sources, and policy incentives do not affect them equally. A 15-year property tax exemption is worth far more to a holder than to a flipper; a fee waiver benefits both about the same.
 
+# Model-wide Assumptions
+
+These hold in every pathway:
+
+- **One pathway per project.** Each run is a single pathway. In practice some projects have combined Bill 7 and 201H, and a project that qualifies for both could stack their grants and subsidies; the model does not combine them.
+- **One project per lot.** Each lot is developed alone, as one project, by one developer. The model does not combine adjacent lots or model a developer building several projects at once.
+- **Good standing.** The developer is in good standing with the City, so no fines or penalties apply.
+- **Funding.** The only public funding modeled is the Bill 7 grants. Other city and state programs, such as LIHTC, the Rental Housing Revolving Fund, Hula Mae Multi-Family (HMMF) and the Dwelling Unit Revolving Fund (DURF), are not included.
+- **Housing types.** Multi-family rental buildings only. Cluster housing and planned development housing (ROH Chapter 21) are not modeled.
+
 # Envelope and Hard Costs
 
 The envelope is the building the lot allows: the number of floors the height limit permits, each floor's footprint, and the floor area FAR allows. The model fills it with ground-floor retail, parking and homes, then prices the construction.
@@ -59,6 +69,8 @@ The envelope is the building the lot allows: the number of floors the height lim
 ```math
 \text{buildable area} = \min\left(\text{FAR} \times \text{lot},\ \sum_{\text{storeys}} \text{floor plate}\right)
 ```
+
+***Note:*** whichever of FAR, lot coverage, the yards and the height limit binds first sets the building. Moving a lever that is not the binding one (for example Setbacks when FAR binds, or Max FAR when height binds) can leave the results unchanged.
 
 ### Lot coverage
 
@@ -120,6 +132,8 @@ The Unit Mix lever picks a blend of unit types; the unit size is the blend's ave
 | Studio | 300 |
 | One-bedroom | 500 |
 | Two-bedroom | 700 |
+
+The sizes are the maximum unit sizes for an affordable rental housing project in ROH § 32-2.9, used for every pathway. Units in recent Honolulu projects can be smaller than these maximums, so the model may understate how many units fit.
 
 Units = net residential area ÷ average unit size, rounded down. Some pathways also cap the unit count; their pages give the cap.
 
@@ -328,6 +342,16 @@ School impact fees are a state assessment (HRS Chapter 302A), not a City fee, so
 
 Construction management is 3% of hard cost, in every pathway.
 
+### Soft cost assumptions
+
+- **Zoning permit fees:** none in Standard, Before Ord. 26-7, Bill 7 or 201H beyond plan review. TOD pays its own zoning and special district fees (see [TOD](pathways/tod.md#fees-waivers-and-taxes)).
+- **Building permit valuation:** the "total valuation of work" for the building permit and plan review fees is the hard cost, taken per unit.
+- **Certificate of occupancy:** only the temporary certificate ($200) is charged.
+- **Environmental review:** every project pays both the EA and the EIS application fees ($600 and $1,200).
+- **Civil permits:** every project needs the grubbing, grading and stockpiling permits. Grubbing is sized on the whole lot area; grading and stockpiling on the excavated volume, lot area × the zone's excavation depth. Site preparation itself is inside the hard cost rate.
+- **Utilities:** a flat $245 per unit: the $195 trench permit for the first 20 lineal ft (the extra $10 per additional 10 lineal ft is not charged) plus the $50 service connection (ROH Chapter 14).
+- **Inclusionary housing in-lieu fees:** not charged; the model builds rental housing only, and Chapter 29 applies to for-sale projects.
+
 ## BWS Water Charges: Water System Facilities Charge and New Meter Cost
 
 The Housing Policy Simulator includes two one-time Board of Water Supply (BWS) charges. Both are soft costs inside total development cost, and both are paid at building permit submission:
@@ -458,7 +482,7 @@ WSFC has been flat for over a decade, so neither charge is escalated. The model'
 - **The islandwide 500-unit annual pool:** BWS's affordable waiver is limited to 500 dwelling units per fiscal year (July 1 to June 30) across all projects islandwide, and BWS testified that the year's allocation had already been used up. The model instead applies the 500 units as a cap per project and assumes the project secures an allocation.
 - **Deferral when the pool is exhausted:** Once the allocation is gone, BWS may defer WSFC and installation fees until the meter is installed (BWS Rules §§ 1-102, 2-202) instead of waiving them. A deferral is worth only the carrying-cost savings. It is not modeled.
 - **Waiver sunset (June 30, 2029):** The model has no permit submission date, so the waiver is always treated as available.
-- **Single-family WSFC rate ($185.33 per FU).** Not used; all projects are priced as multi-family housing.
+- **Single-family WSFC rate ($185.33 per FU).** Not used; every project is priced at the multi-family rates, including projects in industrial districts, because every pathway produces multi-family housing.
 - **Common-area fixtures:** Lobby restrooms, janitor sinks and amenity areas are set to zero, matching BWS's worked examples. A real permit application lists every fixture, so a high-rise with common-area restrooms would pay more.
 - **Adaptive reuse and conversions:** These pay WSFC only on new fixture units added. The model covers new construction only.
 
@@ -542,7 +566,7 @@ Debt service uses a 30-year amortization at a 6.75% permanent rate, both user in
 
 **Hold:** The developer holds the building for the hold period, then sells:
 
-- **Each year:** NOI minus permanent debt service. Rents grow 4% a year, affordable and market alike (see [Rent growth](#rent-growth)), operating expenses 3.5%, and assessed value 2%.
+- **Each year:** NOI minus permanent debt service. Rents grow 4% a year, affordable and market alike (see [Rent growth](#rent-growth)), operating expenses 3.5%, and assessed value 2%. The 3.5% and 2% are the expense and property tax escalation rates California's TCAC requires in the 15-year cash flow every LIHTC applicant files (4 CCR § 10327(g)(1)); operating expenses follow their own series rather than a fixed share of EGI.
 - **At exit:** the next year's NOI ÷ exit cap, less 3.5% selling costs and the remaining loan balance.
 - **Property tax exemptions:** a pathway with a 15-year improvement exemption pays tax on land only for those years (see Property Tax).
 
@@ -558,6 +582,7 @@ Every rent in the model, affordable or market, is an AMI-based rent from the HHF
 
 - **Household size by unit type:** studio 1 person; one-bedroom the average of 1 and 2 persons; two-bedroom 3 persons.
 - **Unpublished AMI levels:** scale the 50% AMI row linearly. HHFDC publishes rents floored, so the model floors too.
+- **Data year:** the income limits are HHFDC's 2025 Honolulu County schedule (median $129,300). The [2026 schedule](https://dbedt.hawaii.gov/hhfdc/2026/06/23/honolulu-county-income-rent-sales-price-guidelines-2026/) (median $133,400) is published but not yet in the model.
 - **Unit mix:** the rent is the weighted average over the mix.
 - **Escalation:** Affordable and market rents both grow 4% a year from today through permitting, construction and lease-up, and through the hold (see [Rent growth](#rent-growth)).
 

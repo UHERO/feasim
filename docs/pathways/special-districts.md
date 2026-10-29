@@ -16,6 +16,8 @@ Special districts are not a separate pathway in the code. The Waikiki Special Di
 | Lot coverage | 100%, less the required open space (Bill 7: 80%) |
 | Ground-floor retail | Apartment Mixed Use Subprecinct only, up to 60% of the lot |
 
+The open-space set-aside is keyed on the FAR the envelope actually uses, including a Max FAR override, so a FAR set to 1.5 or more triggers the larger 50% set-aside.
+
 ## Height setbacks
 
 Above 40 ft, the front, side and rear yards grow by 1 ft per 10 ft of height (§ 21-9.80-5(c)(2)). Unlike the other zones' rules (see [Standard](bill6.md#height-setbacks)), the front yard steps back too. Bill 7 projects take no step-backs.
@@ -36,3 +38,4 @@ Table 29-1.4 (see [Standard](bill6.md#affordability)) requires 15%, 10% or 5% of
 
 - Other special districts (Hawaii Capital, Diamond Head, Punchbowl, Chinatown, Thomas Square and others): their parcels run under their underlying zoning.
 - Special district permit fees outside TOD.
+- An open-space bonus in the Waikiki precincts: the § 21-3.120-2(c) bonus applies only to B-2, BMX-3 and BMX-4 in the model.
