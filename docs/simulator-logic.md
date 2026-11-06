@@ -62,7 +62,7 @@ These hold in every pathway:
 
 # Envelope and Hard Costs
 
-The envelope is the building the lot allows: the number of floors the height limit permits, each floor's footprint, and the floor area FAR allows. The model fills it with ground-floor retail, parking and homes, then prices the construction.
+The envelope is the building the lot allows: the number of floors the height limit permits, each floor's footprint, and the floor area FAR allows. The model fills it with ground-floor retail, parking and homes, then prices the construction. The outputs `built_floors` and `built_height` report the storeys and feet actually built, parking included, which can be under the height limit when FAR or the unit count stops the building first.
 
 ***Note:*** `height_limit` and `max_far` override the pathway's envelope, including Bill 7's 60 ft cap. See the `SliderInputs` type for the full list, with units.
 

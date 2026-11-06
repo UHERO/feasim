@@ -149,6 +149,7 @@ Every function returns a `ParcelOutput`. Some of its fields:
 | Building | `max_units`, `buildable_sqft`, `net_residential_sqft`, `net_commercial_sqft`, `height_limit` |
 | Units | `affordable_units`, `mkt_rent_units`, `afd_rent_units`, `mkt_sale_units`, `afd_sale_units` |
 | Parking | `parking_stalls`, split into `surface_stalls`, `ground_floor_stalls` and `podium_stalls`; `podium_levels`, `loading_spaces`, `bicycle_spaces` |
+| Building | `height_limit`; `built_floors` and `built_height`, the storeys and feet actually built, parking included |
 | Costs | `hard_cost`, `soft_cost` (itemized in `soft_cost_breakdown`: permits, fees, water charges, construction management), `dev_cost`, `total_financing_cost` |
 | Bill 7 grants | `pre_construction_subsidy`, `dev_post_grant`; pre-construction runs also report `pw_premium_cost` (prevailing wage cost, included in `hard_cost`), `subsidy_labor_cap` and `subsidy_cap_binds` |
 | Income | `egi` (effective gross income), `noi` (net operating income), `gdv` (gross development value) |
