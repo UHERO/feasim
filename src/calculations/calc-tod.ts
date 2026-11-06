@@ -609,6 +609,8 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
     ground_floor_stalls: env.ground_floor_stalls,
     podium_stalls: env.podium_stalls,
     podium_levels: env.podium_levels,
+    built_floors: env.built_floors,
+    built_height: env.built_floors * floor_height,
     parking_sqft: env.parking_sqft,
     parking_share: env.parking_share,
     affordable_units,

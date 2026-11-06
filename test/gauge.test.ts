@@ -133,6 +133,14 @@ describe.each(PROGRAMS)("gauge: %s", (program) => {
     }
   });
 
+  it("never builds above the height limit", () => {
+    for (const { parcel, r } of results) {
+      expect(r.built_height, parcel.tmk).toBeLessThanOrEqual(r.height_limit);
+      expect(r.built_floors, parcel.tmk).toBeGreaterThanOrEqual(r.podium_levels);
+      if (r.max_units > 0) expect(r.built_floors, parcel.tmk).toBeGreaterThan(0);
+    }
+  });
+
   it("places no loading on lots of 7,500 sqft or less", () => {
     for (const { parcel, r } of results)
       if (parcel.lot_sqft <= LOADING.min_lot_sqft) expect(r.loading_spaces ?? 0, parcel.tmk).toBe(0);

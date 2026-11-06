@@ -183,6 +183,7 @@ function standardHard(
     ground_floor_stalls: env.ground_floor_stalls,
     podium_stalls: env.podium_stalls,
     podium_levels: env.podium_levels,
+    built_floors: env.built_floors,
     parking_sqft: env.parking_sqft,
     parking_share: env.parking_share,
   };
@@ -878,6 +879,8 @@ export function calcStandardSingle(sliders: SliderInputs): ParcelOutput {
     ground_floor_stalls: hard.ground_floor_stalls,
     podium_stalls: hard.podium_stalls,
     podium_levels: hard.podium_levels,
+    built_floors: hard.built_floors,
+    built_height: hard.built_floors * floor_height,
     parking_sqft: hard.parking_sqft,
     parking_share: hard.parking_share,
     affordable_units: hard.affordable_units,
