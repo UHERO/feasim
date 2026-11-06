@@ -62,7 +62,7 @@ const parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 150 };
 
 const result = calcParcel("bill6", parcel);
 
-// results for this lot at the default assumptions (v0.2.2)
+// results for this lot at the default assumptions (v0.3.0)
 result.max_units;     // 140 units
 result.dev_roc;       // 0.064, a 6.40% return on cost
 result.rlv_sqft;      // 238.45, residual land value in $ per sqft of lot

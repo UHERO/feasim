@@ -57,20 +57,39 @@ These hold in every pathway:
 - **One pathway per project:** Each run is a single pathway. In practice some projects have combined Bill 7 and 201H, and a project that qualifies for both could stack their grants and subsidies; the model does not combine them.
 - **One project per lot:** Each lot is developed alone, as one project, by one developer. The model does not combine adjacent lots or model a developer building several projects at once.
 - **Good standing:** The developer is in good standing with the City, so no fines or penalties apply.
+- **Floor area:** FAR counts housing and retail only, in every pathway. See [Floor area counted toward FAR](#floor-area-counted-toward-far).
 - **Funding:** The only public funding modeled is the Bill 7 grants. Other city and state programs, such as LIHTC, the Rental Housing Revolving Fund, Hula Mae Multi-Family (HMMF) and the Dwelling Unit Revolving Fund (DURF), are not included.
 - **Housing types:** Multi-family rental buildings only. Every pathway's defaults are 100% rental (`rental_split` 1, `sale_split` 0); for-sale units are planned for later versions. Cluster housing and planned development housing (ROH Chapter 21) are not modeled.
 
 # Envelope and Hard Costs
 
-The envelope is the building the lot allows: the number of floors the height limit permits, each floor's footprint, and the floor area FAR allows. The model fills it with ground-floor retail, parking and homes, then prices the construction. The outputs `built_floors` and `built_height` report the storeys and feet actually built, parking included, which can be under the height limit when FAR or the unit count stops the building first.
+The envelope is the building the lot allows: the number of floors the height limit permits, each floor's footprint, and the floor area FAR allows. The model fills it with ground-floor retail, parking and homes, then prices the construction. The outputs `built_floors` and `built_height` report the storeys and feet actually built, parking included, which can be under the height limit when FAR or the unit count stops the building first. A partly filled top floor counts as a full storey, so the built height is always a whole number of floors. The project summary shows it as Built Height.
 
 ***Note:*** `height_limit` and `max_far` override the pathway's envelope, including Bill 7's 60 ft cap. See the `SliderInputs` type for the full list, with units.
+
+***Citywide View levers:*** Max Height (-150 to +450 ft) and Max FAR (-2.0 to +6.0) start at Baseline, the limit the pathway gives each parcel, and add the same amount to every parcel's own limit. The simulator passes the result to `calcParcel` as `height_limit` and `max_far`. A parcel pushed to 0 or below is treated as 0, builds nothing, and shows as gray on the map. TOD parcels that are not applicable or not modeled do not change. The Project View has no parcel, so its sliders set the height and FAR directly.
+
+## Floor area counted toward FAR
+
+"Buildable area" is the model's term. The law limits **floor area**: "the area of all floors of a structure excluding unroofed areas" (ROH § 21-10.1). The ordinance excludes parking structures (with covered driveways and accessways, porte cocheres and parking attendant booths), attics with head room under 7 ft, basements, lanais, decorative projections, roofing that only screens rooftop machinery, and areas under rooftop solar panels or unsupported overhangs that are not otherwise enclosed.
+
+| Space | ROH § 21-10.1 | Model |
+| --- | --- | --- |
+| Housing, including its corridors, stairs, elevators and mechanical space (the 20% efficiency loss) | Counts | Counts |
+| Retail | Counts | Counts |
+| Ground-floor and podium stalls | Excluded as parking structures | Excluded |
+| Loading spaces | Not listed as excluded | Excluded (assumption) |
+| Bicycle parking | Not listed as excluded | Excluded (assumption) |
+| Ground-floor lobby | Not listed as excluded | Excluded (assumption) |
+| Attics, basements, lanais | Excluded | Not built by the model |
+
+***Model assumption:*** treating loading, bicycle parking and the ground-floor lobby as outside FAR goes further than the text of § 21-10.1. Loading and bicycle parking may fall under parking structures when they sit inside one, but the ordinance does not say so, and it has not been confirmed with the Department of Planning and Permitting. Where FAR limits the building, counting these spaces would leave less floor area for housing, so the model may slightly overstate units. The model applies the same rule in every pathway, including Bill 7, whose FAR comes from Chapter 32.
 
 ## Buildable area
 
 1. **Floors:** Floors = height limit ÷ floor height, rounded down. Floor height is 10 ft in every pathway.
 2. **Floor plates:** Each storey's footprint is the smaller of the lot-coverage limit and the area inside the yards, after any height step-back for that storey (see Height Setbacks). The lot is assumed to be twice as deep as it is wide, with the street on the short side.
-3. **FAR cap:** Residential plus retail floor area may not exceed FAR × lot area. Parking, loading and lobby are excluded from FAR.
+3. **FAR cap:** Residential plus retail floor area may not exceed FAR × lot area. Parking, loading, bicycle parking and the ground-floor lobby are left out of that floor area (see [Floor area counted toward FAR](#floor-area-counted-toward-far)).
 4. **Net area:** 80% of gross residential area is rentable (the efficiency factor); the rest is corridors, stairs, elevators and walls.
 
 ```math
@@ -102,7 +121,7 @@ The Setbacks slider (default 10 ft) sets the front, side and rear yards. Step-ba
 
 ### Floor Area Ratio (FAR)
 
-Each pathway has its own FAR rule, set out in the Envelope section of its pathway page; the Max FAR slider shows it and can override it.
+Each pathway has its own FAR rule, set out in the Envelope section of its pathway page. The Project View's Max FAR slider shows it and can override it; the Citywide View's Max FAR lever adds to or subtracts from it.
 
 ### Open-space bonus
 
@@ -144,7 +163,7 @@ The Unit Mix lever picks a blend of unit types; the unit size is the blend's ave
 
 The sizes are the maximum unit sizes for an affordable rental housing project in ROH § 32-2.9, used for every pathway. Units in recent Honolulu projects can be smaller than these maximums, so the model may understate how many units fit.
 
-Units = net residential area ÷ average unit size, rounded down. Some pathways also cap the unit count; their pages give the cap.
+Units = net residential area ÷ average unit size, rounded down. Some pathways also cap the unit count; their pages give the cap. Once a cap is met, the building stops at the floor area those units need, so it may use less than its FAR. Both views offer all eight unit mix presets.
 
 ## Height Setbacks 
 
@@ -272,7 +291,7 @@ the Industrial and Hotel rows of Table 21-6.3 (the model builds no industrial of
 | Ground floor | Inside the building's ground floor (tuck-under), behind any retail | 330 sq ft | $190 per sq ft | $62,700 |
 | Podium | Whole parking floors between the ground floor and the housing | 330 sq ft | $190 per sq ft | $62,700, plus the empty part of the top podium floor, which is built whole |
 
-1. **Surface lot first:** The building is made as slim as the floor area allows. If every stall and the loading fit on the open part of the ground plate, they become a surface lot and the building keeps all its units. Surface parking stays inside the yards and the lot-coverage area (§ 21-6.80(a)).
+1. **Surface lot first:** The building is made as slim as the floor area allows. With a tall height limit this can produce an implausibly thin building: a 5,000 sq ft Bill 7 lot at FAR 2 and 450 ft reports 26 floors averaging 231 sq ft. The model sets no minimum floor size, so read Built Height with care on surface-lot projects. If every stall and the loading fit on the open part of the ground plate, they become a surface lot and the building keeps all its units. Surface parking stays inside the yards and the lot-coverage area (§ 21-6.80(a)).
 2. **Then inside the building:** Retail (when on) takes its share of the ground floor, then stalls at 330 sq ft each. A leftover ground floor at least one unit's gross size becomes housing; anything smaller is lobby, charged at the residential hard cost.
 3. **Podium floors:** Stalls that don't fit go on whole podium floors above. For each podium height the model finds the most units whose stalls still fit, and keeps the arrangement with the most units. More parking therefore never produces more units. The unit count is found by a direct search for the most units whose stalls still leave room for them; an earlier version stepped down from an upper bound and could stop short (one 248,815 sq ft A-2 lot showed 597 units where 628 fit), and the fix raised units 0.1–0.6% depending on the pathway.
 4. **Income:** Stalls × $100 per month × 12, added to potential gross income.

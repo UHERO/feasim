@@ -9,7 +9,7 @@ This pathway is baseline development under the apartment district standards as t
 | FAR | Apartment and AMX FAR rises with lot area up to a cap (the pre-Ord. 26-7 Table 21-3.3 formulas, below). Business districts use Table 21-3.4: B-1 1.0, B-2 2.5, BMX-3 2.5, BMX-4 4.0 |
 | Open-space bonus | B-2 and BMX-3 up to 3.5, BMX-4 up to 7.5, as in Standard (see [Open-space bonus](../simulator-logic.md#open-space-bonus)) |
 | Lot coverage | Apartment and AMX districts: 60% of lots under 7,500 sq ft, 50% of lots up to 20,000 sq ft, and 40% above. Business districts 100%. The Waikiki precincts keep 35–50% of the lot open (see [Special districts](special-districts.md)) |
-| Height | The zoned height in the Citywide View; the Max Height slider in the Project View (default 30 ft) |
+| Height | The zoned height in the Citywide View, which the Max Height lever adds to or subtracts from; the Max Height slider in the Project View (default 30 ft) |
 | Ground-floor retail | Allowed in AMX-1, AMX-2, AMX-3, BMX-3, BMX-4 and the Waikiki Apartment Mixed Use Subprecinct |
 | Unit cap | None |
 

@@ -9,7 +9,7 @@ The Standard pathway is baseline development under the apartment and business di
 | FAR | Table 21-3.3 as amended by Ord. 26-7: A-1/AMX-1 2.0; A-2/AMX-2 3.0; A-3/AMX-3 and the Waikiki precincts 4.0. Business districts keep Table 21-3.4: B-1 1.0, B-2 2.5, BMX-3 2.5, BMX-4 4.0 |
 | Open-space bonus | B-2 and BMX-3 up to 3.5, BMX-4 up to 7.5, with 1 sq ft of plaza per 5 sq ft of bonus floor area (see [Open-space bonus](../simulator-logic.md#open-space-bonus)) |
 | Lot coverage | 60% in the apartment and AMX districts (Ord. 26-7 replaced the lot-size tiers with a flat 60%); 100% in business districts; the Waikiki precincts keep 35–50% of the lot open (see [Special districts](special-districts.md)) |
-| Height | The parcel's zoned height in the Citywide View (30 ft when the record has none); the Max Height slider in the Project View (default 30 ft) |
+| Height | The parcel's zoned height in the Citywide View (30 ft when the record has none), which the Max Height lever adds to or subtracts from; the Max Height slider in the Project View (default 30 ft) |
 | Ground-floor retail | Allowed in AMX-1, AMX-2, AMX-3, BMX-3, BMX-4 and the Waikiki Apartment Mixed Use Subprecinct |
 | Unit cap | None |
 

@@ -11,7 +11,7 @@ Chapter 32 sets its own development standards (§ 32-2.3) in place of the underl
 | Lot size | At most 20,000 sq ft | The Citywide View's Bill 7 parcel set holds only lots of 20,000 sq ft or less (7,822 parcels in apartment, AMX, BMX and Waikiki zones) |
 | FAR | 4.0 | 4.0 in every zone; the open-space bonus does not apply, since Ch. 32 sets its own FAR |
 | Lot coverage | 80% of the zoning lot | 80% in every zone, including the Waikiki precincts |
-| Height | 60 ft | Capped at 60 ft whatever the zoning, unless the Max Height lever is locked higher |
+| Height | 60 ft | Capped at 60 ft whatever the zoning, or lower where the zoned height is lower. The Max Height lever can go above 60 ft to test a taller building, which the law does not allow today |
 | Yards | Front 10 ft, side and rear 5 ft, or the zone's if less | The Setbacks slider (default 10 ft) |
 | Unit cap | Maximum density | Units at most lot area × 4.0 ÷ the building area per unit (default 800 sq ft). The building stops at the floor area those units need, so it can use less than FAR 4.0 |
 

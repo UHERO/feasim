@@ -26,7 +26,7 @@ Each pathway page describes only what differs from the shared [Housing Policy Si
 UHERO's Housing Policy Simulator has two views, and these pages refer to both:
 
 - **Project View:** analyzes a single hypothetical lot. The user sets every physical and financial input. In this package that is `calcSingle`.
-- **Citywide View:** runs the same calculations across real parcels. Lot size, zone and height come from the parcel records, and the user adjusts only the financial and policy assumptions. In this package that is `calcParcel`.
+- **Citywide View:** runs the same calculations across real parcels. Lot size, zone and height come from the parcel records, and the user adjusts the financial and policy assumptions. The Max Height and Max FAR levers start at Baseline and add to or subtract from each parcel's own limit. In this package that is `calcParcel`, which takes the resulting height and FAR.
 
 ## Background reading
 

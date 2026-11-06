@@ -113,7 +113,7 @@ The open-space bonus (how it is sized and the plaza it costs are in [Open-space 
 | IPD-T Base | Yes, on top of underlying FAR |
 | IPD-T Approval | Yes: in B-2, BMX-3 and BMX-4 the FAR doubles after the bonus (2 × 3.5 = 7.0 for B-2 and BMX-3; BMX-4 is capped at 7.5). Where a station plan's FAR is higher, the plan FAR replaces it and no plaza is set aside |
 
-The Project View and the Citywide View apply the bonus the same way. The Max FAR slider's unlocked default includes it.
+The Project View and the Citywide View apply the bonus the same way. The Project View's Max FAR slider includes it by default, and so does the Citywide View's Baseline.
 
 ## Height setbacks
 
@@ -187,7 +187,7 @@ Both views build the envelope with the same function (`todEnvelope`, in this pac
 | Zone | All 17 eligible zones; a zone without housing at the tier shows "Not applicable" | From the parcel data |
 | Zoned height | Max Height (ft) slider | From the parcel data |
 | Lot size | Slider, default 20,000 sq ft | From the parcel data |
-| Max FAR, Max Height override | Unlocked default is the envelope | Unlocked default is the selected parcel's envelope |
+| Max FAR, Max Height | Sliders that set the value; unlocked default is the envelope | Levers that add to or subtract from each parcel's envelope, from Baseline; not applicable and not modeled parcels do not change |
 
 **Where results can differ for the same lot:**
 
