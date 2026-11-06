@@ -113,21 +113,28 @@ describe("calculator defaults", () => {
 
 describe("calculator parking", () => {
   for (const program of ["bill6", "standard", "h201"] as const) {
-    it(`${program}: defaults to the Article 6 minimum for the unit mix`, () => {
+    it(`${program}: defaults to 0.95 stalls per unit`, () => {
       const inputs = CASES[program];
-      expect(inputs.parking_ratio).toBe(legalParkingRatio(inputs.unit_type!));
+      expect(inputs.parking_ratio).toBe(0.95);
       const r = calcSingle(inputs);
-      expect(r.parking_stalls).toBe(roundHalfUp(inputs.parking_ratio! * r.max_units));
+      expect(r.parking_stalls).toBe(roundHalfUp(0.95 * r.max_units));
+    });
+
+    it(`${program}: with the ratio unset, builds the Article 6 minimum for the unit mix`, () => {
+      const inputs = CASES[program];
+      const r = calcSingle({ ...inputs, parking_ratio: undefined });
+      expect(r.parking_stalls).toBe(roundHalfUp(legalParkingRatio(inputs.unit_type!) * r.max_units));
       // the calculator applies no § 21-6.20(a) exemption
       expect(inputs.parking_exempt).toBeUndefined();
       expect(r.parking_stalls).toBeGreaterThan(0);
     });
   }
 
-  it("bill7 and TOD default to no car parking", () => {
+  it("bill7 and TOD build no car parking at a ratio of 0", () => {
     for (const [name, inputs] of [...casesOf("bill7"), ...casesOf("tod")]) {
-      expect(inputs.parking_ratio, name).toBe(0);
-      if (!inputs.include_retail) expect(calcSingle(inputs).parking_stalls, name).toBe(0);
+      expect(inputs.parking_ratio, name).toBe(inputs.program === "bill7" ? 0.5 : 0.85);
+      if (!inputs.include_retail)
+        expect(calcSingle({ ...inputs, parking_ratio: 0 }).parking_stalls, name).toBe(0);
     }
   });
 

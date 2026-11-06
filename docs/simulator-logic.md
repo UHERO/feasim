@@ -33,7 +33,10 @@ Physical inputs (lot size, height, zone class) are user sliders in the Project V
 | Hold period | 8 years | 0 years selects the dev flip strategy |
 | Permitting, construction, lease-up | 18, 12 and 9 months | The same for every pathway and zone, in the Project View and the package (no longer set by zone) |
 | Operating expense ratio | 30% of EGI |  |
-| Unit mix | All one-bedroom | Unit sizes: studio 300, one-bedroom 500, two-bedroom 700 sq ft |
+| Unit mix | Half studio, half one-bedroom | Unit sizes: studio 300, one-bedroom 500, two-bedroom 700 sq ft |
+| Parking | 0.95 stalls per unit | Bill 7 0.5, TOD 0.85. A flat default: it does not follow the unit mix or the § 21-6.20(a) exemption |
+
+***Note:*** with `parking_ratio` left unset, the model applies the Article 6 minimum (0 on exempt parcels) instead. Only `calcSingle` can do this: `calcParcel` fills an unset lever from `DEFAULT_INPUTS`.
 
 ***Note:*** when the user chooses AMI 30% for both affordable and market for-sale units, we use the prices listed in HHFDC 2025's [Honolulu County Income, Rent, and Sales Price Guidelines](https://www.dbedt.hawaii.gov/hhfdc/files/2025/05/Honolulu-County-2025.pdf) for AMI 50%, as that is the lowest AMI level listed for sale units.
 
@@ -54,20 +57,39 @@ These hold in every pathway:
 - **One pathway per project:** Each run is a single pathway. In practice some projects have combined Bill 7 and 201H, and a project that qualifies for both could stack their grants and subsidies; the model does not combine them.
 - **One project per lot:** Each lot is developed alone, as one project, by one developer. The model does not combine adjacent lots or model a developer building several projects at once.
 - **Good standing:** The developer is in good standing with the City, so no fines or penalties apply.
+- **Floor area:** FAR counts housing and retail only, in every pathway. See [Floor area counted toward FAR](#floor-area-counted-toward-far).
 - **Funding:** The only public funding modeled is the Bill 7 grants. Other city and state programs, such as LIHTC, the Rental Housing Revolving Fund, Hula Mae Multi-Family (HMMF) and the Dwelling Unit Revolving Fund (DURF), are not included.
 - **Housing types:** Multi-family rental buildings only. Every pathway's defaults are 100% rental (`rental_split` 1, `sale_split` 0); for-sale units are planned for later versions. Cluster housing and planned development housing (ROH Chapter 21) are not modeled.
 
 # Envelope and Hard Costs
 
-The envelope is the building the lot allows: the number of floors the height limit permits, each floor's footprint, and the floor area FAR allows. The model fills it with ground-floor retail, parking and homes, then prices the construction.
+The envelope is the building the lot allows: the number of floors the height limit permits, each floor's footprint, and the floor area FAR allows. The model fills it with ground-floor retail, parking and homes, then prices the construction. The outputs `built_floors` and `built_height` report the storeys and feet actually built, parking included, which can be under the height limit when FAR or the unit count stops the building first. A partly filled top floor counts as a full storey, so the built height is always a whole number of floors. The project summary shows it as Built Height.
 
-***Note:*** `height_limit` and `max_far` override the pathway's envelope. Bill 7 still caps height at 60 ft. See the `SliderInputs` type for the full list, with units.
+***Note:*** `height_limit` and `max_far` override the pathway's envelope, including Bill 7's 60 ft cap. See the `SliderInputs` type for the full list, with units.
+
+***Citywide View levers:*** Max Height (-150 to +450 ft) and Max FAR (-2.0 to +6.0) start at Baseline, the limit the pathway gives each parcel, and add the same amount to every parcel's own limit. The simulator passes the result to `calcParcel` as `height_limit` and `max_far`. A parcel pushed to 0 or below is treated as 0, builds nothing, and shows as gray on the map. TOD parcels that are not applicable or not modeled do not change. The Project View has no parcel, so its sliders set the height and FAR directly.
+
+## Floor area counted toward FAR
+
+"Buildable area" is the model's term. The law limits **floor area**: "the area of all floors of a structure excluding unroofed areas" (ROH § 21-10.1). The ordinance excludes parking structures (with covered driveways and accessways, porte cocheres and parking attendant booths), attics with head room under 7 ft, basements, lanais, decorative projections, roofing that only screens rooftop machinery, and areas under rooftop solar panels or unsupported overhangs that are not otherwise enclosed.
+
+| Space | ROH § 21-10.1 | Model |
+| --- | --- | --- |
+| Housing, including its corridors, stairs, elevators and mechanical space (the 20% efficiency loss) | Counts | Counts |
+| Retail | Counts | Counts |
+| Ground-floor and podium stalls | Excluded as parking structures | Excluded |
+| Loading spaces | Not listed as excluded | Excluded (assumption) |
+| Bicycle parking | Not listed as excluded | Excluded (assumption) |
+| Ground-floor lobby | Not listed as excluded | Excluded (assumption) |
+| Attics, basements, lanais | Excluded | Not built by the model |
+
+***Model assumption:*** treating loading, bicycle parking and the ground-floor lobby as outside FAR goes further than the text of § 21-10.1. Loading and bicycle parking may fall under parking structures when they sit inside one, but the ordinance does not say so, and it has not been confirmed with the Department of Planning and Permitting. Where FAR limits the building, counting these spaces would leave less floor area for housing, so the model may slightly overstate units. The model applies the same rule in every pathway, including Bill 7, whose FAR comes from Chapter 32.
 
 ## Buildable area
 
 1. **Floors:** Floors = height limit ÷ floor height, rounded down. Floor height is 10 ft in every pathway.
 2. **Floor plates:** Each storey's footprint is the smaller of the lot-coverage limit and the area inside the yards, after any height step-back for that storey (see Height Setbacks). The lot is assumed to be twice as deep as it is wide, with the street on the short side.
-3. **FAR cap:** Residential plus retail floor area may not exceed FAR × lot area. Parking, loading and lobby are excluded from FAR.
+3. **FAR cap:** Residential plus retail floor area may not exceed FAR × lot area. Parking, loading, bicycle parking and the ground-floor lobby are left out of that floor area (see [Floor area counted toward FAR](#floor-area-counted-toward-far)).
 4. **Net area:** 80% of gross residential area is rentable (the efficiency factor); the rest is corridors, stairs, elevators and walls.
 
 ```math
@@ -99,7 +121,7 @@ The Setbacks slider (default 10 ft) sets the front, side and rear yards. Step-ba
 
 ### Floor Area Ratio (FAR)
 
-Each pathway has its own FAR rule, set out in the Envelope section of its pathway page; the Max FAR slider shows it and can override it.
+Each pathway has its own FAR rule, set out in the Envelope section of its pathway page. The Project View's Max FAR slider shows it and can override it; the Citywide View's Max FAR lever adds to or subtracts from it.
 
 ### Open-space bonus
 
@@ -141,7 +163,7 @@ The Unit Mix lever picks a blend of unit types; the unit size is the blend's ave
 
 The sizes are the maximum unit sizes for an affordable rental housing project in ROH § 32-2.9, used for every pathway. Units in recent Honolulu projects can be smaller than these maximums, so the model may understate how many units fit.
 
-Units = net residential area ÷ average unit size, rounded down. Some pathways also cap the unit count; their pages give the cap.
+Units = net residential area ÷ average unit size, rounded down. Some pathways also cap the unit count; their pages give the cap. Once a cap is met, the building stops at the floor area those units need, so it may use less than its FAR. Both views offer all eight unit mix presets.
 
 ## Height Setbacks 
 
@@ -199,11 +221,11 @@ The model builds the off-street parking and loading that ROH Chapter 21, Article
 The rules below are the ROH Chapter 21, Article 6 minimum. Each pathway page says which of them apply: Standard, Before Ord. 26-7 and 201H apply the full minimum, TOD requires loading but no car parking, and Bill 7 requires neither.
 
 #### Exempt parcels
-§ 21-6.20(a) requires no parking in the Primary Urban Center and Ewa development plan areas (except residential, agricultural and preservation districts) or within 0.5 miles of a rail station. Each parcel in the Citywide View carries `parking_exempt`, and the pathways that apply the Article 6 minimum read it. An exempt parcel needs no housing or retail stalls but still needs loading (§ 21-6.110 is not exempted). "Residential districts" means R-3.5 to R-20 only; apartment and apartment mixed-use are separate district classes, so no modeled parcel falls into the carve-out. The Project View has no parcel, so it always applies the minimum.
+§ 21-6.20(a) requires no parking in the Primary Urban Center and Ewa development plan areas (except residential, agricultural and preservation districts) or within 0.5 miles of a rail station. Each parcel in the Citywide View carries `parking_exempt`, and the pathways that apply the Article 6 minimum read it. An exempt parcel needs no housing or retail stalls but still needs loading (§ 21-6.110 is not exempted). "Residential districts" means R-3.5 to R-20 only; apartment and apartment mixed-use are separate district classes, so no modeled parcel falls into the carve-out. The Project View has no parcel, so its below-minimum warning always uses the non-exempt minimum.
 
 Retail uses the Commercial 1 rate (retail and sales, eating and drinking, offices). The model builds only housing and ground-floor retail, so the industrial (1 per 2,000 sq ft), Commercial 2 (1 per 1,000 sq ft), hotel and assembly rates in Table 21-6.1 are not used; housing in resort and industrial zones takes the residential rate.
 
-Dropping stalls from the exempt parcels frees ground and podium floors for units, and each stall costs more to build than its $100 monthly rent repays, so the exemption moves thousands of parcels into strong. Each pathway page gives its totals with and without the exemption.
+Dropping stalls from the exempt parcels frees ground and podium floors for units, and each stall costs more to build than its $100 monthly rent repays, so with the Parking lever unset the exemption moves thousands of parcels into strong. Each pathway page gives those totals with and without the exemption. The flat Parking default sets housing stalls on exempt parcels too, so at the defaults the exemption removes only retail stalls.
 
 ### Counting stalls
 
@@ -211,7 +233,7 @@ Dropping stalls from the exempt parcels frees ground and podium floors for units
 \text{stalls} = \mathrm{round}\left(j \times \left(r \times \text{units} + \frac{\text{retail sq ft}}{500}\right)\right)
 ```
 
-- **r:** stalls per unit, set by the Parking lever. Its default is the legal minimum: the unit mix's average private dwelling area ÷ 1,000. Common areas and accessory recreation areas are excluded (§ 21-6.20(b)(2)(A)), so the unit sizes alone count: studio 300, one-bedroom 500, two-bedroom 700 sq ft.
+- **r:** stalls per unit, set by the Parking lever. It defaults to 0.95 (Bill 7 0.5, TOD 0.85). With the lever unset, the model uses the legal minimum: the unit mix's average private dwelling area ÷ 1,000. Common areas and accessory recreation areas are excluded (§ 21-6.20(b)(2)(A)), so the unit sizes alone count: studio 300, one-bedroom 500, two-bedroom 700 sq ft.
 - **j:** 0.9 when housing and retail both need stalls (Table 21-6.2, residential with retail/commercial), else 1.
 - A fraction of 0.5 or more rounds up (§ 21-6.20(b)(1)).
 
@@ -219,9 +241,9 @@ Dropping stalls from the exempt parcels frees ground and podium floors for units
 | --- | --- | --- |
 | All studios | 300 | 0.30 |
 | 75% studios, 25% one-bedroom | 350 | 0.35 |
-| Half studios, half one-bedroom | 400 | 0.40 |
+| Half studios, half one-bedroom (default) | 400 | 0.40 |
 | 25% studios, 75% one-bedroom | 450 | 0.45 |
-| All one-bedroom (default) | 500 | 0.50 |
+| All one-bedroom | 500 | 0.50 |
 | Thirds of studio, one- and two-bedroom | 500 | 0.50 |
 | Half one-bedroom, half two-bedroom | 600 | 0.60 |
 | All two-bedroom | 700 | 0.70 |
@@ -269,7 +291,7 @@ the Industrial and Hotel rows of Table 21-6.3 (the model builds no industrial of
 | Ground floor | Inside the building's ground floor (tuck-under), behind any retail | 330 sq ft | $190 per sq ft | $62,700 |
 | Podium | Whole parking floors between the ground floor and the housing | 330 sq ft | $190 per sq ft | $62,700, plus the empty part of the top podium floor, which is built whole |
 
-1. **Surface lot first:** The building is made as slim as the floor area allows. If every stall and the loading fit on the open part of the ground plate, they become a surface lot and the building keeps all its units. Surface parking stays inside the yards and the lot-coverage area (§ 21-6.80(a)).
+1. **Surface lot first:** The building is made as slim as the floor area allows. With a tall height limit this can produce an implausibly thin building: a 5,000 sq ft Bill 7 lot at FAR 2 and 450 ft reports 26 floors averaging 231 sq ft. The model sets no minimum floor size, so read Built Height with care on surface-lot projects. If every stall and the loading fit on the open part of the ground plate, they become a surface lot and the building keeps all its units. Surface parking stays inside the yards and the lot-coverage area (§ 21-6.80(a)).
 2. **Then inside the building:** Retail (when on) takes its share of the ground floor, then stalls at 330 sq ft each. A leftover ground floor at least one unit's gross size becomes housing; anything smaller is lobby, charged at the residential hard cost.
 3. **Podium floors:** Stalls that don't fit go on whole podium floors above. For each podium height the model finds the most units whose stalls still fit, and keeps the arrangement with the most units. More parking therefore never produces more units. The unit count is found by a direct search for the most units whose stalls still leave room for them; an earlier version stepped down from an upper bound and could stop short (one 248,815 sq ft A-2 lot showed 597 units where 628 fit), and the fix raised units 0.1–0.6% depending on the pathway.
 4. **Income:** Stalls × $100 per month × 12, added to potential gross income.
@@ -277,15 +299,15 @@ the Industrial and Hotel rows of Table 21-6.3 (the model builds no industrial of
 Ground-floor and podium stalls cost the same per square foot. What separates them is housing: ground-floor stalls take space that could be a unit or lobby, and podium floors take whole floors under the height limit.
 
 #### Why the defaults use the ground floor 
-At the Standard defaults (A-1, 10,000 sq ft, 30 ft), 60% lot coverage gives 6,000 sq ft floor plates, and three floors hold 18,000 sq ft. FAR 2 allows 20,000 sq ft, so the building fills its whole ground plate and no open ground is left for a surface lot. The 11 stalls go inside: about $690,000, plus about $102,000 for the 536 sq ft of loading and bicycle area and $18,175 of racks and lockers. As a surface lot they would cost $10,800 each, $118,800 in all. Units fall from 27 with no parking to 22.
+At the Standard defaults (A-1, 10,000 sq ft, 30 ft), 60% lot coverage gives 6,000 sq ft floor plates, and three floors hold 18,000 sq ft. FAR 2 allows 20,000 sq ft. A surface lot does not fit on the open ground, so the 16 stalls go inside: about $1.0 million, plus about $123,000 for the 646 sq ft of loading and bicycle area and $23,400 of racks and lockers. As a surface lot they would cost $10,800 each, $172,800 in all. Units fall from 34 with no parking to 17.
 
-Surface parking appears when FAR, not height or coverage, limits the building, so a slimmer building leaves ground open: a tall height limit with a low FAR. Across the Citywide View's parcels at default settings (43,110 runs: every parcel in each pathway, and TOD at each tier its regime offers), 1,778 runs use a surface lot, 5,540 use ground-floor stalls and 1,760 use podium stalls. The model never puts surface stalls on the part of the lot that lot coverage keeps unbuilt (about 4,000 sq ft on the default lot); allowing that would be a modeling change.
+Surface parking appears when FAR, not height or coverage, limits the building, so a slimmer building leaves ground open: a tall height limit with a low FAR. Across the Citywide View's parcels at default settings (43,110 runs: every parcel in each pathway, and TOD at each tier its regime offers), 1,813 runs use a surface lot, 39,235 use ground-floor stalls and 28,429 use podium stalls. The model never puts surface stalls on the part of the lot that lot coverage keeps unbuilt (about 4,000 sq ft on the default lot); allowing that would be a modeling change.
 
 ### Levers and warnings
 
-The Parking lever follows the legal minimum until the user moves it, and a lever set below the minimum is allowed but flagged.
+The Parking lever starts at a flat default and does not follow the unit mix or the exemption. A value below the legal minimum is allowed but flagged.
 
-- **No exemption toggle:** Neither view has a switch for the exemption, by decision: the Citywide View reads it from each parcel, and the Project View, which has no parcel, always applies the minimum.
+- **No exemption toggle:** Neither view has a switch for the exemption, by decision: the Citywide View reads it from each parcel for the warning, and the Project View, which has no parcel, always warns against the non-exempt minimum.
 - **Below the minimum:** A lower value is modeled as if a variance were granted. The Project View's status line says "Parking below the Article 6 minimum of X stalls per unit (§ 21-6.20)", and the Citywide View's parcel card shows a "Parking below legal minimum" tag, both in the warning orange.
 - **Retail stalls:** switch on with retail (1 per 500 sq ft, with the 90% joint-use rate) and are always required on a non-exempt parcel; the lever sets housing stalls only. On an exempt parcel retail stalls stay at 0 whatever the lever says.
 - **Joint use:** also applies to a ratio the user sets by hand.

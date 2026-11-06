@@ -113,7 +113,7 @@ The open-space bonus (how it is sized and the plaza it costs are in [Open-space 
 | IPD-T Base | Yes, on top of underlying FAR |
 | IPD-T Approval | Yes: in B-2, BMX-3 and BMX-4 the FAR doubles after the bonus (2 × 3.5 = 7.0 for B-2 and BMX-3; BMX-4 is capped at 7.5). Where a station plan's FAR is higher, the plan FAR replaces it and no plaza is set aside |
 
-The Project View and the Citywide View apply the bonus the same way. The Max FAR slider's unlocked default includes it.
+The Project View and the Citywide View apply the bonus the same way. The Project View's Max FAR slider includes it by default, and so does the Citywide View's Baseline.
 
 ## Height setbacks
 
@@ -123,7 +123,7 @@ The underlying zone's step-back rule, as in [Standard](bill6.md#height-setbacks)
 
 ## Parking and loading
 
-TOD parking defaults to 0 stalls per unit, the legal minimum: § 21-6.20(a) requires no off-street parking within 0.5 miles of a rail station or in a TOD special district, which covers every TOD parcel. Loading is not exempted: lots over 7,500 sq ft reserve ground for the loading spaces Table 21-6.5 requires (1 for 20 to 150 units, more for larger buildings and retail). The user can still add parking with the Parking slider. Bicycle parking is required (§ 21-6.40) except on industrial-zoned parcels. How stalls are counted, placed and priced is in [Parking and loading](../simulator-logic.md#parking-and-loading).
+TOD parking defaults to 0.85 stalls per unit. The legal minimum is 0: § 21-6.20(a) requires no off-street parking within 0.5 miles of a rail station or in a TOD special district, which covers every TOD parcel. Loading is not exempted: lots over 7,500 sq ft reserve ground for the loading spaces Table 21-6.5 requires (1 for 20 to 150 units, more for larger buildings and retail). The user can change parking with the Parking slider. Bicycle parking is required (§ 21-6.40) except on industrial-zoned parcels. How stalls are counted, placed and priced is in [Parking and loading](../simulator-logic.md#parking-and-loading).
 
 ### Ground floor and parking placement (PD-T)
 
@@ -140,7 +140,7 @@ Inside a TOD special district, parking and loading stay out of the front 40 ft o
 | § 21-9.100-7(b): AMX ground floor facing those frontages in dwellings or active use | Not modeled; met on the front | Not checked, since there is no key-street data, but met on every lot's front as a side effect: the 40 ft rule keeps parking out of it, and what remains (housing, retail or a residential lobby) all qualify under § 21-9.100(c), which lists lobbies for multi-unit dwellings as active use. Not covered: the side facade of a corner lot facing a key street, which could still get ground-floor stalls |
 | § 21-9.100-7(c): up to 10 dwelling units in IMX-1, above the ground floor | Partly modeled | The 10-unit cap applies; units are not forced above the ground floor |
 
-At the default of no parking the strip changes nothing. With parking added the effect is small: at 1 stall per unit and PD-T Approval, PD-T units fall 0.8% (692,706 to 687,413), and the strip never adds units.
+With no parking the strip changes nothing. With parking added the effect is small: at 1 stall per unit and PD-T Approval, PD-T units fall 0.8% (692,706 to 687,413), and the strip never adds units.
 
 ## Affordability
 
@@ -162,12 +162,12 @@ Table 29-1.4 (see [Standard](bill6.md#affordability)) requires IPD-T, PD-T and T
 
 | Input | Default |
 | --- | --- |
-| Unit mix | All one-bedroom |
+| Unit mix | Half studio, half one-bedroom |
 | Affordable share | 0% |
 | Affordable / market rent | 80% / 120% AMI |
 | Hard cost | $450 per sq ft |
 | Operating expense ratio | 30% of EGI |
-| Parking | 0 stalls |
+| Parking | 0.85 stalls per unit |
 | Park dedication | In-lieu fee |
 | Impact Fees toggle | Market Units Only |
 | Permanent rate / minimum DSCR | 6.75% / 1.20 |
@@ -187,7 +187,7 @@ Both views build the envelope with the same function (`todEnvelope`, in this pac
 | Zone | All 17 eligible zones; a zone without housing at the tier shows "Not applicable" | From the parcel data |
 | Zoned height | Max Height (ft) slider | From the parcel data |
 | Lot size | Slider, default 20,000 sq ft | From the parcel data |
-| Max FAR, Max Height override | Unlocked default is the envelope | Unlocked default is the selected parcel's envelope |
+| Max FAR, Max Height | Sliders that set the value; unlocked default is the envelope | Levers that add to or subtract from each parcel's envelope, from Baseline; not applicable and not modeled parcels do not change |
 
 **Where results can differ for the same lot:**
 

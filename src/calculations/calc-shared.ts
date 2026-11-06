@@ -322,7 +322,7 @@ export function mixPostGrant(mix_key: string): number {
 // parking
 export const PARKING = {
   // default stalls per dwelling unit
-  stalls_per_unit: 0,
+  stalls_per_unit: 0.85,
   // gross sqft per stall incl. drive aisles (Ulupono 2020)
   stall_sqft: 330,
   monthly_rent_per_stall: 100,
@@ -1659,6 +1659,10 @@ export interface ParcelOutput {
   podium_stalls?: number;
   // parking levels above the ground floor
   podium_levels: number;
+  // storeys actually built, parking included, and their height in ft; can be
+  // under height_limit when FAR or the unit count stops the building first
+  built_floors: number;
+  built_height: number;
   parking_sqft: number;
   // share of the building's gross area used for parking
   parking_share: number;
@@ -2441,6 +2445,19 @@ export function podiumEnvelope(i: {
       ),
     };
   const stallsOn = (sqft: number) => Math.floor(sqft / PARKING.stall_sqft);
+  // storeys needed to hold `sqft`, filling from the first
+  const storeysFor = (storeys: number[], sqft: number) => {
+    let count = 0;
+    for (
+      let j = 0, filled = 0;
+      j < storeys.length && filled < sqft - 1e-9;
+      j++
+    ) {
+      filled += storeys[j];
+      count++;
+    }
+    return count;
+  };
 
   // loading spaces, sized for the most units the envelope holds
   const most_units = Math.min(
@@ -2511,6 +2528,10 @@ export function podiumEnvelope(i: {
         bicycle_short_term: bicycle.short_term,
         bicycle_long_term: bicycle.long_term,
         podium_levels: 0,
+        built_floors: storeysFor(
+          plates.map((plate) => Math.min(built, plate)),
+          residential_sqft + retail_sqft
+        ),
         parking_sqft,
         parking_cost: parking_sqft * PARKING.surface_cost_per_sqft,
         parking_share: gross_sqft > 0 ? parking_sqft / gross_sqft : 0,
@@ -2643,6 +2664,18 @@ export function podiumEnvelope(i: {
     living_stories++;
   }
 
+  // with parking: the ground floor, the podium, then the housing above them
+  const built_floors = !parking
+    ? storeysFor(plates, res.residential_sqft + retail_sqft + loading_sqft)
+    : res.units === 0 && retail_sqft === 0
+      ? 0
+      : 1 +
+        podium_levels +
+        storeysFor(
+          plates.slice(firstResidential(podium_levels)),
+          res.residential_sqft - ground_housing
+        );
+
   return {
     residential_sqft: res.residential_sqft,
     retail_sqft,
@@ -2656,6 +2689,7 @@ export function podiumEnvelope(i: {
     bicycle_short_term: bicycle.short_term,
     bicycle_long_term: bicycle.long_term,
     podium_levels,
+    built_floors,
     parking_sqft,
     parking_cost: parking_sqft * PARKING.cost_per_sqft,
     parking_share: gross_sqft > 0 ? parking_sqft / gross_sqft : 0,
@@ -3166,6 +3200,8 @@ export function zeroOutput(
     max_units: 0,
     parking_stalls: 0,
     podium_levels: 0,
+    built_floors: 0,
+    built_height: 0,
     parking_sqft: 0,
     parking_share: 0,
     affordable_units: 0,

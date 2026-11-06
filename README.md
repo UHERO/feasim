@@ -62,11 +62,11 @@ const parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 150 };
 
 const result = calcParcel("bill6", parcel);
 
-// results for this lot at the default assumptions (v0.2.1)
-result.max_units;     // 112 units
-result.dev_roc;       // 0.0597, a 5.97% return on cost
-result.rlv_sqft;      // 64.45, residual land value in $ per sqft of lot
-overallLevel(result); // "marginal"
+// results for this lot at the default assumptions (v0.3.0)
+result.max_units;     // 140 units
+result.dev_roc;       // 0.064, a 6.40% return on cost
+result.rlv_sqft;      // 238.45, residual land value in $ per sqft of lot
+overallLevel(result); // "strong"
 ```
 
 ## Concepts
@@ -95,7 +95,7 @@ A pathway is a set of rules a project can be built under. Each pathway sets what
 | `zone_class` | yes | Zoning district, such as `"A-2"`, `"BMX-3"` or `"I-2"` |
 | `height` | yes | Height limit, ft. Use `0` if unknown, and the pathway's default is used. |
 | `tmk` | no | An ID such as the tax map key, copied onto the result |
-| `parking_exempt` | no | No off-street parking required (ROH § 21-6.20(a)). Applies to `standard`, `bill6` and `h201`. |
+| `parking_exempt` | no | No off-street parking required (ROH § 21-6.20(a)). Applies to `standard`, `bill6` and `h201`. Removes retail stalls; the `parking_ratio` lever still sets housing stalls. |
 | `tod_regime` | TOD | `"pdt"` (in an adopted TOD special district) or `"ipdt"` (elsewhere). Leave it out if the lot can't get a TOD permit. |
 | `slu_urban` | TOD | `true` if the lot is entirely in the State Land Use urban district |
 | `station_area`, `tod_precinct` | TOD | The rail station area, and `"core"` (within ¼ mile) or `"tiz"` (¼ to ½ mile) |
@@ -149,6 +149,7 @@ Every function returns a `ParcelOutput`. Some of its fields:
 | Building | `max_units`, `buildable_sqft`, `net_residential_sqft`, `net_commercial_sqft`, `height_limit` |
 | Units | `affordable_units`, `mkt_rent_units`, `afd_rent_units`, `mkt_sale_units`, `afd_sale_units` |
 | Parking | `parking_stalls`, split into `surface_stalls`, `ground_floor_stalls` and `podium_stalls`; `podium_levels`, `loading_spaces`, `bicycle_spaces` |
+| Building | `height_limit`; `built_floors` and `built_height`, the storeys and feet actually built, parking included |
 | Costs | `hard_cost`, `soft_cost` (itemized in `soft_cost_breakdown`: permits, fees, water charges, construction management), `dev_cost`, `total_financing_cost` |
 | Bill 7 grants | `pre_construction_subsidy`, `dev_post_grant`; pre-construction runs also report `pw_premium_cost` (prevailing wage cost, included in `hard_cost`), `subsidy_labor_cap` and `subsidy_cap_binds` |
 | Income | `egi` (effective gross income), `noi` (net operating income), `gdv` (gross development value) |

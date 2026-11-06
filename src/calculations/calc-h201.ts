@@ -28,7 +28,6 @@ import {
   DEFAULT_RETAIL_SHARE,
   DEFAULT_TARGET_RETURN,
   DEFAULT_TARGET_SPREAD,
-  DEFAULT_UNIT_TYPE,
   EFFICIENCY,
   envelopeCoverage,
   equityFirstDraws,
@@ -86,7 +85,7 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
   const lot_sqft = sliders.lot_sqft ?? 5000;
   const height_limit = sliders.height_limit ?? H201_DEFAULT_HEIGHT_LIMIT;
   const zone_class = sliders.zone_class ?? H201_DEFAULT_ZONE_CLASS;
-  const unit_type = sliders.unit_type ?? DEFAULT_UNIT_TYPE;
+  const unit_type = sliders.unit_type ?? "studio50_1br50";
   const rental_split = 1;
   const sale_split = 0;
   const leaseup_override = sliders.leaseup_months;
@@ -604,6 +603,8 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
     ground_floor_stalls: env.ground_floor_stalls,
     podium_stalls: env.podium_stalls,
     podium_levels: env.podium_levels,
+    built_floors: env.built_floors,
+    built_height: env.built_floors * 10,
     parking_sqft: env.parking_sqft,
     parking_share: env.parking_share,
     affordable_units,
