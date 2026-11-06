@@ -342,7 +342,7 @@ Levers are user inputs. The default for each pathway is set in `DEFAULT_INPUTS` 
 | --- | --- | --- | --- | --- | --- | --- |
 | `GRANT` | Table | 50000 / 12000 | Bill 7 grant per unit: pre_construct $50,000 on every unit, post_construct $12,000 per affordable unit. The `grant_amount` lever overrides. | ROH chp 32 article 4 & 5 | Yearly | calc-shared.ts |
 | `building_area_per_unit` | Lever | 800 | Bill 7 unit cap: max_units_by_law = floor(lot sq ft x FAR / 800). | ROH 32 | Yearly | parcels.ts |
-| `max_units_by_law` | Inline constant |  | Bill 7 legal unit cap from FAR and building_area_per_unit. | ROH 32 |  | calc-bill7.ts |
+| `max_units_by_law` | Inline constant |  | Bill 7 legal unit cap from FAR and building_area_per_unit. Only the floor area these units need is built. | ROH 32 |  | calc-bill7.ts |
 | Bill 7 tax exemption AMI | Inline constant | 80 | 15-year improvement exemption applies only when affordable_ami <= 80%. | ROH 32 | Yearly | calc-bill7.ts |
 | `DEFAULT_RETAIL_RENT` | Constant | 3 | Bill 7 retail rent fallback, $/sq ft/month. |  |  | calc-bill7.ts |
 | `DEFAULT_HEIGHT_LIMIT` | Constant | 30 | Bill 7 height when a parcel has none, ft. |  |  | calc-bill7.ts |

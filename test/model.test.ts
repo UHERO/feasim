@@ -497,6 +497,18 @@ describe("calcParcel", () => {
       .toBe(pre.max_units * 60000);
   });
 
+  it("builds only the floor area Bill 7's unit cap needs", () => {
+    const site = { lot_sqft: 5000, zone_class: "A-1", max_far: 4, setback: 10 };
+    const r = calcSingle({ ...DEFAULT_INPUTS.bill7, ...site, height_limit: 140 });
+    expect(r.max_units).toBe(25); // 5,000 x 4.0 / 800
+    expect(r.buildable_sqft).toBeCloseTo(12500, 3); // 25 x 400 / 0.8
+    expect(r.built_floors).toBe(8); // ground, 1 podium, 6 of housing
+    // a taller limit adds nothing once the cap is met
+    expect({ ...calcSingle({ ...DEFAULT_INPUTS.bill7, ...site, height_limit: 450 }), height_limit: 80 }).toEqual(
+      calcSingle({ ...DEFAULT_INPUTS.bill7, ...site, height_limit: 80 })
+    );
+  });
+
   it("builds to the Bill 7 cap unless a lever asks for more", () => {
     expect(calcParcel("bill7", tall).height_limit).toBe(60);
     expect(calcParcel("bill7", tall, { height_limit: 75 }).height_limit).toBe(75);

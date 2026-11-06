@@ -163,7 +163,8 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     retail_share,
     unit_size,
     parking_ratio,
-    max_units: max_units_by_law,
+    // only the floor area the capped units need is built
+    unit_cap: max_units_by_law,
   });
   const gross_residential_sqft = env.residential_sqft;
   const gross_commercial_sqft = env.retail_sqft;
