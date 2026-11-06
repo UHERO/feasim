@@ -23,11 +23,11 @@ None. Chapter 32's development standards set "Height setbacks: None" (Ord. 19-8)
 
 | Requirement | Bill 7 |
 | --- | --- |
-| Car parking | None (§ 32-2.3); the Parking lever defaults to 0 stalls |
+| Car parking | None required (§ 32-2.3); the Parking lever defaults to 0.5 stalls per unit |
 | Bicycle parking | None; the § 21-6.40 requirement does not apply (Ord. 19-8) |
 | Loading | None, but loading and garbage storage must be accommodated on site; the model reserves no loading spaces |
 
-With no parking requirement, Bill 7 projects carry none of the parking-related soft and hard costs a Standard project does. A user can still add stalls with the Parking lever.
+With no parking requirement, the 0.5 default is an assumption, not a legal minimum. Setting the Parking lever to 0 removes the stalls and their costs.
 
 ## Affordability
 
@@ -69,7 +69,7 @@ Bill 7 waives several government fees; these waivers apply to the affordable por
 | Affordable / market rent | 80% / 100% AMI |
 | Hard cost | $450 per sq ft |
 | Operating expense ratio | 19% of EGI (GET exemption assumed) |
-| Parking | 0 stalls |
+| Parking | 0.5 stalls per unit |
 | Park dedication | Exempt |
 | Impact Fees toggle | Exempt |
 | Permanent rate / minimum DSCR | 7.0% / 1.15 |
@@ -87,7 +87,7 @@ Bill 7 waives several government fees; these waivers apply to the affordable por
 | Real property tax exemption | Improvements are exempt for 15 years (land-only tax) while the affordable rent is 80% AMI or less |
 | GET exemption | Operating expenses modeled at 19% of EGI |
 | Fee waivers | Building permit, plan review, wastewater, park dedication and BWS charges (above) |
-| No parking | No stalls, no loading spaces, no bicycle parking |
+| No parking requirement | No required stalls, loading spaces or bicycle parking |
 
 **Not modeled:** stacking Bill 7 grants with 201H or other subsidies. A project that meets both programs' requirements could combine them (ROH Chapter 32, Articles 4 and 5), but each run is a single pathway.
 
@@ -156,21 +156,21 @@ The subsidy can't exceed on-site labor at prevailing wages (§ 32-5.2(c)(3)): 25
 \text{subsidy} = \min(\text{units} \times \$50{,}000,\ \text{market-wage hard cost} \times 0.25 + \text{premium})
 ```
 
-The cap rarely binds. In the worked example below it is $1.31M against a $700,000 subsidy, about 1.9 times. `subsidy_cap_binds` reports when it does, and the app does not show the cap yet.
+The cap rarely binds. In the worked example below it is $1.04M against a $500,000 subsidy, about 2.1 times. `subsidy_cap_binds` reports when it does, and the app does not show the cap yet.
 
 ### Worked example: 5,000 sq ft lot
 
-This example uses the Project View's Bill 7 defaults (`test/data/calculator-defaults.json`) on a 5,000 sq ft lot: 14 units, 12 of them affordable.
+This example uses the Project View's Bill 7 defaults (`test/data/calculator-defaults.json`) on a 5,000 sq ft lot: 10 units, 8 of them affordable, and 5 stalls.
 
 | Output | Post-construction grant | Pre-construction, no premium | Pre-construction, 45% premium |
 | --- | --- | --- | --- |
-| Grant | $144,000 (12 affordable units) | $700,000 (all 14 units) | $700,000 (all 14 units) |
-| Hard cost | $3.61M | $3.61M | $4.02M (+$406,000 premium) |
-| Labor cap | none | $0.90M, doesn't bind | $1.31M, doesn't bind |
-| Return on cost | 6.58% | 7.41% | 6.71% |
-| Residual land value per sq ft | $176 | $266 | $186 |
-| Levered IRR | 13.6% | 17.4% | 14.0% |
-| Verdict | strong | strong | strong |
+| Grant | $96,000 (8 affordable units) | $500,000 (all 10 units) | $500,000 (all 10 units) |
+| Hard cost | $2.86M | $2.86M | $3.18M (+$322,000 premium) |
+| Labor cap | none | $0.71M, doesn't bind | $1.04M, doesn't bind |
+| Return on cost | 5.92% | 6.57% | 5.98% |
+| Residual land value per sq ft | $89 | $154 | $94 |
+| Levered IRR | 10.6% | 13.2% | 10.7% |
+| Verdict | marginal | strong | marginal |
 
 At the 45% premium, the pre-construction subsidy is still slightly better than the post-construction grant on this lot, but most of its advantage goes to wages.
 

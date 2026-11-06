@@ -42,7 +42,7 @@ How a step-back is applied storey by storey, with a worked example, is in [Heigh
 | Bicycle parking | Required (§ 21-6.40) |
 | § 21-6.20(a) exemption | Applied parcel by parcel: exempt parcels (Primary Urban Center, Ewa, near rail) need no car stalls but still need loading and bicycle parking. 6,998 of 9,444 Standard parcels are exempt |
 
-**Impact of the exemption.** Citywide View totals at default levers, retail off, with the Article 6 minimum on every parcel and then with the exemption applied: stalls fall from 623,728 to 120,384, units rise from 1,243,569 to 1,444,875, and parcels rated strong rise from 176 to 5,159.
+**Impact of the exemption.** Citywide View totals with all one-bedroom units and the Parking lever unset, retail off, with the Article 6 minimum on every parcel and then with the exemption applied: stalls fall from 623,728 to 120,384, units rise from 1,243,569 to 1,444,875, and parcels rated strong rise from 176 to 5,159. The default 0.95 ratio puts housing stalls on exempt parcels too, so at the defaults, with retail off, the exemption changes nothing.
 
 How stalls are counted, placed and priced is in [Parking and loading](../simulator-logic.md#parking-and-loading).
 
@@ -81,12 +81,12 @@ The model builds no affordable units in this pathway: it is rental only, and the
 
 | Input | Default |
 | --- | --- |
-| Unit mix | All one-bedroom |
+| Unit mix | Half studio, half one-bedroom |
 | Affordable share | 0% |
 | Affordable / market rent | 80% / 120% AMI |
 | Hard cost | $450 per sq ft |
 | Operating expense ratio | 30% of EGI |
-| Parking | The Article 6 minimum (0 on exempt parcels) |
+| Parking | 0.95 stalls per unit |
 | Park dedication | In-lieu fee |
 | Impact Fees toggle | Market Units Only |
 | Permanent rate / minimum DSCR | 6.75% / 1.20 |

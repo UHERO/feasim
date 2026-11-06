@@ -33,7 +33,10 @@ Physical inputs (lot size, height, zone class) are user sliders in the Project V
 | Hold period | 8 years | 0 years selects the dev flip strategy |
 | Permitting, construction, lease-up | 18, 12 and 9 months | The same for every pathway and zone, in the Project View and the package (no longer set by zone) |
 | Operating expense ratio | 30% of EGI |  |
-| Unit mix | All one-bedroom | Unit sizes: studio 300, one-bedroom 500, two-bedroom 700 sq ft |
+| Unit mix | Half studio, half one-bedroom | Unit sizes: studio 300, one-bedroom 500, two-bedroom 700 sq ft |
+| Parking | 0.95 stalls per unit | Bill 7 0.5, TOD 0.85. A flat default: it does not follow the unit mix or the § 21-6.20(a) exemption |
+
+***Note:*** with `parking_ratio` left unset, the model applies the Article 6 minimum (0 on exempt parcels) instead. Only `calcSingle` can do this: `calcParcel` fills an unset lever from `DEFAULT_INPUTS`.
 
 ***Note:*** when the user chooses AMI 30% for both affordable and market for-sale units, we use the prices listed in HHFDC 2025's [Honolulu County Income, Rent, and Sales Price Guidelines](https://www.dbedt.hawaii.gov/hhfdc/files/2025/05/Honolulu-County-2025.pdf) for AMI 50%, as that is the lowest AMI level listed for sale units.
 
@@ -199,11 +202,11 @@ The model builds the off-street parking and loading that ROH Chapter 21, Article
 The rules below are the ROH Chapter 21, Article 6 minimum. Each pathway page says which of them apply: Standard, Before Ord. 26-7 and 201H apply the full minimum, TOD requires loading but no car parking, and Bill 7 requires neither.
 
 #### Exempt parcels
-§ 21-6.20(a) requires no parking in the Primary Urban Center and Ewa development plan areas (except residential, agricultural and preservation districts) or within 0.5 miles of a rail station. Each parcel in the Citywide View carries `parking_exempt`, and the pathways that apply the Article 6 minimum read it. An exempt parcel needs no housing or retail stalls but still needs loading (§ 21-6.110 is not exempted). "Residential districts" means R-3.5 to R-20 only; apartment and apartment mixed-use are separate district classes, so no modeled parcel falls into the carve-out. The Project View has no parcel, so it always applies the minimum.
+§ 21-6.20(a) requires no parking in the Primary Urban Center and Ewa development plan areas (except residential, agricultural and preservation districts) or within 0.5 miles of a rail station. Each parcel in the Citywide View carries `parking_exempt`, and the pathways that apply the Article 6 minimum read it. An exempt parcel needs no housing or retail stalls but still needs loading (§ 21-6.110 is not exempted). "Residential districts" means R-3.5 to R-20 only; apartment and apartment mixed-use are separate district classes, so no modeled parcel falls into the carve-out. The Project View has no parcel, so its below-minimum warning always uses the non-exempt minimum.
 
 Retail uses the Commercial 1 rate (retail and sales, eating and drinking, offices). The model builds only housing and ground-floor retail, so the industrial (1 per 2,000 sq ft), Commercial 2 (1 per 1,000 sq ft), hotel and assembly rates in Table 21-6.1 are not used; housing in resort and industrial zones takes the residential rate.
 
-Dropping stalls from the exempt parcels frees ground and podium floors for units, and each stall costs more to build than its $100 monthly rent repays, so the exemption moves thousands of parcels into strong. Each pathway page gives its totals with and without the exemption.
+Dropping stalls from the exempt parcels frees ground and podium floors for units, and each stall costs more to build than its $100 monthly rent repays, so with the Parking lever unset the exemption moves thousands of parcels into strong. Each pathway page gives those totals with and without the exemption. The flat Parking default sets housing stalls on exempt parcels too, so at the defaults the exemption removes only retail stalls.
 
 ### Counting stalls
 
@@ -211,7 +214,7 @@ Dropping stalls from the exempt parcels frees ground and podium floors for units
 \text{stalls} = \mathrm{round}\left(j \times \left(r \times \text{units} + \frac{\text{retail sq ft}}{500}\right)\right)
 ```
 
-- **r:** stalls per unit, set by the Parking lever. Its default is the legal minimum: the unit mix's average private dwelling area ÷ 1,000. Common areas and accessory recreation areas are excluded (§ 21-6.20(b)(2)(A)), so the unit sizes alone count: studio 300, one-bedroom 500, two-bedroom 700 sq ft.
+- **r:** stalls per unit, set by the Parking lever. It defaults to 0.95 (Bill 7 0.5, TOD 0.85). With the lever unset, the model uses the legal minimum: the unit mix's average private dwelling area ÷ 1,000. Common areas and accessory recreation areas are excluded (§ 21-6.20(b)(2)(A)), so the unit sizes alone count: studio 300, one-bedroom 500, two-bedroom 700 sq ft.
 - **j:** 0.9 when housing and retail both need stalls (Table 21-6.2, residential with retail/commercial), else 1.
 - A fraction of 0.5 or more rounds up (§ 21-6.20(b)(1)).
 
@@ -219,9 +222,9 @@ Dropping stalls from the exempt parcels frees ground and podium floors for units
 | --- | --- | --- |
 | All studios | 300 | 0.30 |
 | 75% studios, 25% one-bedroom | 350 | 0.35 |
-| Half studios, half one-bedroom | 400 | 0.40 |
+| Half studios, half one-bedroom (default) | 400 | 0.40 |
 | 25% studios, 75% one-bedroom | 450 | 0.45 |
-| All one-bedroom (default) | 500 | 0.50 |
+| All one-bedroom | 500 | 0.50 |
 | Thirds of studio, one- and two-bedroom | 500 | 0.50 |
 | Half one-bedroom, half two-bedroom | 600 | 0.60 |
 | All two-bedroom | 700 | 0.70 |
@@ -277,15 +280,15 @@ the Industrial and Hotel rows of Table 21-6.3 (the model builds no industrial of
 Ground-floor and podium stalls cost the same per square foot. What separates them is housing: ground-floor stalls take space that could be a unit or lobby, and podium floors take whole floors under the height limit.
 
 #### Why the defaults use the ground floor 
-At the Standard defaults (A-1, 10,000 sq ft, 30 ft), 60% lot coverage gives 6,000 sq ft floor plates, and three floors hold 18,000 sq ft. FAR 2 allows 20,000 sq ft, so the building fills its whole ground plate and no open ground is left for a surface lot. The 11 stalls go inside: about $690,000, plus about $102,000 for the 536 sq ft of loading and bicycle area and $18,175 of racks and lockers. As a surface lot they would cost $10,800 each, $118,800 in all. Units fall from 27 with no parking to 22.
+At the Standard defaults (A-1, 10,000 sq ft, 30 ft), 60% lot coverage gives 6,000 sq ft floor plates, and three floors hold 18,000 sq ft. FAR 2 allows 20,000 sq ft. A surface lot does not fit on the open ground, so the 16 stalls go inside: about $1.0 million, plus about $123,000 for the 646 sq ft of loading and bicycle area and $23,400 of racks and lockers. As a surface lot they would cost $10,800 each, $172,800 in all. Units fall from 34 with no parking to 17.
 
-Surface parking appears when FAR, not height or coverage, limits the building, so a slimmer building leaves ground open: a tall height limit with a low FAR. Across the Citywide View's parcels at default settings (43,110 runs: every parcel in each pathway, and TOD at each tier its regime offers), 1,778 runs use a surface lot, 5,540 use ground-floor stalls and 1,760 use podium stalls. The model never puts surface stalls on the part of the lot that lot coverage keeps unbuilt (about 4,000 sq ft on the default lot); allowing that would be a modeling change.
+Surface parking appears when FAR, not height or coverage, limits the building, so a slimmer building leaves ground open: a tall height limit with a low FAR. Across the Citywide View's parcels at default settings (43,110 runs: every parcel in each pathway, and TOD at each tier its regime offers), 1,813 runs use a surface lot, 39,235 use ground-floor stalls and 28,429 use podium stalls. The model never puts surface stalls on the part of the lot that lot coverage keeps unbuilt (about 4,000 sq ft on the default lot); allowing that would be a modeling change.
 
 ### Levers and warnings
 
-The Parking lever follows the legal minimum until the user moves it, and a lever set below the minimum is allowed but flagged.
+The Parking lever starts at a flat default and does not follow the unit mix or the exemption. A value below the legal minimum is allowed but flagged.
 
-- **No exemption toggle:** Neither view has a switch for the exemption, by decision: the Citywide View reads it from each parcel, and the Project View, which has no parcel, always applies the minimum.
+- **No exemption toggle:** Neither view has a switch for the exemption, by decision: the Citywide View reads it from each parcel for the warning, and the Project View, which has no parcel, always warns against the non-exempt minimum.
 - **Below the minimum:** A lower value is modeled as if a variance were granted. The Project View's status line says "Parking below the Article 6 minimum of X stalls per unit (§ 21-6.20)", and the Citywide View's parcel card shows a "Parking below legal minimum" tag, both in the warning orange.
 - **Retail stalls:** switch on with retail (1 per 500 sq ft, with the 90% joint-use rate) and are always required on a non-exempt parcel; the lever sets housing stalls only. On an exempt parcel retail stalls stay at 0 whatever the lever says.
 - **Joint use:** also applies to a ratio the user sets by hand.

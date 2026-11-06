@@ -32,7 +32,7 @@ The same zone step-back rules as [Standard](bill6.md#height-setbacks); Ord. 26-7
 
 The same Article 6 requirements as [Standard](bill6.md#parking-and-loading): 1 stall per 1,000 sq ft of dwelling area plus 1 per 500 sq ft of retail, 90% when combined, loading on lots over 7,500 sq ft, and bicycle parking. The § 21-6.20(a) exemption applies parcel by parcel: 6,998 of 9,444 parcels are exempt.
 
-**Impact of the exemption.** Citywide View totals at default levers, retail off, with the Article 6 minimum on every parcel and then with the exemption applied: stalls fall from 445,399 to 78,049, units rise from 886,336 to 1,022,077, and parcels rated strong rise from 93 to 1,987.
+**Impact of the exemption.** Citywide View totals with all one-bedroom units and the Parking lever unset, retail off, with the Article 6 minimum on every parcel and then with the exemption applied: stalls fall from 445,399 to 78,049, units rise from 886,336 to 1,022,077, and parcels rated strong rise from 93 to 1,987. The default 0.95 ratio puts housing stalls on exempt parcels too, so at the defaults, with retail off, the exemption changes nothing.
 
 ## Affordability
 
@@ -56,12 +56,12 @@ The model builds no affordable units in this pathway. The Table 29-1.4 requireme
 
 | Input | Default |
 | --- | --- |
-| Unit mix | All one-bedroom |
+| Unit mix | Half studio, half one-bedroom |
 | Affordable share | 0% |
 | Affordable / market rent | 80% / 120% AMI |
 | Hard cost | $450 per sq ft |
 | Operating expense ratio | 30% of EGI |
-| Parking | The Article 6 minimum (0 on exempt parcels) |
+| Parking | 0.95 stalls per unit |
 | Park dedication | In-lieu fee |
 | Impact Fees toggle | Market Units Only |
 | Permanent rate / minimum DSCR | 6.75% / 1.20 |

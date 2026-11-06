@@ -16,8 +16,8 @@ Each pathway page describes only what differs from the shared [Housing Policy Si
 | --- | --- | --- |
 | [Standard (post Ord. 26-7)](pathways/bill6.md) | `bill6` | Baseline development under the apartment standards as amended by Ord. 26-7 |
 | [Before Ord. 26-7](pathways/standard.md) | `standard` | Baseline development under the apartment standards before Ord. 26-7 |
-| [Bill 7](pathways/bill7.md) | `bill7` | ROH Chapter 32: affordable rental housing, FAR 4.0 and 60 ft cap, no parking, most fees waived, and a 15-year real property tax exemption |
-| [TOD (IPD-T / PD-T)](pathways/tod.md) | `tod` | Transit-oriented development near rail stations: permit tiers that raise FAR and height, no car parking, and higher affordability requirements |
+| [Bill 7](pathways/bill7.md) | `bill7` | ROH Chapter 32: affordable rental housing, FAR 4.0 and 60 ft cap, no required parking, most fees waived, and a 15-year real property tax exemption |
+| [TOD (IPD-T / PD-T)](pathways/tod.md) | `tod` | Transit-oriented development near rail stations: permit tiers that raise FAR and height, no required car parking, and higher affordability requirements |
 | [201H](pathways/h201.md) | `h201` | HRS Chapter 201H: state affordable projects with a required 50% + 1 affordable minimum |
 | [Special districts](pathways/special-districts.md) | (not a separate pathway) | Districts with their own zoning rules, such as the Waikiki Apartment Precinct |
 
