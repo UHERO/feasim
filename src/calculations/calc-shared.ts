@@ -322,7 +322,7 @@ export function mixPostGrant(mix_key: string): number {
 // parking
 export const PARKING = {
   // default stalls per dwelling unit
-  stalls_per_unit: 0,
+  stalls_per_unit: 0.85,
   // gross sqft per stall incl. drive aisles (Ulupono 2020)
   stall_sqft: 330,
   monthly_rent_per_stall: 100,

@@ -87,7 +87,7 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   const height_limit = sliders.height_limit ?? TOD_DEFAULT_HEIGHT_LIMIT;
   const floor_height = sliders.floor_height ?? TOD_DEFAULT_FLOOR_HEIGHT;
   const zone_class = sliders.zone_class ?? TOD_DEFAULT_ZONE_CLASS;
-  const unit_type = sliders.unit_type ?? "one_bb";
+  const unit_type = sliders.unit_type ?? "studio50_1br50";
   const rental_split = 1;
   const sale_split = 0;
   const leaseup_override = sliders.leaseup_months;

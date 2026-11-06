@@ -12,6 +12,7 @@ import {
   BILL7_MAX_HEIGHT,
   bicycleRequired,
   calcParcel,
+  calcSingle,
   DEFAULT_INPUTS,
   IMX1_PDT_MAX_UNITS,
   LOADING,
@@ -144,13 +145,24 @@ describe.each(PROGRAMS)("gauge: %s", (program) => {
 });
 
 describe("gauge: Article 6 parking on real parcels", () => {
+  // parking_ratio left unset: the model applies the Article 6 minimum
+  const article6 = (program: ProgramId, parcel: Parcel) =>
+    calcSingle({ ...parcelInputs(program, parcel), parking_ratio: undefined });
+
   for (const program of ["bill6", "standard", "h201"] as const) {
+    it(`${program}: the default ratio builds stalls on exempt parcels too`, () => {
+      for (const parcel of SAMPLE[program]) {
+        const r = calcParcel(program, parcel);
+        expect(r.parking_stalls, parcel.tmk).toBe(roundHalfUp(0.95 * r.max_units));
+      }
+    });
+
     it(`${program}: exempt parcels build no stalls, the rest the legal minimum`, () => {
       const ratio = legalParkingRatio(DEFAULT_INPUTS[program].unit_type!);
       let exempt = 0;
       let required = 0;
       for (const parcel of SAMPLE[program]) {
-        const r = calcParcel(program, parcel);
+        const r = article6(program, parcel);
         expect(parcelInputs(program, parcel).parking_exempt, parcel.tmk).toBe(parcel.parking_exempt);
         if (parcel.parking_exempt) {
           exempt++;
@@ -175,9 +187,9 @@ describe("gauge: Article 6 parking on real parcels", () => {
     });
   }
 
-  it("bill7: no parking, loading or bicycle parking", () => {
+  it("bill7: no required parking, loading or bicycle parking", () => {
     for (const parcel of SAMPLE.bill7) {
-      const r = calcParcel("bill7", parcel);
+      const r = calcParcel("bill7", parcel, { parking_ratio: 0 });
       expect(r.parking_stalls, parcel.tmk).toBe(0);
       expect(r.loading_spaces ?? 0, parcel.tmk).toBe(0);
       expect(r.bicycle_spaces ?? 0, parcel.tmk).toBe(0);
@@ -187,8 +199,8 @@ describe("gauge: Article 6 parking on real parcels", () => {
   it("a stall minimum never adds units", () => {
     for (const program of ["bill6", "standard", "h201"] as const)
       for (const parcel of SAMPLE[program].filter((p) => !p.parking_exempt))
-        expect(calcParcel(program, parcel).max_units, parcel.tmk).toBeLessThanOrEqual(
-          calcParcel(program, { ...parcel, parking_exempt: true }).max_units
+        expect(article6(program, parcel).max_units, parcel.tmk).toBeLessThanOrEqual(
+          article6(program, { ...parcel, parking_exempt: true }).max_units
         );
   });
 });
@@ -243,10 +255,10 @@ describe("gauge: TOD on real parcels", () => {
       }
   });
 
-  it("builds no car parking by default but bicycle parking outside industrial zones", () => {
+  it("requires no car parking but bicycle parking outside industrial zones", () => {
     for (const parcel of tod) {
       if (pathwayEnvelope("tod", parcel).status !== "eligible") continue;
-      const r = calcParcel("tod", parcel);
+      const r = calcParcel("tod", parcel, { parking_ratio: 0 });
       expect(r.parking_stalls, parcel.tmk).toBe(0);
       if (!bicycleRequired(parcel.zone_class) || r.max_units === 0)
         expect(r.bicycle_spaces ?? 0, parcel.tmk).toBe(0);

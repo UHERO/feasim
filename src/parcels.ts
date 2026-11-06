@@ -349,7 +349,7 @@ export function todOpenSpaceCostSqft(
 export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
   const standard: SliderInputs = {
     program: "standard",
-    unit_type: "one_bb_100",
+    unit_type: "studio50_1br50",
     affordable_ami: "ami_80",
     market_ami: "ami_120",
     include_retail: false,
@@ -361,7 +361,8 @@ export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
     waivable_fee_basis: "market_units",
     park: "in_lieu",
     setback: 10,
-    // no parking_ratio: the model applies the Article 6 minimum
+    // set on exempt parcels too; left unset, the model applies the Article 6 minimum
+    parking_ratio: 0.95,
     permitting_months: 18,
     const_months: 12,
     leaseup_months: 9,
@@ -378,7 +379,7 @@ export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
   return {
     standard,
     bill6: { ...standard, program: "bill6" },
-    tod: { ...standard, program: "tod", floor_height: 10, parking_ratio: 0 },
+    tod: { ...standard, program: "tod", floor_height: 10, parking_ratio: 0.85 },
     h201: {
       ...standard,
       program: "h201",
@@ -407,7 +408,7 @@ export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
       waivable_fee_basis: "none",
       park: "exempt",
       setback: 10,
-      parking_ratio: 0,
+      parking_ratio: 0.5,
       permitting_months: 18,
       const_months: 12,
       leaseup_months: 9,

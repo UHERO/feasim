@@ -986,13 +986,31 @@ describe("parking", () => {
     expect(calcParkingIncome(10)).toBe(10 * 100 * 12);
   });
 
-  it("defaults to the Article 6 minimum for Standard, Before Ord. 26-7 and 201H, none for Bill 7 and TOD", () => {
-    // left unset, the model applies the legal minimum for the unit mix
-    expect(DEFAULT_INPUTS.bill6.parking_ratio).toBeUndefined();
-    expect(DEFAULT_INPUTS.standard.parking_ratio).toBeUndefined();
-    expect(DEFAULT_INPUTS.h201.parking_ratio).toBeUndefined();
-    expect(DEFAULT_INPUTS.bill7.parking_ratio).toBe(0);
-    expect(DEFAULT_INPUTS.tod.parking_ratio).toBe(0);
+  it("defaults to a flat ratio by pathway", () => {
+    expect(DEFAULT_INPUTS.bill6.parking_ratio).toBe(0.95);
+    expect(DEFAULT_INPUTS.standard.parking_ratio).toBe(0.95);
+    expect(DEFAULT_INPUTS.h201.parking_ratio).toBe(0.95);
+    expect(DEFAULT_INPUTS.bill7.parking_ratio).toBe(0.5);
+    expect(DEFAULT_INPUTS.tod.parking_ratio).toBe(0.85);
+  });
+
+  it("defaults every pathway to half studio, half one-bedroom", () => {
+    for (const program of PROGRAMS)
+      expect(DEFAULT_INPUTS[program].unit_type, program).toBe("studio50_1br50");
+  });
+
+  it("falls back to the same unit mix, and Bill 7 and TOD to the same ratio, when calcSingle gets neither", () => {
+    const site = { lot_sqft: 20000, zone_class: "BMX-3", height_limit: 60, max_far: 3 };
+    for (const program of PROGRAMS) {
+      const inputs = { ...DEFAULT_INPUTS[program], ...site };
+      const withParking = program === "bill7" || program === "tod";
+      const { unit_type, ...noMix } = inputs;
+      expect(calcSingle(noMix).max_units, program).toBe(calcSingle(inputs).max_units);
+      if (withParking) {
+        const { parking_ratio, ...noRatio } = inputs;
+        expect(calcSingle(noRatio).parking_stalls, program).toBe(calcSingle(inputs).parking_stalls);
+      }
+    }
   });
 
   it("builds a surface lot when the stalls fit beside a slimmer building", () => {
@@ -1083,10 +1101,11 @@ describe("Article 6 parking minimums", () => {
   it("requires no stalls on a parcel exempt under § 21-6.20(a)", () => {
     const parcel: Parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 150 };
     for (const program of ["bill6", "standard", "h201"] as const) {
-      const exempt = calcParcel(program, { ...parcel, parking_exempt: true }, { include_retail: true });
+      const levers = { include_retail: true, parking_ratio: 0 };
+      const exempt = calcParcel(program, { ...parcel, parking_exempt: true }, levers);
       expect(exempt.parking_stalls, program).toBe(0);
       expect(exempt.loading_spaces, program).toBeGreaterThan(0); // loading is not exempted
-      expect(calcParcel(program, parcel, { include_retail: true }).parking_stalls, program).toBeGreaterThan(0);
+      expect(calcParcel(program, parcel, levers).parking_stalls, program).toBeGreaterThan(0);
     }
   });
 
@@ -1224,18 +1243,20 @@ describe("open-space bonus", () => {
   it("keeps the bigger building where neither version pencils", () => {
     // 10,000 sqft BMX-4 at 60 ft loses money either way; the bonus would give
     // up 70% of the lot to open space for floor area the height can't hold
-    const r = calcParcel("bill6", { lot_sqft: 10000, zone_class: "BMX-4", height: 60 });
+    const levers = { unit_type: "one_bb_100", parking_ratio: 0.5 };
+    const r = calcParcel("bill6", { lot_sqft: 10000, zone_class: "BMX-4", height: 60 }, levers);
     expect(r.rlv).toBeLessThan(0);
     expect(r.open_space_bonus).toBe(0);
     expect(r.max_units).toBeGreaterThanOrEqual(
-      calcParcel("bill6", { lot_sqft: 10000, zone_class: "BMX-3", height: 60 }).max_units
+      calcParcel("bill6", { lot_sqft: 10000, zone_class: "BMX-3", height: 60 }, levers).max_units
     );
   });
 
   it("skips the bonus a 60 ft BMX-4 building can't use", () => {
-    const bmx4 = calcParcel("bill6", site("BMX-4", 60));
+    const levers = { unit_type: "one_bb_100", parking_ratio: 0.5 };
+    const bmx4 = calcParcel("bill6", site("BMX-4", 60), levers);
     expect(bmx4.open_space_bonus).toBe(0);
-    expect(bmx4.max_units).toBeGreaterThanOrEqual(calcParcel("bill6", site("BMX-3", 60)).max_units);
+    expect(bmx4.max_units).toBeGreaterThanOrEqual(calcParcel("bill6", site("BMX-3", 60), levers).max_units);
   });
 
   it("takes the bonus where the height can use the floor area", () => {
