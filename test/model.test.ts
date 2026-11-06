@@ -444,10 +444,11 @@ describe("parcelInputs", () => {
     expect(inputs.max_far).toBe(2.5);
   });
 
-  it("holds Bill 7 to 60 ft even when a lever asks for more", () => {
+  it("holds Bill 7 to 60 ft unless a lever asks for more", () => {
+    expect(parcelInputs("bill7", tall).height_limit).toBe(60);
     expect(parcelInputs("bill7", tall, { height_limit: 30 }).height_limit).toBe(30);
-    expect(parcelInputs("bill7", tall, { height_limit: 75 }).height_limit).toBe(60);
-    expect(parcelInputs("bill7", low, { height_limit: 75 }).height_limit).toBe(60);
+    expect(parcelInputs("bill7", tall, { height_limit: 75 }).height_limit).toBe(75);
+    expect(parcelInputs("bill7", low, { height_limit: 75 }).height_limit).toBe(75);
   });
 
   it("treats levers set to undefined as not set", () => {
@@ -496,8 +497,9 @@ describe("calcParcel", () => {
       .toBe(pre.max_units * 60000);
   });
 
-  it("builds to the Bill 7 cap, not above it", () => {
-    expect(calcParcel("bill7", tall, { height_limit: 75 }).height_limit).toBe(60);
+  it("builds to the Bill 7 cap unless a lever asks for more", () => {
+    expect(calcParcel("bill7", tall).height_limit).toBe(60);
+    expect(calcParcel("bill7", tall, { height_limit: 75 }).height_limit).toBe(75);
     expect(calcParcel("bill7", tall, { height_limit: 30 }).height_limit).toBe(30);
   });
 });

@@ -61,7 +61,7 @@ These hold in every pathway:
 
 The envelope is the building the lot allows: the number of floors the height limit permits, each floor's footprint, and the floor area FAR allows. The model fills it with ground-floor retail, parking and homes, then prices the construction.
 
-***Note:*** `height_limit` and `max_far` override the pathway's envelope. Bill 7 still caps height at 60 ft. See the `SliderInputs` type for the full list, with units.
+***Note:*** `height_limit` and `max_far` override the pathway's envelope, including Bill 7's 60 ft cap. See the `SliderInputs` type for the full list, with units.
 
 ## Buildable area
 

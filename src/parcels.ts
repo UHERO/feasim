@@ -424,7 +424,7 @@ export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
 /**
  * Model inputs for a parcel: pathway defaults, then `levers` (undefined = not
  * set), then the parcel's envelope. `levers.height_limit` / `max_far` override
- * the envelope; Bill 7's 60 ft cap still applies. `opts` is TOD only.
+ * the envelope, including Bill 7's 60 ft cap. `opts` is TOD only.
  */
 export function parcelInputs(
   program: ProgramId,
@@ -436,15 +436,13 @@ export function parcelInputs(
     Object.entries(levers).filter(([, value]) => value !== undefined)
   ) as Partial<SliderInputs>;
   const envelope = pathwayEnvelope(program, parcel, opts);
-  const height = set.height_limit ?? envelope.height_limit;
   const inputs: SliderInputs = {
     ...DEFAULT_INPUTS[program],
     ...set,
     program,
     lot_sqft: parcel.lot_sqft,
     zone_class: parcel.zone_class,
-    height_limit:
-      program === "bill7" ? Math.min(height, BILL7_MAX_HEIGHT) : height,
+    height_limit: set.height_limit ?? envelope.height_limit,
     max_far: set.max_far ?? envelope.max_far,
   };
   if (program === "tod") {

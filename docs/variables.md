@@ -114,7 +114,7 @@ Levers are user inputs. The default for each pathway is set in `DEFAULT_INPUTS` 
 | `openSpaceBonus` / `openSpaceBonusOver` | Function |  | Largest open-space bonus the district allows over base FAR / over a pathway's own FAR. Applied by Standard, Before Ord. 26-7, 201H and IPD-T. | ROH 21-3.120-2(c) |  | calc-shared.ts |
 | `lotAfterOpenSpace` | Function |  | Public open space for the bonus is earned at 5:1, so 1.0 FAR of bonus gives up lot_sqft/5 of ground. | ROH 21-3.120-2(b) |  | calc-shared.ts |
 | `BILL7_FAR` | Constant | 4 | Bill 7 statutory FAR. | ROH 32 | Yearly | parcels.ts |
-| `BILL7_MAX_HEIGHT` | Constant | 60 | Bill 7 height cap, ft. Applied in parcelInputs on top of any height lever. | ROH 32 | Yearly | parcels.ts |
+| `BILL7_MAX_HEIGHT` | Constant | 60 | Bill 7 height cap, ft. Applied in pathwayEnvelope; a height lever overrides it. | ROH 32 | Yearly | parcels.ts |
 | Bill 7 lot coverage (coverage) | Inline constant | 0.8 | Bill 7's own 80% maximum building area; overridable with the coverage lever. | ROH 32 | Yearly | calc-bill7.ts |
 
 ## Building envelope

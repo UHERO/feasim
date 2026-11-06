@@ -127,9 +127,7 @@ describe.each(PROGRAMS)("gauge: %s", (program) => {
   it("builds to the parcel's envelope", () => {
     for (const { parcel, r } of results) {
       const env = pathwayEnvelope(program, parcel);
-      expect(r.height_limit, parcel.tmk).toBe(
-        program === "bill7" ? Math.min(env.height_limit, BILL7_MAX_HEIGHT) : env.height_limit
-      );
+      expect(r.height_limit, parcel.tmk).toBe(env.height_limit);
       if (program === "bill7") expect(r.height_limit, parcel.tmk).toBeLessThanOrEqual(BILL7_MAX_HEIGHT);
     }
   });
