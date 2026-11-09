@@ -24,10 +24,11 @@ None. Chapter 32's development standards set "Height setbacks: None" (Ord. 19-8)
 | Requirement | Bill 7 |
 | --- | --- |
 | Car parking | None required (§ 32-2.3); the Parking lever defaults to 0.5 stalls per unit |
+| Retail parking | None; with ground-floor retail on, the model adds no retail stalls (the Article 6 rate of 1 per 500 sq ft does not apply) |
 | Bicycle parking | None; the § 21-6.40 requirement does not apply (Ord. 19-8) |
 | Loading | None, but loading and garbage storage must be accommodated on site; the model reserves no loading spaces |
 
-With no parking requirement, the 0.5 default is an assumption, not a legal minimum. Setting the Parking lever to 0 removes the stalls and their costs.
+With no parking requirement, the 0.5 default is an assumption, not a legal minimum. The only stalls the model builds are these housing stalls, so adding retail adds no parking. Setting the Parking lever to 0 removes the stalls and their costs.
 
 ## Affordability
 
