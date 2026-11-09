@@ -202,11 +202,12 @@ describe("calculator Bill 7 and the zone", () => {
     expect(soft("A-3")).toBeGreaterThan(soft("A-1"));
   });
 
-  it("steps back above 40 ft where the zone requires it", () => {
+  it("never steps back, whatever the zone (Chapter 32 has no height setbacks)", () => {
     const at60 = (zone: string, s: Partial<SliderInputs> = {}) =>
       calcSingle({ ...base, zone_class: zone, height_limit: 60, ...s }).buildable_sqft;
-    expect(at60("A-2")).toBeLessThan(at60("A-2", { stepback_trigger_ft: 1000 }));
-    expect(at60("A-1")).toBe(at60("A-1", { stepback_trigger_ft: 1000 }));
+    for (const zone of ["A-2", "BMX-3", "Resort"])
+      expect(at60(zone), zone).toBe(at60(zone, { stepback_trigger_ft: 1000 }));
+    expect(at60("A-2", { stepback_trigger_ft: 40 })).toBeLessThan(at60("A-2"));
   });
 
   it("keeps Bill 7's FAR and unit density in every zone", () => {

@@ -7,7 +7,8 @@
 //   sqft), or a $50k pre-construction subsidy per unit with prevailing wages
 // - 15-year property tax exemption on improvements
 // - Height-based construction cost rate (not zone lookup)
-// - excavation and stepbacks follow the zone; timing is 18/12 months unless set
+// - no height step-backs (ROH Chp 32); excavation follows the zone; timing is
+//   18/12 months unless set
 
 import {
   allocatePropertyTax,
@@ -54,7 +55,6 @@ import {
   stepBackOf,
   VACANCY,
   zeroOutput,
-  zoneStepBack,
 } from "./calc-shared";
 
 // =========================================================
@@ -101,8 +101,8 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   const market_ami = sliders.market_ami ?? DEFAULT_MARKET_AMI;
   const construction_rate =
     sliders.construction_rate ?? FINANCING.construction_rate;
-  // bill 7 applies in A, AMX, BMX and waikiki districts; excavation and
-  // stepbacks follow the zone, or the height without one
+  // bill 7 applies in A, AMX, BMX and waikiki districts; excavation follows
+  // the zone, or the height without one
   const has_zone = sliders.zone_class != null;
   const zone_class =
     sliders.zone_class ?? (height_limit <= 30 ? "low_rise" : "mid_rise");
@@ -138,10 +138,8 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     lot_sqft,
     coverage_plate: envelopeCoverage(zone_class, max_far, coverage) * lot_sqft,
     setback,
-    stepback: stepBackOf(
-      sliders,
-      has_zone ? zoneStepBack(zone_class) : undefined
-    ),
+    // chapter 32 sets no height setbacks, so only a set lever steps back
+    stepback: stepBackOf(sliders),
   });
 
   // ground-floor retail is only permitted where the base zone allows it
