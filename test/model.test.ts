@@ -1253,9 +1253,10 @@ describe("open-space bonus", () => {
   });
 
   it("keeps the bigger building where neither version pencils", () => {
-    // 10,000 sqft BMX-4 at 60 ft loses money either way; the bonus would give
-    // up 70% of the lot to open space for floor area the height can't hold
-    const levers = { unit_type: "one_bb_100", parking_ratio: 0.5 };
+    // 10,000 sqft BMX-4 at 60 ft loses money either way at $475/sqft; the bonus
+    // would give up 70% of the lot to open space for floor area the height
+    // can't hold
+    const levers = { unit_type: "one_bb_100", parking_ratio: 0.5, hard_cost_per_sqft: 475 };
     const r = calcParcel("bill6", { lot_sqft: 10000, zone_class: "BMX-4", height: 60 }, levers);
     expect(r.rlv).toBeLessThan(0);
     expect(r.open_space_bonus).toBe(0);

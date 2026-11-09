@@ -38,7 +38,7 @@ Physical inputs (lot size, height, zone class) are user sliders in the Project V
 
 ***Note:*** with `parking_ratio` left unset, the model applies the Article 6 minimum (0 on exempt parcels) instead. Only `calcSingle` can do this: `calcParcel` fills an unset lever from `DEFAULT_INPUTS`.
 
-***Note:*** when the user chooses AMI 30% for both affordable and market for-sale units, we use the prices listed in HHFDC 2025's [Honolulu County Income, Rent, and Sales Price Guidelines](https://www.dbedt.hawaii.gov/hhfdc/files/2025/05/Honolulu-County-2025.pdf) for AMI 50%, as that is the lowest AMI level listed for sale units.
+***Note:*** when the user chooses AMI 30% for both affordable and market for-sale units, we use the prices listed in HHFDC 2026's [Honolulu County Income, Rent, and Sales Price Guidelines](https://dbedt.hawaii.gov/hhfdc/files/2026/06/2026-HHFDC-Honolulu-County-Income-Limits_Sales-Price-Guidelines-1.pdf) for AMI 50%, as that is the lowest AMI level listed for sale units.
 
 # Developer Strategies
 
@@ -629,7 +629,7 @@ Every rent in the model, affordable or market, is an AMI-based rent from the HHF
 
 - **Household size by unit type:** studio 1 person; one-bedroom the average of 1 and 2 persons; two-bedroom 3 persons.
 - **Unpublished AMI levels:** scale the 50% AMI row linearly. HHFDC publishes rents floored, so the model floors too.
-- **Data year:** the income limits are HHFDC's 2025 Honolulu County schedule (median $129,300). The [2026 schedule](https://dbedt.hawaii.gov/hhfdc/2026/06/23/honolulu-county-income-rent-sales-price-guidelines-2026/) (median $133,400) is published but not yet in the model.
+- **Data year:** the income limits and sale prices are HHFDC's [2026 Honolulu County schedule](https://dbedt.hawaii.gov/hhfdc/2026/06/23/honolulu-county-income-rent-sales-price-guidelines-2026/) (median $133,400, effective May 1, 2026).
 - **Unit mix:** the rent is the weighted average over the mix.
 - **Escalation:** Affordable and market rents both grow 4% a year from today through permitting, construction and lease-up, and through the hold (see [Rent growth](#rent-growth)).
 
