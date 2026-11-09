@@ -1,15 +1,17 @@
-// Standard Development calculator:
+// Before Ord. 26-7 calculator (program id "standard"):
 //
-// Key Standard rules:
-// - Base FAR (no bonus), zone-based lot coverage
-// - Surface car parking required (no bicycle)
-// - 5% affordable rental, 15% affordable sale
-// - User-selectable AMI levels
-// - No grants/subsidies
-// - Full property tax from year 1 (NO exemption period)
-// - Retail allowed for AMX/BMX zones only
-// - Zone-based permitting months
-// - Parking income included in PGI
+// Key rules:
+// - pre-Ord. 26-7 FAR and lot coverage, which scale with lot size; open-space
+//   bonus where the zone allows it
+// - parking from the lever, or the Article 6 minimum when unset; loading and
+//   bicycle parking apply
+// - no affordable units: Ch. 29 applies only to for-sale projects
+// - user-selectable AMI levels
+// - no grants or subsidies
+// - full property tax from year 1 (no exemption period)
+// - retail only where the zone allows it
+// - 18 months of permitting unless set
+// - parking income included in PGI
 
 import {
   allocatePropertyTax,

@@ -1,13 +1,16 @@
 // TOD (Transit-Oriented Development) calculator:
 //
 // Key TOD rules:
-//   - 2× FAR bonus on top of base zone FAR (TOD entitlement)
-//   - Zone-specific lot coverage (small/medium/large/apt/b_bmx)
-//   - Mandatory 15% affordable rental + 30% affordable sale (validation errors otherwise)
-//   - NO car parking required (bicycle parking only) — major hard-cost reduction
-//   - Soft costs have TOD application fee + Special District Major Permit
-//   - Permit/plan-review fees apply to MARKET units only (affordable exempt)
-//   - 15-year improvement-tax exemption applies if hold strategy used
+//   - FAR and height from the regime's tier (todEnvelope in parcels.ts); Base
+//     uses the underlying zone
+//   - the underlying zone's lot coverage
+//   - no affordable units: Ch. 29 applies only to for-sale projects
+//   - no car parking minimum near rail (§ 21-6.20(a)): stalls come from the
+//     parking lever; loading and bicycle parking still apply
+//   - soft costs add the TOD application fee and special district fee
+//   - permit and plan-review fees on market units only by default
+//   - 15-year improvement-tax exemption
+//   - 18 months of permitting unless set
 
 import {
   allocatePropertyTax,
@@ -295,8 +298,7 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
   const pri =
     affordable_rent * afd_rent_units * 12 + market_rent * mkt_rent_units * 12;
 
-  // TOD: no car parking income (bicycle only)
-  // 7/20/26 Trey says to implement car parking for TOD for now
+  // car parking income from the lever's stalls
   const parking_income = calcParkingIncome(env.stalls);
   const admin_income =
     max_units * 0.3 * INCOME.application_fee +
