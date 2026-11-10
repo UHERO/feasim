@@ -8,6 +8,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   BILL7_FAR,
+  conveyanceTax,
+  sellingCosts,
   BILL7_MAX_HEIGHT,
   DEFAULT_INPUTS,
   DEFAULT_TARGET_RETURN,
@@ -1284,5 +1286,34 @@ describe("open-space bonus", () => {
   it("reports no bonus where none is offered", () => {
     expect(calcParcel("bill6", site("A-2", 60)).open_space_bonus).toBe(0);
     expect(calcParcel("bill7", site("BMX-4", 60)).open_space_bonus).toBe(0);
+  });
+});
+
+describe("conveyance tax", () => {
+  it("taxes the whole price at its bracket's rate, not marginally", () => {
+    expect(conveyanceTax(500_000)).toBeCloseTo(500);
+    expect(conveyanceTax(600_000)).toBeCloseTo(1_200);
+    expect(conveyanceTax(9_999_999)).toBeCloseTo(89_999.991);
+    expect(conveyanceTax(10_000_000)).toBeCloseTo(100_000);
+    expect(conveyanceTax(12_000_000)).toBeCloseTo(120_000);
+  });
+
+  it("uses the higher § 247-2(2) rates for condos and homes without a home exemption", () => {
+    expect(conveyanceTax(500_000, "condo_sfr")).toBeCloseTo(750);
+    expect(conveyanceTax(12_000_000, "condo_sfr")).toBeCloseTo(150_000);
+  });
+
+  it("charges nothing when nothing is sold", () => {
+    expect(conveyanceTax(0)).toBe(0);
+  });
+
+  it("adds the 3.5% disposition cost on top of the tax", () => {
+    expect(sellingCosts(12_000_000)).toBeCloseTo(420_000 + 120_000);
+    expect(sellingCosts(0)).toBe(0);
+  });
+
+  it("charges both on the stabilized sale", () => {
+    const r = calcParcel("bill6", { lot_sqft: 20000, zone_class: "BMX-3", height: 150 });
+    expect(r.rlv_selling_costs).toBe(Math.round(0.035 * r.gdv + conveyanceTax(r.gdv)));
   });
 });

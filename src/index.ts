@@ -58,6 +58,9 @@ export {
   wsfcCategory,
 } from "./calculations/calc-shared";
 
+// selling costs: the 3.5% disposition cost plus the conveyance tax (HRS § 247-2)
+export { CONVEYANCE_TAX, conveyanceTax, sellingCosts } from "./calculations/calc-shared";
+
 // parking (surface lot, ground floor, podium) and height step-backs; the
 // Article 6 minimums (§ 21-6.20), joint use, loading (§ 21-6.110) and bicycle
 // parking (§ 21-6.40); the TOD special district front strip (§ 21-9.100-8(c))

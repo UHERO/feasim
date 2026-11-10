@@ -55,6 +55,7 @@ import {
   stepBackOf,
   VACANCY,
   zeroOutput,
+  sellingCosts,
 } from "./calc-shared";
 
 // =========================================================
@@ -367,7 +368,7 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   const operating_expenses = residential_opex + retail_opex;
 
   // =========================================================
-  // Step 6: NOI & GDV (gross, no disposition cost baked in)
+  // Step 6: NOI & GDV (gross, no conveyance tax baked in)
   // =========================================================
   const cap_rate = resolveCapRate(sliders.cap_rate);
   // NOI is after property tax (bill 7: improvements exempt, land-only tax)
@@ -386,7 +387,7 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   const noi = residential_noi + retail_noi;
 
   // GDV is gross capitalized value (NOI / cap rate)
-  // disposition cost is applied at point of sale only, not here
+  // conveyance tax is applied at point of sale only, not here
   const rental_gdv = residential_noi / cap_rate;
   let retail_gdv_val = 0;
   if (include_retail && retail_egi > 0) {
@@ -464,7 +465,7 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
 
   if (hold_years === 0) {
     // DEV FLIP
-    const selling_costs = gdv * FINANCING.disposition_cost;
+    const selling_costs = sellingCosts(gdv);
     const post_grant = post_construction_grant;
     const equity_out = gdv - selling_costs - leaseup.final_principal;
 
@@ -602,7 +603,7 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
       if (yr === hold_years) {
         const forward_noi = current_noi * (1 + HOLD.annual_rent_growth);
         const gross_sale = forward_noi / exit_cap;
-        stored_selling_costs = gross_sale * FINANCING.disposition_cost;
+        stored_selling_costs = sellingCosts(gross_sale);
         const net_reversion =
           gross_sale - stored_selling_costs - perm.remaining_bal;
         cf[total_with_hold] += net_reversion;

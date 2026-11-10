@@ -65,6 +65,7 @@ import {
   VACANCY,
   zeroOutput,
   zoneStepBack,
+  sellingCosts,
 } from "./calc-shared";
 
 // =========================================================
@@ -325,7 +326,7 @@ function standardOpex(
 }
 
 // =========================================================
-// STEP 7: NOI & GDV (gross, no disposition cost)
+// STEP 7: NOI & GDV (gross, before the conveyance tax)
 // =========================================================
 
 function standardNoi(
@@ -386,8 +387,8 @@ function standardDevFlip(
   land_cost_sqft: number,
   lot_sqft: number
 ): Partial<ParcelOutput> {
-  // disposition cost at sale only
-  const selling_costs = gdv * FINANCING.disposition_cost;
+  // disposition cost and conveyance tax at sale only
+  const selling_costs = sellingCosts(gdv);
   const equity_out = gdv - selling_costs - loan_balance;
 
   // monthly cashflow: predev spread across permitting, construction equity at close, exit at end
@@ -478,7 +479,9 @@ function standardHold(
   const total_equity_invested = equity_amount;
 
   // Sale units sold at stabilization, pay down construction loan first
-  const sale_selling_costs = gross_sales * FINANCING.disposition_cost;
+  // sale units are off (gross_sales is 0); if they return, charge each
+  // unit's price
+  const sale_selling_costs = sellingCosts(gross_sales);
   const net_sale_proceeds = gross_sales - sale_selling_costs;
   const perm_loan_balance = Math.max(0, loan_balance - net_sale_proceeds);
   const excess_sale_cash = Math.max(0, net_sale_proceeds - loan_balance);
@@ -544,7 +547,7 @@ function standardHold(
     if (yr === hold_years) {
       const forward_noi = current_noi * (1 + HOLD.annual_rent_growth);
       const gross_sale = forward_noi / exit_cap;
-      stored_selling_costs = gross_sale * FINANCING.disposition_cost;
+      stored_selling_costs = sellingCosts(gross_sale);
       const net_reversion =
         gross_sale - stored_selling_costs - perm.remaining_bal;
       cf[total_with_hold] += net_reversion;

@@ -57,6 +57,7 @@ import {
   VACANCY,
   zeroOutput,
   zoneStepBack,
+  sellingCosts,
 } from "./calc-shared";
 
 // =========================================================
@@ -405,7 +406,7 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
 
   if (hold_years === 0) {
     //  DEV FLIP
-    const selling_costs = gdv * FINANCING.disposition_cost;
+    const selling_costs = sellingCosts(gdv);
     const equity_out = gdv - selling_costs - leaseup.final_principal;
     const cashflows = new Array(total_months + 1).fill(0);
     // equity first: land, then predev, then the balance at loan closing
@@ -460,7 +461,9 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
     const tax_rate = FINANCING.rpt_residential;
 
     // Sale proceeds pay down construction loan first
-    const sale_selling_costs = gross_sales * FINANCING.disposition_cost;
+    // sale units are off (gross_sales is 0); if they return, charge each
+    // unit's price
+    const sale_selling_costs = sellingCosts(gross_sales);
     const net_sale_proceeds = gross_sales - sale_selling_costs;
     const perm_loan_balance = Math.max(
       0,
@@ -530,7 +533,7 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
       if (yr === hold_years) {
         const forward_noi = current_noi * (1 + HOLD.annual_rent_growth);
         const gross_sale = forward_noi / exit_cap;
-        stored_selling_costs = gross_sale * FINANCING.disposition_cost;
+        stored_selling_costs = sellingCosts(gross_sale);
         const net_reversion =
           gross_sale - stored_selling_costs - perm.remaining_bal;
         cf[total_with_hold] += net_reversion;

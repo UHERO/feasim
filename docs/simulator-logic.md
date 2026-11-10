@@ -608,13 +608,13 @@ Debt service uses a 30-year amortization at a 6.75% permanent rate, both user in
 **Flip:** The developer sells immediately after lease-up, in a single lump sum:
 
 ```math
-\text{proceeds} = \text{GDV} - \text{selling costs (3.5\%)} - \text{outstanding loan balance}
+\text{proceeds} = \text{GDV} - \text{selling costs} - \text{outstanding loan balance}
 ```
 
 **Hold:** The developer holds the building for the hold period, then sells:
 
 - **Each year:** NOI minus permanent debt service. Rents grow 4% a year, affordable and market alike (see [Rent growth](#rent-growth)), operating expenses 3.5%, and assessed value 2%. The 3.5% and 2% are the expense and property tax escalation rates California's TCAC requires in the 15-year cash flow every LIHTC applicant files (4 CCR § 10327(g)(1)); operating expenses follow their own series rather than a fixed share of EGI.
-- **At exit:** the next year's NOI ÷ exit cap, less 3.5% selling costs and the remaining loan balance.
+- **At exit:** the next year's NOI ÷ exit cap, less the selling costs on that price and the remaining loan balance.
 - **Property tax exemptions:** a pathway with a 15-year improvement exemption pays tax on land only for those years (see Property Tax).
 
 ## Revenue
@@ -676,6 +676,42 @@ Real property tax is 0.35% a year of assessed value (land plus improvements, the
 
 Some pathways exempt the improvements for a period; each pathway page gives its treatment under Fees, waivers and taxes.
 
+## Selling Costs
+
+When the developer sells the finished building, it pays selling costs on the sale price: on GDV at a flip and in the residual land value, and on the exit price at the end of a hold. `sellingCosts` adds two parts:
+
+- **Disposition cost, 3.5%** (`FINANCING.disposition_cost`): the brokerage commission and marketing, the general excise tax (GET) on the commission, owner's title insurance, the seller's half of escrow, and etc.
+- **Conveyance tax:** see [below](#conveyance-tax).
+
+| Sale price | Disposition cost (3.5%) | Conveyance tax | Selling costs |
+| --- | --- | --- | --- |
+| $9 million | $315,000 | $81,000 | $396,000 (4.4%) |
+| $30 million | $1,050,000 | $300,000 | $1,350,000 (4.5%) |
+
+Hawaii feasibility studies put selling costs at 5.5% of sales ([Strategic Economics for HCDA, 2017](https://dbedt.hawaii.gov/hcda/files/2017/03/Final-Memo-HCDA-Kakaako-Reserved-Workforce-Housing-2017-06-02.pdf), Figure 2) and 4% ([Keyser Marston for the County of Hawaiʻi, 2024 draft](https://records.hawaiicounty.gov/WebLink/1/edoc/150133/2024%20Keyser%20Marston%20Associates%20-%20%20Analysis%20%20Recommendations%20in%20Support%20of%20Updates%20to%20Chapter%2011%20HCC.pdf), Appendix A Table 6). Those rates include the conveyance tax and GET. The model charges the conveyance tax separately, so it uses 3.5%. Neither study itemizes its rate.
+
+### Conveyance tax
+
+The seller pays Hawaii's conveyance tax on every transfer of real property (HRS § 247-1; [Form P-64A](https://files.hawaii.gov/tax/forms/current/p64ains.pdf)). It is charged on the full price, including any mortgage the buyer takes over (§ 247-2). The bracket's rate applies to the whole price, not marginally, so a $9.9 million sale pays $89,100 and a $10 million sale pays $100,000.
+
+| Sale price | General (§ 247-2(1)) | Condo or single-family home, buyer ineligible for a home exemption (§ 247-2(2)) |
+| --- | --- | --- |
+| Under $600,000 | 0.10% | 0.15% |
+| $600,000 to under $1 million | 0.20% | 0.25% |
+| $1 million to under $2 million | 0.30% | 0.40% |
+| $2 million to under $4 million | 0.50% | 0.60% |
+| $4 million to under $6 million | 0.70% | 0.85% |
+| $6 million to under $10 million | 0.90% | 1.10% |
+| $10 million or more | 1.00% | 1.25% |
+
+The rates were last changed by Act 59 (2009).
+
+The higher schedule applies only to "the sale of a condominium or single family residence for which the purchaser is ineligible for a county homeowner's exemption on property tax" (§ 247-2(2)). A buyer who will live in the unit as their primary home is eligible ([Honolulu home exemption](https://realproperty.honolulu.gov/tax-relief-and-forms/exemptions/home-exemption/)); an investor or landlord is not.
+
+A condominium is a form of ownership, not a type of building. Under [HRS § 514B-3](https://www.capitol.hawaii.gov/hrscurrent/Vol12_Ch0501-0588/HRS0514B/HRS_0514B-0003.htm), real estate is a condominium only if portions are "designated for separate ownership" and the common elements are "vested in the unit owners". A rental building with one owner has no separately owned units, so it is not a condominium, whatever its zoning, and always takes the general schedule. Selling it whole costs more: a $30 million building pays $300,000, while the same value sold as 100 condo units to investors pays $450 each, or $45,000.
+
+In the model, every sale is a whole rental building, so every pathway uses the general schedule. The tax's rounding to $0.10 and its $1 minimum are not modeled. Source: [HRS Chapter 247](https://data.capitol.hawaii.gov/sessions/session2017/HRS-Chapter-PDF's/HRS_0247.pdf).
+
 ## NOI and Gross Development Value
 
 Net operating income is effective gross income less operating expenses and property tax. Gross development value (GDV) capitalizes it at the market cap rate, with retail at a 150 basis point spread:
@@ -700,7 +736,7 @@ The residual land value is the most a developer could pay for the land and still
 \text{RLV} = \frac{\text{residual}}{(1 + \text{target return})^{\text{months}/12}} + \sum_{m} \frac{\text{grant}_m}{(1 + \text{target return})^{m/12}}
 ```
 
-- **Selling costs:** 3.5% of GDV.
+- **Selling costs:** 3.5% of GDV (the disposition cost) plus the conveyance tax on GDV (see [Selling Costs](#selling-costs)).
 - **Project cost:** development cost (1.1 × hard + soft) plus financing cost, with the loan sized on construction cost only.
 - **Profit:** 15% of project cost.
 - **Target return:** 11.5% a year, the carry on the land from purchase to stabilization.

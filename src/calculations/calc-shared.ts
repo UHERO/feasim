@@ -218,9 +218,44 @@ export const FINANCING = {
   ami_escalation: 1.04,
   // 5.6%/yr construction hard-cost escalation; applied to construction midpoint
   cost_inflation: 1.056,
+  // 3.5% disposition cost on the sale price, charged with the conveyance tax;
+  // below hawaii studies' 4-5.5%, which include the conveyance tax and get
   disposition_cost: 0.035,
   rpt_residential: 0.0035,
 };
+
+// hrs § 247-2 conveyance tax, paid by the seller: the bracket's rate (per
+// $100) applies to the whole price, not marginally. condo_sfr is § 247-2(2),
+// a condo or single-family home whose buyer can't take a home exemption
+export const CONVEYANCE_TAX: {
+  below: number;
+  general: number;
+  condo_sfr: number;
+}[] = [
+  { below: 600_000, general: 0.1, condo_sfr: 0.15 },
+  { below: 1_000_000, general: 0.2, condo_sfr: 0.25 },
+  { below: 2_000_000, general: 0.3, condo_sfr: 0.4 },
+  { below: 4_000_000, general: 0.5, condo_sfr: 0.6 },
+  { below: 6_000_000, general: 0.7, condo_sfr: 0.85 },
+  { below: 10_000_000, general: 0.9, condo_sfr: 1.1 },
+  { below: Infinity, general: 1.0, condo_sfr: 1.25 },
+];
+
+/** conveyance tax on a sale; a whole rental building is neither a condo nor a
+ *  single-family home, so it takes the general schedule */
+export function conveyanceTax(
+  price: number,
+  schedule: "general" | "condo_sfr" = "general"
+): number {
+  if (!(price > 0)) return 0;
+  const bracket = CONVEYANCE_TAX.find((b) => price < b.below)!;
+  return (price * bracket[schedule]) / 100;
+}
+
+/** selling costs on a sale: the 3.5% disposition cost plus the conveyance tax */
+export function sellingCosts(price: number): number {
+  return price * FINANCING.disposition_cost + conveyanceTax(price);
+}
 
 // hold strategy assumptions
 export const HOLD = {
@@ -3002,7 +3037,8 @@ export function calcDevRLV(
   rlv: number;
   rlv_sqft: number;
 } {
-  const selling_costs = gdv * FINANCING.disposition_cost;
+  // disposition cost and conveyance tax on the stabilized sale
+  const selling_costs = sellingCosts(gdv);
 
   const project_cost = dev_cost + total_financing_cost;
   const profit = project_cost * profit_margin;
