@@ -19,7 +19,6 @@ import {
   calcLeaseupCarry,
   calcParkArea,
   calcParkingIncome,
-  calcPermanentLoan,
   calcPredevEquity,
   calcPropertyTax,
   calcSoftCosts,
@@ -30,7 +29,6 @@ import {
   DEFAULT_TARGET_SPREAD,
   EFFICIENCY,
   envelopeCoverage,
-  equityFirstDraws,
   excavationDepthByZone,
   FEES,
   FINANCING,
@@ -50,9 +48,10 @@ import {
   DEFAULT_CONST_MONTHS,
   RETAIL_CAP_SPREAD,
   RETAIL_PREMIUM,
+  runDevFlipStrategy,
+  runHoldStrategy,
   sizeConstructionLoan,
   SliderInputs,
-  solveIRR,
   stepBackOf,
   VACANCY,
   zeroOutput,
@@ -393,189 +392,48 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
     rlv_sqft: Math.round((rlv_base.rlv / lot_sqft) * 100) / 100,
   };
 
-  // 11. DEVELOPER FEASIBILITY
-  // the deal loan's base includes land, so equity_amount already carries the
-  // developer's share of the land purchase
-  const total_equity_invested = equity_amount;
-  const total_dev_cost_full = dev_cost + land_cost_total + total_financing_cost;
-  const yr1_prop_tax =
-    (land_cost_total + hard_cost) * FINANCING.rpt_residential;
-
-  let dev: Partial<ParcelOutput>;
-
-  if (hold_years === 0) {
-    //  DEV FLIP
-    const selling_costs = gdv * FINANCING.disposition_cost;
-    const equity_out = gdv - selling_costs - leaseup.final_principal;
-    const cashflows = new Array(total_months + 1).fill(0);
-    // equity first: land, then predev, then the balance at loan closing
-    equityFirstDraws(
-      equity_amount,
-      land_cost_total,
-      predev.monthly_predev_spend,
-      permitting_months
-    ).forEach((d, m) => {
-      cashflows[m] += d;
-    });
-    cashflows[total_months] = equity_out;
-
-    const levered_irr = solveIRR(cashflows, true);
-    const equity_multiple = equity_out / total_equity_invested;
-    const roi = (equity_out - total_equity_invested) / total_equity_invested;
-    const profit = gdv - selling_costs - total_dev_cost_full;
-    const roc = noi / total_dev_cost_full;
-
-    dev = {
-      dev_strategy: "dev_flip",
-      dev_hold_years: 0,
-      dev_post_grant: 0,
-      dev_land_cost: land_cost_total,
-      dev_total_dev_cost: Math.round(total_dev_cost_full),
-      dev_capital_subsidy: 0,
-      dev_net_dev_cost: Math.round(total_dev_cost_full),
-      dev_levered_irr: Math.round(levered_irr * 10000) / 10000,
-      dev_equity_multiple: Math.round(equity_multiple * 100) / 100,
-      dev_profit: Math.round(profit),
-      dev_roi: Math.round(roi * 10000) / 10000,
-      dev_roc: Math.round(roc * 10000) / 10000,
-      dev_gdv: Math.round(gdv),
-      dev_selling_costs: Math.round(selling_costs),
-      dev_equity_out: Math.round(equity_out),
-      dev_loan_payoff: Math.round(leaseup.final_principal),
-      dev_perm_principal: null,
-      dev_perm_rate: null,
-      dev_annual_debt_svc: null,
-      dev_dscr: null,
-      dev_is_bankable: null,
-      dev_cash_on_cash: null,
-      dev_entry_cap: null,
-      dev_exit_cap: null,
-      dev_yr1_prop_tax: null,
-      dev_equity_invested: total_equity_invested,
-    };
-  } else {
-    // HOLD STRATEGY
-    const land_value = land_cost_total;
-    const improvement_value = hard_cost;
-    const tax_rate = FINANCING.rpt_residential;
-
-    // Sale proceeds pay down construction loan first
-    const sale_selling_costs = gross_sales * FINANCING.disposition_cost;
-    const net_sale_proceeds = gross_sales - sale_selling_costs;
-    const perm_loan_balance = Math.max(
-      0,
-      leaseup.final_principal - net_sale_proceeds
-    );
-    const excess_sale_cash = Math.max(
-      0,
-      net_sale_proceeds - leaseup.final_principal
-    );
-
-    // 201H: full tax from year 1, no exemption
-    const yr1_noi_after_tax = egi - operating_expenses - yr1_prop_tax;
-
-    const perm = calcPermanentLoan(
-      perm_loan_balance,
-      yr1_noi_after_tax,
-      permanent_rate,
-      hold_years,
-      amort_years,
-      min_dscr
-    );
-
-    const dscr_display = perm_loan_balance === 0 ? null : perm.dscr;
-    const is_bankable_display =
-      perm_loan_balance === 0 ? null : perm.is_bankable;
-
-    const entry_cap = cap_rate;
-    const exit_cap = entry_cap + HOLD.exit_cap_spread;
-
-    const hold_months = hold_years * 12;
-    const total_with_hold = total_months + hold_months;
-    const cf = new Array(total_with_hold + 1).fill(0);
-    // equity drawn as in the flip: land, predev, rest at closing
-    equityFirstDraws(
-      equity_amount,
-      land_cost_total,
-      predev.monthly_predev_spend,
-      permitting_months
-    ).forEach((d, m) => {
-      cf[m] += d;
-    });
-    cf[total_months] += excess_sale_cash;
-
-    let current_egi = egi,
-      current_opex = operating_expenses;
-    // assessed value is reassessed annually, not frozen at cost
-    let assessed_value = land_value + improvement_value;
-    let stored_selling_costs = 0;
-
-    for (let yr = 1; yr <= hold_years; yr++) {
-      if (yr > 1) {
-        current_egi *= 1 + HOLD.annual_rent_growth;
-        // expenses run on their own inflation series, not as a fixed share of EGI
-        current_opex *= 1 + HOLD.annual_opex_growth;
-        assessed_value *= 1 + HOLD.annual_assessment_growth;
-      }
-      // 201H: full property tax every year, no exemption
-      const prop_tax = assessed_value * tax_rate;
-      const current_noi = current_egi - current_opex - prop_tax;
-      const levered_cf = current_noi - perm.annual_debt_svc;
-
-      const monthly_cf = levered_cf / 12;
-      for (let mo = 1; mo <= 12; mo++) {
-        cf[total_months + (yr - 1) * 12 + mo] = monthly_cf;
-      }
-
-      if (yr === hold_years) {
-        const forward_noi = current_noi * (1 + HOLD.annual_rent_growth);
-        const gross_sale = forward_noi / exit_cap;
-        stored_selling_costs = gross_sale * FINANCING.disposition_cost;
-        const net_reversion =
-          gross_sale - stored_selling_costs - perm.remaining_bal;
-        cf[total_with_hold] += net_reversion;
-      }
-    }
-
-    const annual_irr = solveIRR(cf, true);
-    const total_cash_in = cf.reduce((s, v) => s + Math.max(0, v), 0);
-    const equity_multiple = total_cash_in / total_equity_invested;
-    const roi = (total_cash_in - total_equity_invested) / total_equity_invested;
-    const profit = total_cash_in - total_equity_invested;
-    const yr1_levered_cf = yr1_noi_after_tax - perm.annual_debt_svc;
-    const cash_on_cash = yr1_levered_cf / total_equity_invested;
-    const roc = noi / total_dev_cost_full;
-
-    dev = {
-      dev_strategy: "hold",
-      dev_hold_years: hold_years,
-      dev_post_grant: 0,
-      dev_land_cost: land_cost_total,
-      dev_total_dev_cost: Math.round(total_dev_cost_full),
-      dev_capital_subsidy: 0,
-      dev_net_dev_cost: Math.round(total_dev_cost_full),
-      dev_levered_irr: Math.round(annual_irr * 10000) / 10000,
-      dev_equity_multiple: Math.round(equity_multiple * 100) / 100,
-      dev_profit: Math.round(profit),
-      dev_roi: Math.round(roi * 10000) / 10000,
-      dev_roc: Math.round(roc * 10000) / 10000,
-      dev_gdv: Math.round(gdv),
-      dev_selling_costs: Math.round(stored_selling_costs),
-      dev_equity_out: Math.round(total_cash_in),
-      dev_loan_payoff: perm.remaining_bal,
-      dev_dscr: dscr_display,
-      dev_is_bankable: is_bankable_display,
-      dev_annual_debt_svc:
-        perm_loan_balance === 0 ? null : perm.annual_debt_svc,
-      dev_perm_principal: perm_loan_balance === 0 ? null : perm.perm_principal,
-      dev_perm_rate: perm_loan_balance === 0 ? null : permanent_rate,
-      dev_cash_on_cash: Math.round(cash_on_cash * 10000) / 10000,
-      dev_entry_cap: Math.round(entry_cap * 10000) / 10000,
-      dev_exit_cap: Math.round(exit_cap * 10000) / 10000,
-      dev_yr1_prop_tax: Math.round(yr1_prop_tax),
-      dev_equity_invested: total_equity_invested,
-    };
-  }
+  // 11. DEVELOPER FEASIBILITY (shared with calc-bill6.ts/calc-standard.ts
+  // via calc-far-pathway.ts; 201H rounds a couple of extra fields, see
+  // runDevFlipStrategy/runHoldStrategy's `round_totals` option)
+  const dev: Partial<ParcelOutput> =
+    hold_years === 0
+      ? runDevFlipStrategy({
+          equity_amount,
+          loan_balance: leaseup.final_principal,
+          gdv,
+          noi,
+          dev_cost,
+          total_financing_cost,
+          total_months,
+          permitting_months,
+          monthly_predev_spend: predev.monthly_predev_spend,
+          land_cost_sqft: land_cost,
+          lot_sqft,
+          round_totals: true,
+        })
+      : runHoldStrategy({
+          equity_amount,
+          loan_balance: leaseup.final_principal,
+          gdv,
+          noi,
+          egi,
+          operating_expenses,
+          dev_cost,
+          total_financing_cost,
+          hard_cost,
+          total_months,
+          permitting_months,
+          monthly_predev_spend: predev.monthly_predev_spend,
+          land_cost_sqft: land_cost,
+          lot_sqft,
+          permanent_rate,
+          hold_years,
+          amort_years,
+          min_dscr,
+          cap_rate,
+          gross_sales,
+          round_totals: true,
+        });
 
   // calculate ROC and target spread for output with user inputs
   const _roc = dev.dev_roc ?? 0;
