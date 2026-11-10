@@ -74,10 +74,12 @@ import {
 } from "../src";
 import {
   calcSoftCosts,
+  FINANCING,
   mixPostGrant,
   postGrantPerUnit,
   PREVAILING_WAGE,
   setbackFootprint,
+  solveIRR,
   UNIT_SIZE,
 } from "../src/calculations/calc-shared";
 import { calcbill6Single } from "../src/calculations/calc-bill6";
@@ -141,6 +143,7 @@ const SCENARIOS: Record<string, Partial<SliderInputs>> = {
   "impact fees on all units": { waivable_fee_basis: "all_units" },
   "25-year amortization": { amort_years: 25 },
   "5-year hold": { hold_years: 5 },
+  "flip at completion (0-year hold)": { hold_years: 0 },
   "FAR 2, 60 ft, 20 ft setbacks": { max_far: 2, height_limit: 60, setback: 20 },
 };
 
@@ -260,6 +263,102 @@ describe("DSCR-sized loans", () => {
       }
     }
     expect(sized).toBeGreaterThan(0);
+  });
+});
+
+describe("solveIRR", () => {
+  it("solves the monthly rate that zeroes a one-shot cash flow, then annualizes it", () => {
+    // $100 out at month 0, $110 back at month 12: the monthly rate compounds
+    // to exactly 10% over the year
+    const cashflows = new Array(13).fill(0);
+    cashflows[0] = -100;
+    cashflows[12] = 110;
+    expect(solveIRR(cashflows, true)).toBeCloseTo(0.1, 9);
+  });
+
+  it("returns the rate itself, unannualized, for a non-monthly cash flow", () => {
+    expect(solveIRR([-100, 110], false)).toBeCloseTo(0.1, 9);
+  });
+
+  it("solves a negative rate when less comes back than went in", () => {
+    expect(solveIRR([-100, 90], false)).toBeCloseTo(-0.1, 9);
+  });
+
+  it("can't solve a cash flow that never goes negative, or never goes positive", () => {
+    expect(solveIRR([100, 50], true)).toBeNaN();
+    expect(solveIRR([-100, -50], true)).toBeNaN();
+    expect(solveIRR([0, 0], true)).toBeNaN();
+  });
+
+  it("can't solve a cash flow with no root in the solver's own rate bracket (-95% to 100%/mo)", () => {
+    // mixed signs, but net present value stays negative at both ends of the
+    // bracket, so there's no rate in range where it crosses zero
+    expect(solveIRR([-1, 100, -1000], true)).toBeNaN();
+  });
+});
+
+// ── Flip exit (hold_years: 0): sell the building at completion instead of
+// holding it for rent ───────────────────────────────────────────────────────
+
+describe("dev flip strategy", () => {
+  const site: SliderInputs = { program: "bill6", lot_sqft: 20000, zone_class: "BMX-3", height_limit: 150 };
+  const flip = (program: ProgramId, extra: Partial<SliderInputs> = {}) =>
+    calcSingle({ ...site, ...extra, program, hold_years: 0 });
+
+  it("builds the same thing as holding it, just exits differently", () => {
+    for (const program of PROGRAMS) {
+      const held = calcSingle({ ...site, program });
+      const flipped = flip(program);
+      expect(flipped.max_units, program).toBe(held.max_units);
+      expect(flipped.hard_cost, program).toBe(held.hard_cost);
+      expect(flipped.soft_cost, program).toBe(held.soft_cost);
+    }
+  });
+
+  it.each(PROGRAMS)("%s: labels itself and skips the permanent loan", (program) => {
+    const r = flip(program);
+    expect(r.dev_strategy).toBe("dev_flip");
+    expect(r.dev_hold_years).toBe(0);
+    // nothing takes the construction loan out at a DSCR, so it never binds
+    expect(r.dev_dscr_binds).toBe(false);
+    for (const field of [
+      "dev_perm_principal",
+      "dev_perm_rate",
+      "dev_annual_debt_svc",
+      "dev_dscr",
+      "dev_is_bankable",
+      "dev_cash_on_cash",
+      "dev_entry_cap",
+      "dev_exit_cap",
+      "dev_yr1_prop_tax",
+    ] as const) {
+      expect(r[field], field).toBeNull();
+    }
+  });
+
+  it.each(PROGRAMS)("%s: the sale pays selling costs and the loan, grants and the rest go to equity", (program) => {
+    const r = flip(program);
+    const grants = (r.pre_construction_subsidy ?? 0) + (r.dev_post_grant ?? 0);
+    expect(r.dev_selling_costs).toBeCloseTo(r.dev_gdv! * FINANCING.disposition_cost, 0);
+    // conservation of value: what the sale raises either pays off the
+    // construction loan, covers selling costs, or (with any grant) comes
+    // back to the developer as equity
+    expect(r.dev_equity_out! - grants).toBeCloseTo(r.dev_gdv! - r.dev_selling_costs! - r.dev_loan_payoff!, 0);
+  });
+
+  it.each(PROGRAMS)("%s: the equity multiple is what came out over what went in", (program) => {
+    const r = flip(program);
+    expect(Number.isFinite(r.dev_levered_irr)).toBe(true);
+    expect(Number.isFinite(r.dev_profit)).toBe(true);
+    expect(r.dev_equity_multiple).toBeCloseTo(r.dev_equity_out! / r.dev_equity_invested!, 2);
+  });
+
+  it("bill7's grant pays out on the flip the same as it would on a hold", () => {
+    const flipped = flip("bill7");
+    const held = calcSingle({ ...site, program: "bill7" });
+    expect(flipped.dev_post_grant).toBeGreaterThan(0); // post_construct is bill7's default
+    expect(flipped.dev_post_grant).toBe(held.dev_post_grant);
+    expect(flipped.pre_construction_subsidy).toBe(0);
   });
 });
 
