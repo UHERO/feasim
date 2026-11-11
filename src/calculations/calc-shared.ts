@@ -210,7 +210,6 @@ export const TIMING = {
 export const FINANCING = {
   loan_fee: 0.0075,
   construction_rate: 0.08,
-  dev_fee: 0.1,
   contingency: 1.1,
   cost_carried: 0.1,
   equity: 0.1,
@@ -356,8 +355,8 @@ export function mixPostGrant(mix_key: string): number {
 
 // parking
 export const PARKING = {
-  // default stalls per dwelling unit
-  stalls_per_unit: 0.85,
+  // default stalls per dwelling unit (tod fallback)
+  stalls_per_unit: 0.9,
   // gross sqft per stall incl. drive aisles (Ulupono 2020)
   stall_sqft: 330,
   monthly_rent_per_stall: 100,

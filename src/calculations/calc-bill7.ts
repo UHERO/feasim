@@ -111,7 +111,7 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     sliders.permitting_months ?? DEFAULT_PERMITTING_MONTHS;
   const hard_cost_per_sqft = sliders.hard_cost_per_sqft ?? 450;
   // Bill 7 projects are exempt from off-street parking (ROH 32-2.3)
-  const parking_ratio = sliders.parking_ratio ?? 0.5;
+  const parking_ratio = sliders.parking_ratio ?? 0.35;
   const retail_share = sliders.retail_share ?? DEFAULT_RETAIL_SHARE;
   const setback = sliders.setback ?? 10;
   const building_area_per_unit = sliders.building_area_per_unit ?? 800;

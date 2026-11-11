@@ -34,7 +34,7 @@ Physical inputs (lot size, height, zone class) are user sliders in the Project V
 | Permitting, construction, lease-up | 18, 12 and 9 months | The same for every pathway and zone, in the Project View and the package (no longer set by zone) |
 | Operating expense ratio | 30% of EGI |  |
 | Unit mix | Half studio, half one-bedroom | Unit sizes: studio 300, one-bedroom 500, two-bedroom 700 sq ft |
-| Parking | 0.95 stalls per unit | Bill 7 0.5, TOD 0.85. A flat default: it does not follow the unit mix or the § 21-6.20(a) exemption |
+| Parking | 0.95 stalls per unit | Bill 7 0.35, TOD and 201H 0.9 ([Stalled](https://static1.squarespace.com/static/601374ae84e51e430a1829d8/t/68f15c7cbf563d6a7080bf8f/1760648316670/Stalled_FINAL.pdf) (Hawaiʻi Appleseed, 2025), Table 4; Bill 7 also developer interviews). A flat default: it does not follow the unit mix or the § 21-6.20(a) exemption |
 
 ***Note:*** with `parking_ratio` left unset, the model applies the Article 6 minimum (0 on exempt parcels) instead. Only `calcSingle` can do this: `calcParcel` fills an unset lever from `DEFAULT_INPUTS`.
 
@@ -233,7 +233,7 @@ Dropping stalls from the exempt parcels frees ground and podium floors for units
 \text{stalls} = \mathrm{round}\left(j \times \left(r \times \text{units} + \frac{\text{retail sq ft}}{500}\right)\right)
 ```
 
-- **r:** stalls per unit, set by the Parking lever. It defaults to 0.95 (Bill 7 0.5, TOD 0.85). With the lever unset, the model uses the legal minimum: the unit mix's average private dwelling area ÷ 1,000. Common areas and accessory recreation areas are excluded (§ 21-6.20(b)(2)(A)), so the unit sizes alone count: studio 300, one-bedroom 500, two-bedroom 700 sq ft.
+- **r:** stalls per unit, set by the Parking lever. It defaults to 0.95 (Bill 7 0.35, TOD and 201H 0.9). With the lever unset, the model uses the legal minimum: the unit mix's average private dwelling area ÷ 1,000. Common areas and accessory recreation areas are excluded (§ 21-6.20(b)(2)(A)), so the unit sizes alone count: studio 300, one-bedroom 500, two-bedroom 700 sq ft.
 - **j:** 0.9 when housing and retail both need stalls (Table 21-6.2, residential with retail/commercial), else 1.
 - A fraction of 0.5 or more rounds up (§ 21-6.20(b)(1)).
 

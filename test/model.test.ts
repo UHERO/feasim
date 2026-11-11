@@ -1003,9 +1003,9 @@ describe("parking", () => {
   it("defaults to a flat ratio by pathway", () => {
     expect(DEFAULT_INPUTS.bill6.parking_ratio).toBe(0.95);
     expect(DEFAULT_INPUTS.standard.parking_ratio).toBe(0.95);
-    expect(DEFAULT_INPUTS.h201.parking_ratio).toBe(0.95);
-    expect(DEFAULT_INPUTS.bill7.parking_ratio).toBe(0.5);
-    expect(DEFAULT_INPUTS.tod.parking_ratio).toBe(0.85);
+    expect(DEFAULT_INPUTS.h201.parking_ratio).toBe(0.9);
+    expect(DEFAULT_INPUTS.bill7.parking_ratio).toBe(0.35);
+    expect(DEFAULT_INPUTS.tod.parking_ratio).toBe(0.9);
   });
 
   it("defaults every pathway to half studio, half one-bedroom", () => {

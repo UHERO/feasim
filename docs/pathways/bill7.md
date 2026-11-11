@@ -23,7 +23,7 @@ None. Chapter 32's development standards set "Height setbacks: None" (Ord. 19-8)
 
 | Requirement | Bill 7 |
 | --- | --- |
-| Car parking | None required (§ 32-2.3); the Parking lever defaults to 0.5 stalls per unit |
+| Car parking | None required (§ 32-2.3); the Parking lever defaults to 0.35 stalls per unit: rental projects approved ministerially under Bill 7 averaged 0.27 stalls per unit since 2021 ([Stalled](https://static1.squarespace.com/static/601374ae84e51e430a1829d8/t/68f15c7cbf563d6a7080bf8f/1760648316670/Stalled_FINAL.pdf) (Hawaiʻi Appleseed, 2025), Table 4); 0.35 is set from that and developer interviews |
 | Retail parking | None; with ground-floor retail on, the model adds no retail stalls (the Article 6 rate of 1 per 500 sq ft does not apply) |
 | Bicycle parking | None; the § 21-6.40 requirement does not apply (Ord. 19-8) |
 | Loading | None, but loading and garbage storage must be accommodated on site; the model reserves no loading spaces |
@@ -70,7 +70,7 @@ Bill 7 waives several government fees; these waivers apply to the affordable por
 | Affordable / market rent | 80% / 100% AMI |
 | Hard cost | $450 per sq ft |
 | Operating expense ratio | 19% of EGI (GET exemption assumed) |
-| Parking | 0.5 stalls per unit |
+| Parking | 0.35 stalls per unit ([Stalled](https://static1.squarespace.com/static/601374ae84e51e430a1829d8/t/68f15c7cbf563d6a7080bf8f/1760648316670/Stalled_FINAL.pdf) (Hawaiʻi Appleseed, 2025), Table 4; developer interviews) |
 | Park dedication | Exempt |
 | Impact Fees toggle | Exempt |
 | Permanent rate / minimum DSCR | 7.0% / 1.15 |

@@ -161,7 +161,7 @@ describe("gauge: Article 6 parking on real parcels", () => {
     it(`${program}: the default ratio builds stalls on exempt parcels too`, () => {
       for (const parcel of SAMPLE[program]) {
         const r = calcParcel(program, parcel);
-        expect(r.parking_stalls, parcel.tmk).toBe(roundHalfUp(0.95 * r.max_units));
+        expect(r.parking_stalls, parcel.tmk).toBe(roundHalfUp(DEFAULT_INPUTS[program].parking_ratio! * r.max_units));
       }
     });
 
