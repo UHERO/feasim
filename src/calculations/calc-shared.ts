@@ -2768,49 +2768,55 @@ export function getAffordablePrice(
   return price;
 }
 
-// solve for IRR given a cash flow (monthly)
+// solve for IRR given a cash flow (monthly or annual)
 export function solveIRR(cashflows: number[], isMonthly: boolean): number {
   const hasPositive = cashflows.some((cf) => cf > 0);
   const hasNegative = cashflows.some((cf) => cf < 0);
   if (!hasPositive || !hasNegative) return NaN;
 
-  // horner's method for evaluating the polynomial efficiently
+  // only the sign of npv matters for bisection. below 0% the discount factor
+  // exceeds 1 and npv overflows on long holds (20^279 at -95%/month), so take
+  // the future value there instead: same sign, every factor under 1
   const n = cashflows.length;
-  const npv = (r: number) => {
-    const d = 1 / (1 + r);
+  const f = (r: number) => {
     let acc = 0;
-    for (let t = n - 1; t >= 0; t--) acc = acc * d + cashflows[t];
+    if (r < 0) {
+      for (let t = 0; t < n; t++) acc = acc * (1 + r) + cashflows[t];
+    } else {
+      const d = 1 / (1 + r);
+      for (let t = n - 1; t >= 0; t--) acc = acc * d + cashflows[t];
+    }
     return acc;
   };
 
   let lo = -0.95;
   let hi = isMonthly ? 1.0 : 10.0;
+  let fLo = f(lo);
+  const fHi = f(hi);
 
-  let npvLo = npv(lo);
-  let npvHi = npv(hi);
+  if (!Number.isFinite(fLo) || !Number.isFinite(fHi)) return NaN;
+  if (fLo === 0) return annualize(lo, isMonthly);
+  if (fHi === 0) return annualize(hi, isMonthly);
+  if (fLo * fHi > 0) return NaN;
 
-  if (!Number.isFinite(npvLo) || !Number.isFinite(npvHi)) return NaN;
-  if (npvLo * npvHi > 0) return NaN;
-
-  for (let i = 0; i < 200; i++) {
+  for (let i = 0; i < 200 && (hi - lo) / 2 >= 1e-12; i++) {
     const mid = (lo + hi) / 2;
-    const npvMid = npv(mid);
-
-    if (!Number.isFinite(npvMid)) return NaN;
-
-    if (Math.abs(npvMid) < 1e-7 || (hi - lo) / 2 < 1e-10) {
-      return isMonthly ? Math.pow(1 + mid, 12) - 1 : mid;
-    }
-
-    if (npvLo * npvMid < 0) {
+    const fMid = f(mid);
+    if (!Number.isFinite(fMid)) return NaN;
+    if (fMid === 0) return annualize(mid, isMonthly);
+    if (fLo * fMid < 0) {
       hi = mid;
-      npvHi = npvMid;
     } else {
       lo = mid;
-      npvLo = npvMid;
+      fLo = fMid;
     }
   }
-  return NaN;
+  return annualize((lo + hi) / 2, isMonthly);
+}
+
+// a monthly rate as an annual one
+function annualize(r: number, isMonthly: boolean): number {
+  return isMonthly ? Math.pow(1 + r, 12) - 1 : r;
 }
 
 // =========================================================

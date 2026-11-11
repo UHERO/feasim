@@ -80,6 +80,7 @@ import {
   postGrantPerUnit,
   PREVAILING_WAGE,
   setbackFootprint,
+  solveIRR,
   UNIT_SIZE,
 } from "../src/calculations/calc-shared";
 import { calcbill6Single } from "../src/calculations/calc-bill6";
@@ -1315,5 +1316,77 @@ describe("conveyance tax", () => {
   it("charges both on the stabilized sale", () => {
     const r = calcParcel("bill6", { lot_sqft: 20000, zone_class: "BMX-3", height: 150 });
     expect(r.rlv_selling_costs).toBe(Math.round(0.035 * r.gdv + conveyanceTax(r.gdv)));
+  });
+});
+
+describe("solveIRR", () => {
+  // n periods of zeros between one outflow and one inflow
+  const flows = (out: number, n: number, inflow: number) => {
+    const cf = new Array(n + 1).fill(0);
+    cf[0] = -out;
+    cf[n] = inflow;
+    return cf;
+  };
+  const annual = (monthly: number) => Math.pow(1 + monthly, 12) - 1;
+
+  it("solves simple annual flows", () => {
+    expect(solveIRR([-100, 110], false)).toBeCloseTo(0.1, 9);
+    expect(solveIRR([-1000, ...new Array(9).fill(100), 1100], false)).toBeCloseTo(0.1, 9);
+    expect(solveIRR([-100, 50], false)).toBeCloseTo(-0.5, 9);
+  });
+
+  it("annualizes monthly flows", () => {
+    expect(solveIRR(flows(1000, 12, 1000 * 1.01 ** 12), true)).toBeCloseTo(annual(0.01), 9);
+  });
+
+  it("solves a 30-year hold (about 400 months), where the old solver returned NaN", () => {
+    const n = 39 + 30 * 12;
+    expect(solveIRR(flows(1000, n, 1000 * 1.01 ** n), true)).toBeCloseTo(annual(0.01), 9);
+    // a negative rate on a long schedule: the case that overflowed
+    expect(solveIRR(flows(1000, n, 500), true)).toBeCloseTo(annual(0.5 ** (1 / n) - 1), 9);
+  });
+
+  it("handles very long schedules and very large flows", () => {
+    // the 377-acre parcel's schedule: 3,110 months, flows near $5e14
+    const n = 3109;
+    expect(solveIRR(flows(5e14, n, 1e15), true)).toBeCloseTo(annual(2 ** (1 / n) - 1), 9);
+    expect(solveIRR(flows(5e14, n, 2.5e14), true)).toBeCloseTo(annual(0.5 ** (1 / n) - 1), 9);
+  });
+
+  it("ignores leading and trailing zeros that do not move the flows", () => {
+    expect(solveIRR([-100, 110, 0, 0], false)).toBeCloseTo(0.1, 9);
+    expect(solveIRR([0, -100, 110], false)).toBeCloseTo(0.1, 9);
+  });
+
+  it("returns 0 when money comes back unchanged", () => {
+    expect(solveIRR([-100, 100], false)).toBeCloseTo(0, 9);
+    expect(solveIRR(flows(100, 400, 100), true)).toBeCloseTo(0, 9);
+  });
+
+  it("returns NaN without both an outflow and an inflow", () => {
+    expect(solveIRR([], true)).toBeNaN();
+    expect(solveIRR([0, 0, 0], true)).toBeNaN();
+    expect(solveIRR([100, 50], false)).toBeNaN();
+    expect(solveIRR([-100, -50], false)).toBeNaN();
+  });
+
+  it("returns NaN outside the search range (-95% to 100%/month, 1,000%/year)", () => {
+    expect(solveIRR([-1, 1000], false)).toBeNaN();
+    expect(solveIRR([-1, 0.01], false)).toBeNaN();
+    expect(solveIRR([-1, 3], true)).toBeNaN();
+  });
+
+  it("returns a finite IRR for every pathway at every hold length", () => {
+    const parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 150 };
+    for (const program of ["bill6", "standard", "tod", "h201", "bill7"] as const) {
+      let last = Infinity;
+      for (let hold_years = 1; hold_years <= 30; hold_years++) {
+        const irr = calcParcel(program, parcel, { hold_years }).dev_levered_irr!;
+        expect(Number.isFinite(irr), `${program} ${hold_years}y`).toBe(true);
+        // no jump where the old solver gave up (about 17 years)
+        if (hold_years > 1) expect(Math.abs(irr - last), `${program} ${hold_years}y`).toBeLessThan(0.01);
+        last = irr;
+      }
+    }
   });
 });

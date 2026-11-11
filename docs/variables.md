@@ -256,7 +256,7 @@ Levers are user inputs. The default for each pathway is set in `DEFAULT_INPUTS` 
 | `calcPermanentLoan` | Function |  | Permanent loan = min(balance, DSCR max); equity_gap if short; remaining balance at the end of the hold. min_dscr fallback 1.2. |  |  | calc-shared.ts |
 | `calcDevRLV` | Function |  | RLV = (GDV − selling costs − project cost − profit) ÷ (1 + target_return)^(months/12), plus each Bill 7 grant discounted from the month it is paid. |  |  | calc-shared.ts |
 | `calcPropertyTax` / `allocatePropertyTax` | Function |  | Stabilized-year tax; split between residential and retail NOI by EGI. |  |  | calc-shared.ts |
-| `solveIRR` | Function |  | Bisection IRR on monthly or annual cash flows (bounds -95% to 100%/month or 1,000%/year). |  |  | calc-shared.ts |
+| `solveIRR` | Function |  | Bisection IRR on monthly or annual cash flows (bounds -95% to 100%/month or 1,000%/year). Below 0% it tests the sign on future value instead of NPV, so long schedules (20+ year holds, very large parcels) don't overflow. |  |  | calc-shared.ts |
 | `min_dscr` / `permanent_rate` / `hold_years` / `equity` | Lever | 1.20 / 6.75% / 8 / 30% (Bill 7: 1.15 / 7% / 10 / 30%) | Lender assumptions (defaults set after lender interviews). Per-pathway values are on each pathway page under Default assumptions. |  |  | parcels.ts |
 
 ## Hold strategy
