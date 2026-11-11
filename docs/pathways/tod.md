@@ -168,7 +168,7 @@ Table 29-1.4 (see [Standard](bill6.md#affordability)) requires IPD-T, PD-T and T
 | Hard cost | $450 per sq ft |
 | Operating expense ratio | 30% of EGI |
 | Parking | 0.9 stalls per unit ([Stalled](https://static1.squarespace.com/static/601374ae84e51e430a1829d8/t/68f15c7cbf563d6a7080bf8f/1760648316670/Stalled_FINAL.pdf) (Hawaiʻi Appleseed, 2025), Table 4) |
-| Park dedication | In-lieu fee |
+| Park dedication | In-lieu fee, on every unit and on the bonused floor area (see [Park dedication](../simulator-logic.md#park-dedication)) |
 | Impact Fees toggle | Market Units Only |
 | Permanent rate / minimum DSCR | 6.75% / 1.20 |
 | Hold period | 8 years |

@@ -28,7 +28,7 @@ None. Chapter 32's development standards set "Height setbacks: None" (Ord. 19-8)
 | Bicycle parking | None; the § 21-6.40 requirement does not apply (Ord. 19-8) |
 | Loading | None, but loading and garbage storage must be accommodated on site; the model reserves no loading spaces |
 
-With no parking requirement, the 0.5 default is an assumption, not a legal minimum. The only stalls the model builds are these housing stalls, so adding retail adds no parking. Setting the Parking lever to 0 removes the stalls and their costs.
+With no parking requirement, the 0.35 default is an assumption, not a legal minimum. The only stalls the model builds are these housing stalls, so adding retail adds no parking. Setting the Parking lever to 0 removes the stalls and their costs.
 
 ## Affordability
 
@@ -51,7 +51,7 @@ Bill 7 waives several government fees; these waivers apply to the affordable por
 
 **Building permit and plan review fees:** waived in proportion to the affordable share (Ord. 19-8 § 4, adding ROH 18-6.5(i)). The building official waives these fees for "the portion of an affordable rental housing project equal to the percentage of affordable rental housing units." This is a proportional waiver, not a flat one: at an 80/20 split, roughly 80% of the permit and plan-review fees are waived and the remaining ~20% (the market portion) is charged. The model approximates this by charging permit and plan-review fees on the market unit count.
 
-**Park dedication:** affordable units exempt (Ord. 19-8 § 5, amending ROH 22-7.3(j)), and Bill 7 units are fully exempt under ROH 43-10.8. In the model, Bill 7 park dedication defaults to none; choosing the in-lieu fee charges it as the other pathways do, to show what the waiver is worth.
+**Park dedication:** Chapter 32 rentals at or below 100% AMI and HUD's 100% AMI rent limits are exempt (ROH 22-7.3(j)(4), Ord. 19-8 § 5), which covers every Bill 7 unit in the model, and Bill 7 units are fully exempt under ROH 43-10.8. § 22-7.3(j) sunsets on June 30, 2027; the model keeps the exemption. In the model, Bill 7 park dedication defaults to none; choosing the in-lieu fee charges it as the other pathways do, to show what the waiver is worth.
 
 **BWS water charges:** the Impact Fees toggle defaults to Exempt for Bill 7, so the WSFC and new meter charges are waived. If the toggle is set to All, Bill 7 projects pay both charges in full. See [BWS water charges](../simulator-logic.md#bws-water-charges-water-system-facilities-charge-and-new-meter-cost).
 

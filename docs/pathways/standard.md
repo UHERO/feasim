@@ -44,7 +44,7 @@ The model builds no affordable units in this pathway. The Table 29-1.4 requireme
 
 **Wastewater system facility charges:** waived for affordable rental housing units rented to households earning 100 percent and below of the AMI.
 
-**Park dedication:** park land is charged only on units not exempt under § 22-7.3(j); in other words only market units are charged toward the park dedication requirement.
+**Park dedication:** charged on every unit, since this pathway has no affordable units of the kinds § 22-7.3(j) exempts (see [Park dedication](../simulator-logic.md#park-dedication)).
 
 **BWS water charges:** charged on market units under the default Impact Fees toggle (Market Units Only).
 

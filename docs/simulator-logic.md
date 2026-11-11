@@ -356,7 +356,13 @@ Each pathway's default setting and its waivers are listed on its [pathway page](
 
 ### Park dedication
 
-Park land is charged only on units not exempt under § 22-7.3(j); in other words only market units count toward the park dedication requirement. The requirement is the lesser of 110 sq ft per unit and 10% of floor area. The Park Dedication toggle sets how it is paid: in lieu (a $200 application fee plus the land value of the required area at the land cost) or exempt (no cost).
+The requirement is the lesser of 110 sq ft per unit and 10% of the "maximum permitted floor area" (§ 22-7.5). The same rule covers apartment, resort and mixed-use districts (§ 22-7.5(b)(1)), planned developments such as PD-T (§ 22-7.5(b)(2)) and multifamily housing in special district precincts (§ 22-7.5(c)(2)), so it is the same in every pathway. The model applies it to the floor area it builds, bonus floor area included; DPP counts a project's granted floor area, not the base zoning's ([Halewaiolu Senior Residences, 2020/GEN-16](https://hnldoc.ehawaii.gov/hnldoc/document-download?id=8192), Table 5: 5.9 FAR rather than 4.0).
+
+Park land is charged only on units not exempt under § 22-7.3(j). § 22-7.3(j) exempts four kinds of affordable units: (1) Chapter 29 affordable units; (2) affordable units under a PD-T or IPD-T permit (§ 21-9.100-10, -5); (3) affordable rentals under HRS § 201H-36(a)(5); and (4) Chapter 32 rentals at or below 100% AMI, at or below HUD's 100% AMI rent limits. In the model only 201H (units at 80% AMI) and Bill 7 have affordable units; current zoning, pre-Ord. 26-7 and TOD charge every unit.
+
+The Park Dedication toggle sets how it is paid: in lieu (a $200 application fee plus "the value of the land that would otherwise have been required", § 22-7.3(a), at the land cost) or exempt (no cost). DPP values that land at its post-development value, not the assessed value, so a low land cost understates the fee.
+
+***Sunset:*** § 22-7.3(j) is repealed on June 30, 2027 (Ords. 18-1 and 19-8). After that, affordable units owe park dedication unless the Council extends it or the project gets another waiver. The model keeps the exemption.
 
 ### Wastewater system facility charges
 
