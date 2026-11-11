@@ -52,6 +52,7 @@ import {
   RETAIL_PREMIUM,
   sizeConstructionLoan,
   SliderInputs,
+  exitCapRate,
   solveIRR,
   stepBackOf,
   VACANCY,
@@ -491,7 +492,7 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
       perm_loan_balance === 0 ? null : perm.is_bankable;
 
     const entry_cap = cap_rate;
-    const exit_cap = entry_cap + HOLD.exit_cap_spread;
+    const exit_cap = exitCapRate(entry_cap, hold_years);
 
     const hold_months = hold_years * 12;
     const total_with_hold = total_months + hold_months;

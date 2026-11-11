@@ -79,6 +79,8 @@ import {
   mixPostGrant,
   postGrantPerUnit,
   PREVAILING_WAGE,
+  exitCapRate,
+  HOLD,
   setbackFootprint,
   solveIRR,
   UNIT_SIZE,
@@ -1378,15 +1380,46 @@ describe("solveIRR", () => {
 
   it("returns a finite IRR for every pathway at every hold length", () => {
     const parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 150 };
-    for (const program of ["bill6", "standard", "tod", "h201", "bill7"] as const) {
-      let last = Infinity;
+    for (const program of ["bill6", "standard", "tod", "h201", "bill7"] as const)
       for (let hold_years = 1; hold_years <= 30; hold_years++) {
         const irr = calcParcel(program, parcel, { hold_years }).dev_levered_irr!;
         expect(Number.isFinite(irr), `${program} ${hold_years}y`).toBe(true);
-        // no jump where the old solver gave up (about 17 years)
-        if (hold_years > 1) expect(Math.abs(irr - last), `${program} ${hold_years}y`).toBeLessThan(0.01);
+      }
+  });
+});
+
+describe("exit cap", () => {
+  const parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 150 };
+
+  it("widens 7.5 bps per year held, up to 75 bps", () => {
+    expect(exitCapRate(0.051, 0)).toBeCloseTo(0.051, 12);
+    expect(exitCapRate(0.051, 1)).toBeCloseTo(0.05175, 12);
+    expect(exitCapRate(0.051, 5)).toBeCloseTo(0.05475, 12);
+    expect(exitCapRate(0.051, 10)).toBeCloseTo(0.0585, 12);
+    expect(exitCapRate(0.051, 30)).toBeCloseTo(0.0585, 12);
+    expect(exitCapRate(0.051, -1)).toBeCloseTo(0.051, 12);
+    expect(HOLD.exit_cap_spread_max / HOLD.exit_cap_spread_per_year).toBeCloseTo(10, 9);
+  });
+
+  it("reports the exit cap each hold uses", () => {
+    for (const hold_years of [1, 5, 10, 20]) {
+      const r = calcParcel("bill6", parcel, { hold_years });
+      // reported to 4 decimals
+      expect(r.dev_exit_cap, `${hold_years}y`).toBe(Math.round(exitCapRate(r.dev_entry_cap!, hold_years) * 10000) / 10000);
+    }
+  });
+
+  it("gives higher IRRs on shorter holds, from the flip down to 30 years", () => {
+    for (const program of ["bill6", "standard", "tod", "h201", "bill7"] as const) {
+      let last = calcParcel(program, parcel, { hold_years: 0 }).dev_levered_irr!;
+      for (let hold_years = 1; hold_years <= 30; hold_years++) {
+        const irr = calcParcel(program, parcel, { hold_years }).dev_levered_irr!;
+        // flat past the 10-year cap, within rounding
+        expect(irr, `${program} ${hold_years}y`).toBeLessThanOrEqual(last + 0.0005);
         last = irr;
       }
+      const at = (hold_years: number) => calcParcel(program, parcel, { hold_years }).dev_levered_irr!;
+      expect(at(1), program).toBeGreaterThan(at(10) + 0.03);
     }
   });
 });

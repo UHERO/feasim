@@ -9,6 +9,7 @@ export * from "./calculations";
 // constants and helpers the gauge and calculator use directly
 export {
   DEFAULT_TARGET_RETURN,
+  exitCapRate,
   GRANT,
   zoneName,
   type SoftCostBreakdown,

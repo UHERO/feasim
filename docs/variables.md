@@ -267,7 +267,8 @@ Levers are user inputs. The default for each pathway is set in `DEFAULT_INPUTS` 
 | `annual_rent_growth` | Constant | 0.04 | Hold-period rent growth for all units: affordable caps track AMI (4%/yr) and market rents grew 3.6–4.3%/yr. Also grows the forward NOI at exit. |  | Yearly | calc-shared.ts |
 | `annual_opex_growth` | Constant | 0.035 | Operating expenses grow on their own series, not as a fixed share of EGI. |  | Yearly | calc-shared.ts |
 | `annual_assessment_growth` | Constant | 0.02 | Property-tax assessment escalation. |  | Yearly | calc-shared.ts |
-| `exit_cap_spread` | Constant | 0.005 | Exit cap = entry cap + 50 bps. |  |  | calc-shared.ts |
+| `exit_cap_spread_per_year` / `exit_cap_spread_max` | Constant | 0.00075 / 0.0075 | Exit cap = entry cap + 7.5 bps per year held, up to 75 bps (reached at 10 years). Replaces a flat 50 bps, which priced a 1-year hold like a 10-year one. CBRE puts the typical going-in to exit spread at 50 to 60 bps. | [CBRE Q4 2025 Multifamily Underwriting Survey](https://cbre.com/insights/briefs/core-multifamily-buyer-sentiment-improves-in-q4-2025); [Wang, Grissom & Chan (1990)](https://ideas.repec.org/a/jre/issued/v5n21990p231-246.html) | Yearly | calc-shared.ts |
+| `exitCapRate` | Function |  | Entry cap plus the hold's spread (`exit_cap_spread_per_year` × hold years, capped at `exit_cap_spread_max`). |  |  | calc-shared.ts |
 | `tax_exemption_years` | Constant | 15 | Improvements exempt from property tax for 15 years: Bill 7 (when affordable AMI <= 80%) and TOD. Land is still taxed. | ROH 32 | 5 Years | calc-shared.ts |
 
 ## Cap rates

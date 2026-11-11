@@ -607,7 +607,12 @@ Debt service uses a 30-year amortization at a 6.75% permanent rate, both user in
 
 **Entry cap:** The market cap rate (default 5.1% for every zone) values the building at stabilization. It anchors gross development value and the return-on-cost benchmark.
 
-**Exit cap:** The exit cap values the building at sale after the hold period: the entry cap plus 50 basis points. A buyer further out from stabilization is pricing an older asset in a less certain market and demands a higher yield than a buyer of a new building.
+**Exit cap:** The exit cap values the building at sale after the hold period: the entry cap plus 7.5 basis points for each year held, up to 75 basis points at 10 years (`exitCapRate`). At the 5.1% default, a 1-year hold sells at 5.175%, a 5-year hold at 5.475%, and a hold of 10 years or more at 5.85%. A flip sells at the entry cap.
+
+- **Why it widens:** the further out the sale, the more market risk the buyer prices in. Investors surveyed by CBRE expect exit caps above going-in caps, at "a more typical level of between 50 and 60 bps" ([CBRE Q4 2025 Multifamily Underwriting Survey](https://cbre.com/insights/briefs/core-multifamily-buyer-sentiment-improves-in-q4-2025); the spread was 20 bps for core assets in Q4 2025).
+- **Why it grows with the hold:** a fixed spread charges a 1-year hold as much as a 10-year one, which wiped out most of a short hold's development profit (a 1-year hold earned 14% against the flip's 26%). The traditional ½ to 1 point rule of thumb has no theory behind it, and the exit cap should be chosen consistently with the hold's income growth ([Wang, Grissom & Chan, 1990](https://ideas.repec.org/a/jre/issued/v5n21990p231-246.html)). With the spread tied to the years held, IRR falls steadily from the flip to longer holds.
+- **Not aging:** building age shows up mostly in income, not the cap rate. Bokhari and Geltner find depreciation of 1.5% a year, 92% of it from falling real income and "only 0.17%/year" from cap rate creep ([Bokhari & Geltner, 2018](https://dspace.mit.edu/handle/1721.1/120153)). The model's NOI grows at full market rent growth with no age drag, so long holds are, if anything, generous.
+- **Market cycles:** not modeled; the spread is the same in every year. Test a cycle by changing the Cap Rate lever.
 
 ### Cash flow by developer strategy
 

@@ -267,9 +267,21 @@ export const HOLD = {
   annual_opex_growth: 0.035,
   // 2%/yr is the property-tax escalation
   annual_assessment_growth: 0.02,
-  exit_cap_spread: 0.005,
+  // exit cap widens 7.5 bps per year held, up to 75 bps (cbre's typical
+  // going-in to exit spread is 50-60 bps)
+  exit_cap_spread_per_year: 0.00075,
+  exit_cap_spread_max: 0.0075,
   tax_exemption_years: 15,
 };
+
+/** cap rate at sale after a hold: the entry cap plus the spread for the years held */
+export function exitCapRate(entry_cap: number, hold_years: number): number {
+  const spread = Math.min(
+    HOLD.exit_cap_spread_max,
+    HOLD.exit_cap_spread_per_year * Math.max(0, hold_years)
+  );
+  return entry_cap + spread;
+}
 
 // market cap rate, the same for every zone
 export const DEFAULT_CAP_RATE = 0.051;
