@@ -119,9 +119,8 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   const building_area_per_unit = sliders.building_area_per_unit ?? 800;
   const max_far = sliders.max_far ?? 4.0;
   const waivable_fee_basis = sliders.waivable_fee_basis ?? "none";
-  // Bill 7 waives park dedication (ROH 43-10.8), so by default it costs
-  // nothing. Choosing the in-lieu fee charges it as the other pathways do, to
-  // show what the waiver is worth.
+  // bill 7 waives park dedication (roh 43-10.8), so exempt costs nothing.
+  // in_lieu charges market units, as in every pathway
   const park = sliders.park === "in_lieu" ? "in_lieu" : "none";
   // bill 7's own 80% lot-coverage cap (ROH Chp 32); overridable for testing
   const coverage = sliders.coverage ?? 0.8;
@@ -243,8 +242,8 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
         ? 3
         : 5,
     park,
-    // Park land is charged on market units only; §22-7.3(j)(1) exempts
-    // affordable units, same rule as the other pathways.
+    // park land is charged on market units only; affordable units are exempt
+    // under § 22-7.3(j)(4), the same rule as the other pathways
     park_area:
       park === "in_lieu"
         ? calcParkArea(max_units - affordable_units, buildable_sqft)

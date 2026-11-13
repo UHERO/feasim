@@ -64,6 +64,7 @@ import {
   parcelInputs,
   pathwayEnvelope,
   type Parcel,
+  type ParcelOutput,
   type ProgramId,
   type SliderInputs,
   calcParkingIncome,
@@ -75,6 +76,7 @@ import {
   zoneStepBack,
 } from "../src";
 import {
+  calcParkArea,
   calcSoftCosts,
   mixPostGrant,
   postGrantPerUnit,
@@ -1467,5 +1469,30 @@ describe("aging drag", () => {
     (HOLD as { age_rent_drag: number }).age_rent_drag = saved;
     expect(a.dev_levered_irr).toBe(b.dev_levered_irr);
     expect(a.rlv).toBe(b.rlv);
+  });
+});
+
+describe("park dedication toggle", () => {
+  const site = { lot_sqft: 20000, zone_class: "BMX-3", height: 60 };
+  const fee = (r: ParcelOutput) => r.soft_cost_breakdown!.park_dedication;
+  // $200 application fee plus the park land at the land cost ($130/sq ft by default)
+  const inLieu = (r: ParcelOutput) =>
+    200 + calcParkArea(r.max_units - r.affordable_units, r.buildable_sqft) * 130;
+
+  it("charges nothing when exempt, Bill 7's default", () => {
+    expect(fee(calcParcel("bill7", site))).toBe(0);
+    for (const program of PROGRAMS)
+      expect(fee(calcParcel(program, site, { park: "exempt" })), program).toBe(0);
+  });
+
+  it("charges market units only in lieu, in every pathway", () => {
+    for (const program of PROGRAMS) {
+      const r = calcParcel(program, site, { park: "in_lieu" });
+      expect(fee(r), program).toBeCloseTo(inLieu(r), 2);
+    }
+    // bill 7 has affordable units, so its fee is below the all-units figure
+    const b7 = calcParcel("bill7", site, { park: "in_lieu" });
+    expect(b7.affordable_units).toBeGreaterThan(0);
+    expect(fee(b7)).toBeLessThan(200 + calcParkArea(b7.max_units, b7.buildable_sqft) * 130);
   });
 });

@@ -51,7 +51,7 @@ Bill 7 waives several government fees; these waivers apply to the affordable por
 
 **Building permit and plan review fees:** waived in proportion to the affordable share (Ord. 19-8 § 4, adding ROH 18-6.5(i)). The building official waives these fees for "the portion of an affordable rental housing project equal to the percentage of affordable rental housing units." This is a proportional waiver, not a flat one: at an 80/20 split, roughly 80% of the permit and plan-review fees are waived and the remaining ~20% (the market portion) is charged. The model approximates this by charging permit and plan-review fees on the market unit count.
 
-**Park dedication:** Chapter 32 rentals at or below 100% AMI and HUD's 100% AMI rent limits are exempt (ROH 22-7.3(j)(4), Ord. 19-8 § 5), which covers every Bill 7 unit in the model, and Bill 7 units are fully exempt under ROH 43-10.8. § 22-7.3(j) sunsets on June 30, 2027; the model keeps the exemption. In the model, Bill 7 park dedication defaults to none; choosing the in-lieu fee charges it as the other pathways do, to show what the waiver is worth.
+**Park dedication:** Chapter 32 rentals at or below 100% AMI and HUD's 100% AMI rent limits are exempt (ROH 22-7.3(j)(4), Ord. 19-8 § 5), which covers every Bill 7 unit in the model, and Bill 7 units are fully exempt under ROH 43-10.8. § 22-7.3(j) sunsets on June 30, 2027; the model keeps the exemption. The Park Dedication toggle works as in every pathway: **Exempt** (the default) charges nothing, and **In-lieu** charges the in-lieu fee on market units, the 20% at the market rent.
 
 **BWS water charges:** the Impact Fees toggle defaults to Exempt for Bill 7, so the WSFC and new meter charges are waived. If the toggle is set to All, Bill 7 projects pay both charges in full. See [BWS water charges](../simulator-logic.md#bws-water-charges-water-system-facilities-charge-and-new-meter-cost).
 
@@ -71,7 +71,7 @@ Bill 7 waives several government fees; these waivers apply to the affordable por
 | Hard cost | $450 per sq ft |
 | Operating expense ratio | 19% of EGI (GET exemption assumed) |
 | Parking | 0.35 stalls per unit ([Stalled](https://static1.squarespace.com/static/601374ae84e51e430a1829d8/t/68f15c7cbf563d6a7080bf8f/1760648316670/Stalled_FINAL.pdf) (Hawaiʻi Appleseed, 2025), Table 4; developer interviews) |
-| Park dedication | Exempt |
+| Park dedication | Exempt (no charge) |
 | Impact Fees toggle | Exempt |
 | Permanent rate / minimum DSCR | 7.0% / 1.15 |
 | Hold period | 10 years |

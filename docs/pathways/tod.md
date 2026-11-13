@@ -156,6 +156,8 @@ Table 29-1.4 (see [Standard](bill6.md#affordability)) requires IPD-T, PD-T and T
 
 **Building permit, plan review and BWS water charges:** charged on market units under the default Impact Fees toggle (Market Units Only).
 
+**Park dedication:** charged on every unit. § 22-7.3(j)(2) exempts affordable units under a PD-T or IPD-T permit, but the TOD pathway has no affordable units for now: its affordable requirement applies to for-sale units, and for-sale units are not modeled (see [Affordability](#affordability)). So no park dedication exemption applies for now.
+
 **Property tax:** improvements are exempt from real property tax for 15 years (land-only tax).
 
 ## Default assumptions
