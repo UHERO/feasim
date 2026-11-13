@@ -16,10 +16,14 @@
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
       }
-    }
+    },
+    "./test-data/calculator-defaults.json": "./test/data/calculator-defaults.json",
+    "./test-data/gauge-parcels.json": "./test/data/gauge-parcels.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "test/data/calculator-defaults.json",
+    "test/data/gauge-parcels.json"
   ],
   "publishConfig": {
     "access": "public"
