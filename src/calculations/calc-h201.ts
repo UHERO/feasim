@@ -58,6 +58,7 @@ import {
   VACANCY,
   zeroOutput,
   zoneStepBack,
+  holdEgi,
   sellingCosts,
 } from "./calc-shared";
 
@@ -307,6 +308,9 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
   const residential_egi = pgi - vacancy_loss;
   const retail_egi = retail_pgi - retail_vacancy_loss;
   const egi = residential_egi + retail_egi;
+  // affordable rent income, which grows with ami in a hold
+  const affordable_egi =
+    pgi > 0 ? residential_egi * ((affordable_rent * afd_rent_units * 12) / pgi) : 0;
 
   // 8/26/26, for-sale units are discarded, 100% rental
   const afd_sales = 0;
@@ -516,7 +520,7 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
 
     for (let yr = 1; yr <= hold_years; yr++) {
       if (yr > 1) {
-        current_egi *= 1 + HOLD.annual_rent_growth;
+        current_egi = holdEgi(egi, affordable_egi, yr - 1);
         // expenses run on their own inflation series, not as a fixed share of EGI
         current_opex *= 1 + HOLD.annual_opex_growth;
         assessed_value *= 1 + HOLD.annual_assessment_growth;
@@ -532,7 +536,10 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
       }
 
       if (yr === hold_years) {
-        const forward_noi = current_noi * (1 + HOLD.annual_rent_growth);
+        // next year's noi, at next year's egi growth
+        const forward_noi =
+          current_noi *
+          (holdEgi(egi, affordable_egi, yr) / holdEgi(egi, affordable_egi, yr - 1));
         const gross_sale = forward_noi / exit_cap;
         stored_selling_costs = sellingCosts(gross_sale);
         const net_reversion =

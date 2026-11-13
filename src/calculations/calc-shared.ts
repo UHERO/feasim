@@ -265,6 +265,10 @@ export const HOLD = {
   annual_rent_growth: 0.04,
   // operating expenses trend on their own series rather than as a fixed share of EGI
   annual_opex_growth: 0.035,
+  // a building's market rents fall behind new buildings' as it ages: 1%/yr
+  // off rent growth is a 1.4-1.5%/yr noi decline (egi is ~1.45x noi), near
+  // bokhari & geltner's 1.38%/yr. affordable rents follow ami, not age
+  age_rent_drag: 0.01,
   // 2%/yr is the property-tax escalation
   annual_assessment_growth: 0.02,
   // exit cap widens 7.5 bps per year held, up to 75 bps (cbre's typical
@@ -273,6 +277,16 @@ export const HOLD = {
   exit_cap_spread_max: 0.0075,
   tax_exemption_years: 15,
 };
+
+/** egi in a hold year (0 = the stabilized year): affordable rent grows with
+ *  ami; market rent, parking and retail grow at rent growth less the age drag */
+export function holdEgi(egi: number, affordable_egi: number, years: number): number {
+  const afd = Math.min(Math.max(0, affordable_egi), egi);
+  return (
+    afd * (1 + HOLD.annual_rent_growth) ** years +
+    (egi - afd) * (1 + HOLD.annual_rent_growth - HOLD.age_rent_drag) ** years
+  );
+}
 
 /** cap rate at sale after a hold: the entry cap plus the spread for the years held */
 export function exitCapRate(entry_cap: number, hold_years: number): number {

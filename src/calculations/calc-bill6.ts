@@ -59,6 +59,7 @@ import {
   VACANCY,
   zeroOutput,
   zoneStepBack,
+  holdEgi,
   sellingCosts,
 } from "./calc-shared";
 
@@ -264,8 +265,11 @@ function bill6Rental(
   const residential_egi = pgi - vacancy_loss;
   const retail_egi = retail_pgi - retail_vacancy_loss;
   const egi = residential_egi + retail_egi;
+  // affordable rent income, which grows with ami in a hold
+  const affordable_egi =
+    pgi > 0 ? residential_egi * ((affordable_rent * afd_rent_units * 12) / pgi) : 0;
 
-  return { pri, pgi, egi, retail_pgi, retail_egi, residential_egi };
+  return { pri, pgi, egi, retail_pgi, retail_egi, residential_egi, affordable_egi };
 }
 
 // =========================================================
@@ -461,7 +465,8 @@ function bill6Hold(
   amort_years: number,
   min_dscr: number,
   cap_rate: number,
-  gross_sales: number
+  gross_sales: number,
+  affordable_egi: number
 ): Partial<ParcelOutput> {
   const land_cost = land_cost_sqft * lot_sqft;
   const land_value = land_cost;
@@ -523,7 +528,7 @@ function bill6Hold(
 
   for (let yr = 1; yr <= hold_years; yr++) {
     if (yr > 1) {
-      current_egi *= 1 + HOLD.annual_rent_growth;
+      current_egi = holdEgi(egi, affordable_egi, yr - 1);
       // expenses run on their own inflation series, not as a fixed share of EGI
       current_opex *= 1 + HOLD.annual_opex_growth;
       assessed_value *= 1 + HOLD.annual_assessment_growth;
@@ -538,7 +543,10 @@ function bill6Hold(
     }
 
     if (yr === hold_years) {
-      const forward_noi = current_noi * (1 + HOLD.annual_rent_growth);
+      // next year's noi, at next year's egi growth
+      const forward_noi =
+        current_noi *
+        (holdEgi(egi, affordable_egi, yr) / holdEgi(egi, affordable_egi, yr - 1));
       const gross_sale = forward_noi / exit_cap;
       stored_selling_costs = sellingCosts(gross_sale);
       const net_reversion =
@@ -850,7 +858,8 @@ export function calcbill6Single(sliders: SliderInputs): ParcelOutput {
           amort_years,
           min_dscr,
           noi_result.cap_rate,
-          sale.gross_sales
+          sale.gross_sales,
+          rev.affordable_egi
         );
 
   const _roc = dev.dev_roc ?? 0;

@@ -81,6 +81,7 @@ import {
   PREVAILING_WAGE,
   exitCapRate,
   HOLD,
+  holdEgi,
   setbackFootprint,
   solveIRR,
   UNIT_SIZE,
@@ -1421,5 +1422,50 @@ describe("exit cap", () => {
       const at = (hold_years: number) => calcParcel(program, parcel, { hold_years }).dev_levered_irr!;
       expect(at(1), program).toBeGreaterThan(at(10) + 0.03);
     }
+  });
+});
+
+describe("aging drag", () => {
+  const g = HOLD.annual_rent_growth;
+  const d = HOLD.age_rent_drag;
+
+  it("grows affordable rent with ami and the rest at rent growth less the drag", () => {
+    expect(holdEgi(100, 0, 0)).toBeCloseTo(100, 9);
+    expect(holdEgi(100, 0, 10)).toBeCloseTo(100 * (1 + g - d) ** 10, 9);
+    expect(holdEgi(100, 100, 10)).toBeCloseTo(100 * (1 + g) ** 10, 9);
+    expect(holdEgi(100, 60, 10)).toBeCloseTo(60 * (1 + g) ** 10 + 40 * (1 + g - d) ** 10, 9);
+    // an affordable share outside 0 to egi is clamped
+    expect(holdEgi(100, 150, 10)).toBeCloseTo(100 * (1 + g) ** 10, 9);
+    expect(holdEgi(100, -5, 10)).toBeCloseTo(100 * (1 + g - d) ** 10, 9);
+  });
+
+  it("lowers long-hold IRRs, and lowers them least where most units are affordable", () => {
+    const parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 60 };
+    const cut = (program: ProgramId) => {
+      const saved = HOLD.age_rent_drag;
+      const irr = () => calcParcel(program, parcel, { hold_years: 20 }).dev_levered_irr!;
+      const withDrag = irr();
+      (HOLD as { age_rent_drag: number }).age_rent_drag = 0;
+      const without = irr();
+      (HOLD as { age_rent_drag: number }).age_rent_drag = saved;
+      return without - withDrag;
+    };
+    const bill6 = cut("bill6");
+    const bill7 = cut("bill7");
+    expect(bill6).toBeGreaterThan(0.01);
+    expect(bill7).toBeGreaterThan(0);
+    expect(bill7).toBeLessThan(bill6);
+  });
+
+  it("leaves the flip alone", () => {
+    const parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 150 };
+    const flip = () => calcParcel("bill6", parcel, { hold_years: 0 });
+    const saved = HOLD.age_rent_drag;
+    const a = flip();
+    (HOLD as { age_rent_drag: number }).age_rent_drag = 0;
+    const b = flip();
+    (HOLD as { age_rent_drag: number }).age_rent_drag = saved;
+    expect(a.dev_levered_irr).toBe(b.dev_levered_irr);
+    expect(a.rlv).toBe(b.rlv);
   });
 });

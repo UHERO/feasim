@@ -611,7 +611,7 @@ Debt service uses a 30-year amortization at a 6.75% permanent rate, both user in
 
 - **Why it widens:** the further out the sale, the more market risk the buyer prices in. Investors surveyed by CBRE expect exit caps above going-in caps, at "a more typical level of between 50 and 60 bps" ([CBRE Q4 2025 Multifamily Underwriting Survey](https://cbre.com/insights/briefs/core-multifamily-buyer-sentiment-improves-in-q4-2025); the spread was 20 bps for core assets in Q4 2025).
 - **Why it grows with the hold:** a fixed spread charges a 1-year hold as much as a 10-year one, which wiped out most of a short hold's development profit (a 1-year hold earned 14% against the flip's 26%). The traditional ½ to 1 point rule of thumb has no theory behind it, and the exit cap should be chosen consistently with the hold's income growth ([Wang, Grissom & Chan, 1990](https://ideas.repec.org/a/jre/issued/v5n21990p231-246.html)). With the spread tied to the years held, IRR falls steadily from the flip to longer holds.
-- **Not aging:** building age shows up mostly in income, not the cap rate. Bokhari and Geltner find depreciation of 1.5% a year, 92% of it from falling real income and "only 0.17%/year" from cap rate creep ([Bokhari & Geltner, 2018](https://dspace.mit.edu/handle/1721.1/120153)). The model's NOI grows at full market rent growth with no age drag, so long holds are, if anything, generous.
+- **Not aging:** building age shows up mostly in income, not the cap rate. Bokhari and Geltner find depreciation of 1.5% a year, 92% of it from falling real income and "only 0.17%/year" from cap rate creep ([Bokhari & Geltner, 2018](https://dspace.mit.edu/handle/1721.1/120153)). The model puts aging in income instead (see [Aging](#aging)).
 - **Market cycles:** not modeled; the spread is the same in every year. Test a cycle by changing the Cap Rate lever.
 
 ### Cash flow by developer strategy
@@ -624,8 +624,8 @@ Debt service uses a 30-year amortization at a 6.75% permanent rate, both user in
 
 **Hold:** The developer holds the building for the hold period, then sells:
 
-- **Each year:** NOI minus permanent debt service. Rents grow 4% a year, affordable and market alike (see [Rent growth](#rent-growth)), operating expenses 3.5%, and assessed value 2%. The 3.5% and 2% are the expense and property tax escalation rates California's TCAC requires in the 15-year cash flow every LIHTC applicant files (4 CCR § 10327(g)(1)); operating expenses follow their own series rather than a fixed share of EGI.
-- **At exit:** the next year's NOI ÷ exit cap, less the selling costs on that price and the remaining loan balance.
+- **Each year:** NOI minus permanent debt service. Affordable rents grow 4% a year and market rents, parking and retail 3% (4% less the [aging](#aging) drag; see [Rent growth](#rent-growth)), operating expenses 3.5%, and assessed value 2%. The 3.5% and 2% are the expense and property tax escalation rates California's TCAC requires in the 15-year cash flow every LIHTC applicant files (4 CCR § 10327(g)(1)); operating expenses follow their own series rather than a fixed share of EGI.
+- **At exit:** the next year's NOI ÷ exit cap (NOI grown at next year's income growth), less the selling costs on that price and the remaining loan balance.
 - **Property tax exemptions:** a pathway with a 15-year improvement exemption pays tax on land only for those years (see Property Tax).
 
 ## Revenue
@@ -658,6 +658,15 @@ Each pathway sets its affordable share of units, listed in the Affordability sec
 Affordable and market rents both grow 4% a year: Honolulu's HUD income limits, which set the affordable rent caps, grew 4.4% a year from 2015 to 2026, and market rents grew 3.6% to 4.3% a year. The constants are `FINANCING.ami_escalation` (to lease-up) and `HOLD.annual_rent_growth` (over the hold) in `src/calculations/calc-shared.ts`.
 
 Bill 7's affordable rent cap is tied to HUD's current limits, so it rises every year (see [Bill 7](pathways/bill7.md#affordability)).
+
+#### Aging
+
+Over the hold, a building's market rents fall behind those of new buildings. Market rent, parking and retail income grow 1% a year slower than rent growth, so 3% instead of 4% (`HOLD.age_rent_drag`, applied in `holdEgi`). Affordable rents keep the full 4%: they are set by HUD's limits, which bind whatever the building's age.
+
+- **Source:** Bokhari and Geltner find real depreciation of 1.5% a year across 107,805 US sales, from 1.82% a year for new buildings to 1.12% at 50 years, with apartments slightly faster. 92% of it, 1.38% a year, is "decline in current real income", and only 0.17% a year is cap rate creep. They conclude that pro formas growing cash flow at a standard 3% are "substantially biased on the high side, especially for newer buildings" ([Bokhari & Geltner, 2018](https://dspace.mit.edu/handle/1721.1/120153)).
+- **Why 1% of rent:** their 1.38% is a decline in NOI. Operating expenses and property tax grow on their own series, so a 1% drag on rent takes NOI growth down by 1.4% to 1.5% a year (EGI is about 1.45 times NOI).
+- **Oʻahu:** they also find less depreciation where land is physically scarce, so 1% may be on the high side for Oʻahu.
+- **Effect:** on a 20,000 sq ft BMX-3 lot under current zoning, levered IRR at a 20-year hold falls from 13.0% to 10.8%, and at a 1-year hold from 20.6% to 19.8%. Bill 7 moves least (0.5 points or less), since 80% of its units are affordable.
 
 **Affordable rents follow HUD income limits:** Honolulu's median family income grew 4.05% a year from 2015 ($86,900) to 2025 ($129,300), and the income limits that set rent caps grew 4.4% a year from 2015 to 2026. The 2026 increase of 1.3% followed a 9.2% year. HUD caps any single year's increase at 10%, and the limits used for these projects don't fall. Since 2020, growth has averaged 3.4% a year.
 
