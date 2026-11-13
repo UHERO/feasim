@@ -244,3 +244,17 @@ calcSingle({
 | `todIneligibleReason(parcel)`, `todNotApplicableReason(parcel, tier)` | Why a lot can't use a TOD permit, or can't have housing at a tier |
 
 The package also exports the rules behind the model, such as the zoning FAR tables, the TOD rules, the parking and loading requirements, and the water charges, for use in your own calculations. Their TypeScript types document each one.
+
+### Test fixture
+
+The package also ships two fixtures, so that apps built on the model can test against the same cases at whatever version they have installed:
+
+- `test/data/calculator-defaults.json`: the calculator's default inputs for each pathway.
+- `test/data/gauge-parcels.json`: 287 sample Oahu parcels (the smallest, median and largest lot in each zone) for each pathway.
+
+```ts
+import defaults from "@uhero/feasim/test-data/calculator-defaults.json" with { type: "json" };
+import parcels from "@uhero/feasim/test-data/gauge-parcels.json" with { type: "json" };
+```
+
+They are for tests only. Its contents change whenever the model's defaults change, and renaming or removing it is a breaking change.
