@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/UHERO/feasim/compare/v0.3.0...v0.4.0) (2026-11-13)
+
+
+### Features
+
+* ship calculator and gauge test fixtures in the package ([d5b4087](https://github.com/UHERO/feasim/commit/d5b4087b78255f06d2a8f86591eb9b73520adf1f))
+* ship calculator and gauge test fixtures in the package ([14f9ce6](https://github.com/UHERO/feasim/commit/14f9ce645fc9e0d7549cfde19edccb4a60b91a3e))
+
 ## [0.3.0](https://github.com/UHERO/feasim/compare/v0.2.1...v0.3.0) (2026-11-06)
 
 
