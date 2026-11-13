@@ -50,6 +50,7 @@ Levers are user inputs. The default for each pathway is set in `DEFAULT_INPUTS` 
 | `park` | Lever | in_lieu (Bill 7: exempt) | Park dedication: "exempt" or "in_lieu" (fee + fair market value of the park land, on units not exempt under § 22-7.3(j)). The same in every pathway: "in_lieu" charges market units. Bill 7 defaults to "exempt", which charges nothing (ROH 43-10.8). | ROH 22-7.7; ROH 43-10.8 |  | parcels.ts |
 | `floor_height` | Lever | 10 | Floor-to-floor height, ft. Floors = floor(height_limit ÷ floor_height). |  |  | parcels.ts |
 | `grant_type` | Lever | post_construct | Bill 7 only: "none", "pre_construct" ($50,000 per unit, paid evenly over the construction months) or "post_construct" ($12,000 per affordable unit, paid when construction ends). The amount comes from `grant_amount` or `GRANT`. | ROH chp 32 article 4 & 5 |  | parcels.ts |
+| `open_space_bonus_mode` | Lever | auto | Whether B-2, BMX-3 and BMX-4 projects take the § 21-3.120-2(c) open-space bonus: "auto" keeps the better of with and without (higher RLV, or the bigger building where neither pencils), "on" always takes it, "off" never does. Ignored where no bonus is offered (other zones, Bill 7). With "off", an overridden `max_far` is the FAR built, with no plaza set aside. | ROH 21-3.120-2(c) |  | calc-shared.ts |
 | `retail_rent` | Lever | 5 (Bill 7: 3) | Ground-floor retail rent, $/sq ft/month; developer interviews indicate Hawaiʻi retail runs $3–12/sq ft/month. Only used when `include_retail` is true and the zone permits ground-floor commercial. |  |  | parcels.ts |
 
 ## Zones

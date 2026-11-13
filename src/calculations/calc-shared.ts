@@ -1632,24 +1632,16 @@ export interface SliderInputs {
   target_return?: number;
   profit_margin?: number;
   affordable_ami?: string;
-  /** § 21-3.120-2(b) open-space FAR bonus on offer, in FAR, included in
-   *  max_far. It costs lot_sqft/5 of ground per 1.0 FAR, so it is both an
-   *  uplift and a land cost; calcSingle takes it only if it raises the
-   *  residual land value. */
   open_space_bonus?: number;
-  /** FAR without the open-space bonus, for that comparison. Defaults to
-   *  max_far - open_space_bonus. */
   far_without_bonus?: number;
+  open_space_bonus_mode?: OpenSpaceBonusMode;
   market_ami?: string;
   construction_rate?: number;
   equity?: number;
   grant_type?: "none" | "pre_construct" | "post_construct";
   grant_amount?: number;
-  // units the pre-construction subsidy pays on (ROH 32-5.2(c)(2): "each unit")
   grant_units?: "all" | "affordable";
-  // pre-construction only: premium on on-site labor
   prevailing_wage_premium?: number;
-  // on-site labor share of hard cost
   onsite_labor_share?: number;
   land_cost?: number;
   permanent_rate?: number;
@@ -1659,19 +1651,13 @@ export interface SliderInputs {
   min_dscr?: number;
   include_retail?: boolean;
   retail_rent?: number;
-  // ground-floor retail as a share of the floor plate
   retail_share?: number;
-  // parking stalls per dwelling unit
   parking_ratio?: number;
-  // § 21-6.20(a): no off-street parking required (Primary Urban Center and
-  // Ewa plan areas, within 0.5 miles of rail, TOD special districts)
   parking_exempt?: boolean;
   // § 21-9.100-8(c)(1): no ground-floor parking within this many feet of
   // the front lot line (TOD special districts)
   front_no_parking_ft?: number;
-  // a legal cap on dwelling units (TOD: IMX-1 under PD-T)
   max_units?: number;
-  // height step-back; off unless stepback_trigger_ft is set
   stepback_trigger_ft?: number;
   stepback_above_ft?: number;
   stepback_ft_per_10ft?: number;
@@ -1685,7 +1671,6 @@ export interface SliderInputs {
   cap_rate?: number;
   target_spread?: number;
   setback?: number;
-  // building-lot coverage cap
   coverage?: number;
   opex_ratio?: number;
   hard_cost_per_sqft?: number;
@@ -1820,6 +1805,8 @@ export interface ParcelOutput {
 
 // soft cost waiver types
 export type FeeBasis = "all_units" | "market_units" | "none";
+
+export type OpenSpaceBonusMode = "auto" | "on" | "off";
 
 // soft cost inputs (shared across all pathways)
 export type SoftCostInputs = {

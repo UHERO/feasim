@@ -127,6 +127,8 @@ Each pathway has its own FAR rule, set out in the Envelope section of its pathwa
 
 B-2, BMX-3 and BMX-4 lots can raise their FAR by giving up ground as public open space (§ 21-3.110-1(c), § 21-3.120-2(c)). The bonus is optional, the way it is for a developer: `calcSingle` runs the project with and without it and keeps the one with the higher residual land value, or the bigger building when neither pencils. The bonus costs ground, so it often isn't worth it on lower buildings that can't use the extra floor area. `open_space_bonus` on the result is the bonus taken (0 when the project is better without it). Each pathway page says whether the bonus applies.
 
+**Choosing it yourself:** `open_space_bonus_mode` overrides that choice. "auto" (the default) is the comparison above, "on" always takes the bonus and "off" never does. The setting does nothing where no bonus is offered.
+
 **How it is computed:** The bonus fills the gap between the pathway's own FAR and the district's ceiling, and is never negative:
 
 ```math
@@ -147,7 +149,7 @@ Apartment, AMX, B-1, industrial and IMX-1 zones have no bonus in the model.
 \text{plaza} = \frac{\text{bonus} \times \text{lot}}{5}
 ```
 
-***Example:*** a 20,000 sq ft BMX-4 lot gets 3.5 bonus FAR, gives up 14,000 sq ft of plaza and builds on the remaining 6,000 sq ft. The plaza stays set aside even when the user overrides Max FAR.
+***Example:*** a 20,000 sq ft BMX-4 lot gets 3.5 bonus FAR, gives up 14,000 sq ft of plaza and builds on the remaining 6,000 sq ft. The plaza stays set aside even when the user overrides Max FAR. An overridden Max FAR includes the bonus, so "auto" may still build it at Max FAR less the bonus. With `open_space_bonus_mode` "off", the override is the FAR built and no plaza is set aside: BMX-3 at a proposed 4.0 builds the full 4.0, not 4.0 less a 1.0 bonus.
 
 ***Note:*** Bill 7 never takes the bonus. In TOD the comparison runs only when the FAR without the bonus is known: when the user sets Max FAR, or in the Citywide View, where the parcel's TOD envelope supplies it. Otherwise the TOD tier's FAR, which already includes the bonus, is used as is.
 

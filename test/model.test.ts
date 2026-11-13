@@ -1293,6 +1293,69 @@ describe("open-space bonus", () => {
     expect(calcParcel("bill6", site("A-2", 60)).open_space_bonus).toBe(0);
     expect(calcParcel("bill7", site("BMX-4", 60)).open_space_bonus).toBe(0);
   });
+
+  describe("open_space_bonus_mode", () => {
+    const levers = { unit_type: "one_bb_100", parking_ratio: 0.5 };
+
+    it.each(cases)("%s %s at %i ft: on takes it, off doesn't, auto picks", (program, zone, height) => {
+      const inputs = parcelInputs(program, site(zone, height), levers, { tier: "with_benefits" });
+      const bonus = inputs.open_space_bonus ?? 0;
+      const withBonus = RUN[program](inputs);
+      const without = RUN[program]({
+        ...inputs,
+        open_space_bonus: 0,
+        max_far: inputs.far_without_bonus ?? inputs.max_far! - bonus,
+      });
+      const on = calcSingle({ ...inputs, open_space_bonus_mode: "on" });
+      const off = calcSingle({ ...inputs, open_space_bonus_mode: "off" });
+      expect(on.rlv).toBe(withBonus.rlv);
+      expect(on.open_space_bonus).toBe(bonus);
+      expect(off.rlv).toBe(without.rlv);
+      expect(off.open_space_bonus).toBe(0);
+      // "auto" is the default
+      expect(calcSingle({ ...inputs, open_space_bonus_mode: "auto" })).toEqual(calcSingle(inputs));
+    });
+
+    it("forces the bonus a 60 ft BMX-4 building would skip", () => {
+      const p = site("BMX-4", 60);
+      expect(calcParcel("bill6", p, levers).open_space_bonus).toBe(0);
+      const on = calcParcel("bill6", p, { ...levers, open_space_bonus_mode: "on" });
+      expect(on.open_space_bonus).toBe(3.5);
+    });
+
+    it("forgoes the bonus a 350 ft BMX-4 building would take", () => {
+      const off = calcParcel("bill6", site("BMX-4", 350), { open_space_bonus_mode: "off" });
+      expect(off.open_space_bonus).toBe(0);
+      expect(off.buildable_sqft).toBeLessThanOrEqual(4.0 * 20000);
+    });
+
+    it("builds an overridden FAR as given when off", () => {
+      // BMX-3 at a proposed 4.0 FAR: no plaza, the full 4.0, not 4.0 - 1.0
+      const p: Parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 350 };
+      for (const program of ["bill6", "standard", "h201"] as const) {
+        const inputs = parcelInputs(program, p, { max_far: 4.0, open_space_bonus_mode: "off" });
+        expect(inputs.open_space_bonus, program).toBe(0);
+        expect(inputs.max_far, program).toBe(4.0);
+        const r = calcSingle(inputs);
+        expect(r.open_space_bonus, program).toBe(0);
+        // 350 ft doesn't bind, so the building is the full 4.0 x 20,000 sqft
+        expect(r.buildable_sqft, program).toBe(4.0 * 20000);
+      }
+      // auto keeps today's rule: the override counts the bonus in it
+      expect(parcelInputs("bill6", p, { max_far: 4.0 }).open_space_bonus).toBe(1.0);
+    });
+
+    it("is ignored where no bonus is offered", () => {
+      for (const mode of ["on", "off"] as const) {
+        expect(calcParcel("bill6", site("A-2", 60), { open_space_bonus_mode: mode })).toEqual(
+          calcParcel("bill6", site("A-2", 60))
+        );
+        expect(calcParcel("bill7", site("BMX-4", 60), { open_space_bonus_mode: mode })).toEqual(
+          calcParcel("bill7", site("BMX-4", 60))
+        );
+      }
+    });
+  });
 });
 
 describe("conveyance tax", () => {
