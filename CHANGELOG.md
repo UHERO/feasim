@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0](https://github.com/UHERO/feasim/compare/v0.4.0...v0.5.0) (2026-11-16)
+
+
+### Features
+
+* implement open space toggle, conveyance tax, and shared dev pipeline ([03cc510](https://github.com/UHERO/feasim/commit/03cc5109663f2aec3a23ba8f01ceccc4b0ea66c7))
+
+
+### Bug Fixes
+
+* add new functions to shared far pathway ([cdf629e](https://github.com/UHERO/feasim/commit/cdf629eb6bf6c4370e888ab27e060ad95a8fc8f2))
+
 ## [0.4.0](https://github.com/UHERO/feasim/compare/v0.3.0...v0.4.0) (2026-11-13)
 
 
