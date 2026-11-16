@@ -34,11 +34,11 @@ Physical inputs (lot size, height, zone class) are user sliders in the Project V
 | Permitting, construction, lease-up | 18, 12 and 9 months | The same for every pathway and zone, in the Project View and the package (no longer set by zone) |
 | Operating expense ratio | 30% of EGI |  |
 | Unit mix | Half studio, half one-bedroom | Unit sizes: studio 300, one-bedroom 500, two-bedroom 700 sq ft |
-| Parking | 0.95 stalls per unit | Bill 7 0.5, TOD 0.85. A flat default: it does not follow the unit mix or the § 21-6.20(a) exemption |
+| Parking | 0.95 stalls per unit | Bill 7 0.35, TOD and 201H 0.9 ([Stalled](https://static1.squarespace.com/static/601374ae84e51e430a1829d8/t/68f15c7cbf563d6a7080bf8f/1760648316670/Stalled_FINAL.pdf) (Hawaiʻi Appleseed, 2025), Table 4; Bill 7 also developer interviews). A flat default: it does not follow the unit mix or the § 21-6.20(a) exemption |
 
 ***Note:*** with `parking_ratio` left unset, the model applies the Article 6 minimum (0 on exempt parcels) instead. Only `calcSingle` can do this: `calcParcel` fills an unset lever from `DEFAULT_INPUTS`.
 
-***Note:*** when the user chooses AMI 30% for both affordable and market for-sale units, we use the prices listed in HHFDC 2025's [Honolulu County Income, Rent, and Sales Price Guidelines](https://www.dbedt.hawaii.gov/hhfdc/files/2025/05/Honolulu-County-2025.pdf) for AMI 50%, as that is the lowest AMI level listed for sale units.
+***Note:*** when the user chooses AMI 30% for both affordable and market for-sale units, we use the prices listed in HHFDC 2026's [Honolulu County Income, Rent, and Sales Price Guidelines](https://dbedt.hawaii.gov/hhfdc/files/2026/06/2026-HHFDC-Honolulu-County-Income-Limits_Sales-Price-Guidelines-1.pdf) for AMI 50%, as that is the lowest AMI level listed for sale units.
 
 # Developer Strategies
 
@@ -127,6 +127,8 @@ Each pathway has its own FAR rule, set out in the Envelope section of its pathwa
 
 B-2, BMX-3 and BMX-4 lots can raise their FAR by giving up ground as public open space (§ 21-3.110-1(c), § 21-3.120-2(c)). The bonus is optional, the way it is for a developer: `calcSingle` runs the project with and without it and keeps the one with the higher residual land value, or the bigger building when neither pencils. The bonus costs ground, so it often isn't worth it on lower buildings that can't use the extra floor area. `open_space_bonus` on the result is the bonus taken (0 when the project is better without it). Each pathway page says whether the bonus applies.
 
+**Choosing it yourself:** `open_space_bonus_mode` overrides that choice. "auto" (the default) is the comparison above, "on" always takes the bonus and "off" never does. The setting does nothing where no bonus is offered.
+
 **How it is computed:** The bonus fills the gap between the pathway's own FAR and the district's ceiling, and is never negative:
 
 ```math
@@ -147,7 +149,7 @@ Apartment, AMX, B-1, industrial and IMX-1 zones have no bonus in the model.
 \text{plaza} = \frac{\text{bonus} \times \text{lot}}{5}
 ```
 
-***Example:*** a 20,000 sq ft BMX-4 lot gets 3.5 bonus FAR, gives up 14,000 sq ft of plaza and builds on the remaining 6,000 sq ft. The plaza stays set aside even when the user overrides Max FAR.
+***Example:*** a 20,000 sq ft BMX-4 lot gets 3.5 bonus FAR, gives up 14,000 sq ft of plaza and builds on the remaining 6,000 sq ft. The plaza stays set aside even when the user overrides Max FAR. An overridden Max FAR includes the bonus, so "auto" may still build it at Max FAR less the bonus. With `open_space_bonus_mode` "off", the override is the FAR built and no plaza is set aside: BMX-3 at a proposed 4.0 builds the full 4.0, not 4.0 less a 1.0 bonus.
 
 ***Note:*** Bill 7 never takes the bonus. In TOD the comparison runs only when the FAR without the bonus is known: when the user sets Max FAR, or in the Citywide View, where the parcel's TOD envelope supplies it. Otherwise the TOD tier's FAR, which already includes the bonus, is used as is.
 
@@ -233,7 +235,7 @@ Dropping stalls from the exempt parcels frees ground and podium floors for units
 \text{stalls} = \mathrm{round}\left(j \times \left(r \times \text{units} + \frac{\text{retail sq ft}}{500}\right)\right)
 ```
 
-- **r:** stalls per unit, set by the Parking lever. It defaults to 0.95 (Bill 7 0.5, TOD 0.85). With the lever unset, the model uses the legal minimum: the unit mix's average private dwelling area ÷ 1,000. Common areas and accessory recreation areas are excluded (§ 21-6.20(b)(2)(A)), so the unit sizes alone count: studio 300, one-bedroom 500, two-bedroom 700 sq ft.
+- **r:** stalls per unit, set by the Parking lever. It defaults to 0.95 (Bill 7 0.35, TOD and 201H 0.9). With the lever unset, the model uses the legal minimum: the unit mix's average private dwelling area ÷ 1,000. Common areas and accessory recreation areas are excluded (§ 21-6.20(b)(2)(A)), so the unit sizes alone count: studio 300, one-bedroom 500, two-bedroom 700 sq ft.
 - **j:** 0.9 when housing and retail both need stalls (Table 21-6.2, residential with retail/commercial), else 1.
 - A fraction of 0.5 or more rounds up (§ 21-6.20(b)(1)).
 
@@ -356,7 +358,15 @@ Each pathway's default setting and its waivers are listed on its [pathway page](
 
 ### Park dedication
 
-Park land is charged only on units not exempt under § 22-7.3(j); in other words only market units count toward the park dedication requirement. The requirement is the lesser of 110 sq ft per unit and 10% of floor area. The Park Dedication toggle sets how it is paid: in lieu (a $200 application fee plus the land value of the required area at the land cost) or exempt (no cost).
+The requirement is the lesser of 110 sq ft per unit and 10% of the "maximum permitted floor area" (§ 22-7.5). The same rule covers apartment, resort and mixed-use districts (§ 22-7.5(b)(1)), planned developments such as PD-T (§ 22-7.5(b)(2)) and multifamily housing in special district precincts (§ 22-7.5(c)(2)), so it is the same in every pathway. The model applies it to the floor area it builds, bonus floor area included; DPP counts a project's granted floor area, not the base zoning's ([Halewaiolu Senior Residences, 2020/GEN-16](https://hnldoc.ehawaii.gov/hnldoc/document-download?id=8192), Table 5: 5.9 FAR rather than 4.0).
+
+Park land is charged only on units not exempt under § 22-7.3(j). § 22-7.3(j) exempts four kinds of affordable units: (1) Chapter 29 affordable units; (2) affordable units under a PD-T or IPD-T permit (§ 21-9.100-10, -5); (3) affordable rentals under HRS § 201H-36(a)(5); and (4) Chapter 32 rentals at or below 100% AMI, at or below HUD's 100% AMI rent limits. In the model only 201H (units at 80% AMI) and Bill 7 have affordable units; current zoning, pre-Ord. 26-7 and TOD charge every unit.
+
+The Park Dedication toggle sets how it is paid: in lieu (a $200 application fee plus "the value of the land that would otherwise have been required", § 22-7.3(a), at the land cost) or exempt (no cost). The toggle means the same in every pathway: in lieu charges the units § 22-7.3(j) does not exempt, which in the model are the market units.
+
+**Land value.** The model values the park land at the Land Cost lever. DPP values it at the market value of similar lots in the zone with the proposed development, not the assessed value: in the Halewaiolu report it used $300 per sq ft where the applicant used the $53.20 assessed value. The Land Cost lever is a market price for a developable lot, so it follows DPP's approach rather than the assessed value. It may still run low where a project gets more floor area than the base zoning allows (a TOD bonus, or 201H above the base FAR), since DPP values the land with that development in mind. The code keeps the Land Cost lever; the residual land value can't stand in for it, since the residual land value depends on the fees, park dedication included.
+
+***Sunset:*** § 22-7.3(j) is repealed on June 30, 2027 (Ords. 18-1 and 19-8). After that, affordable units owe park dedication unless the Council extends it or the project gets another waiver. The model keeps the exemption.
 
 ### Wastewater system facility charges
 
@@ -601,20 +611,25 @@ Debt service uses a 30-year amortization at a 6.75% permanent rate, both user in
 
 **Entry cap:** The market cap rate (default 5.1% for every zone) values the building at stabilization. It anchors gross development value and the return-on-cost benchmark.
 
-**Exit cap:** The exit cap values the building at sale after the hold period: the entry cap plus 50 basis points. A buyer further out from stabilization is pricing an older asset in a less certain market and demands a higher yield than a buyer of a new building.
+**Exit cap:** The exit cap values the building at sale after the hold period: the entry cap plus 7.5 basis points for each year held, up to 75 basis points at 10 years (`exitCapRate`). At the 5.1% default, a 1-year hold sells at 5.175%, a 5-year hold at 5.475%, and a hold of 10 years or more at 5.85%. A flip sells at the entry cap.
+
+- **Why it widens:** the further out the sale, the more market risk the buyer prices in. Investors surveyed by CBRE expect exit caps above going-in caps, at "a more typical level of between 50 and 60 bps" ([CBRE Q4 2025 Multifamily Underwriting Survey](https://cbre.com/insights/briefs/core-multifamily-buyer-sentiment-improves-in-q4-2025); the spread was 20 bps for core assets in Q4 2025).
+- **Why it grows with the hold:** a fixed spread charges a 1-year hold as much as a 10-year one, which wiped out most of a short hold's development profit (a 1-year hold earned 14% against the flip's 26%). The traditional ½ to 1 point rule of thumb has no theory behind it, and the exit cap should be chosen consistently with the hold's income growth ([Wang, Grissom & Chan, 1990](https://ideas.repec.org/a/jre/issued/v5n21990p231-246.html)). With the spread tied to the years held, IRR falls steadily from the flip to longer holds.
+- **Not aging:** building age shows up mostly in income, not the cap rate. Bokhari and Geltner find depreciation of 1.5% a year, 92% of it from falling real income and "only 0.17%/year" from cap rate creep ([Bokhari & Geltner, 2018](https://dspace.mit.edu/handle/1721.1/120153)). The model puts aging in income instead (see [Aging](#aging)).
+- **Market cycles:** not modeled; the spread is the same in every year. Test a cycle by changing the Cap Rate lever.
 
 ### Cash flow by developer strategy
 
 **Flip:** The developer sells immediately after lease-up, in a single lump sum:
 
 ```math
-\text{proceeds} = \text{GDV} - \text{selling costs (3.5\%)} - \text{outstanding loan balance}
+\text{proceeds} = \text{GDV} - \text{selling costs} - \text{outstanding loan balance}
 ```
 
 **Hold:** The developer holds the building for the hold period, then sells:
 
-- **Each year:** NOI minus permanent debt service. Rents grow 4% a year, affordable and market alike (see [Rent growth](#rent-growth)), operating expenses 3.5%, and assessed value 2%. The 3.5% and 2% are the expense and property tax escalation rates California's TCAC requires in the 15-year cash flow every LIHTC applicant files (4 CCR § 10327(g)(1)); operating expenses follow their own series rather than a fixed share of EGI.
-- **At exit:** the next year's NOI ÷ exit cap, less 3.5% selling costs and the remaining loan balance.
+- **Each year:** NOI minus permanent debt service. Affordable rents grow 4% a year and market rents, parking and retail 3% (4% less the [aging](#aging) drag; see [Rent growth](#rent-growth)), operating expenses 3.5%, and assessed value 2%. The 3.5% and 2% are the expense and property tax escalation rates California's TCAC requires in the 15-year cash flow every LIHTC applicant files (4 CCR § 10327(g)(1)); operating expenses follow their own series rather than a fixed share of EGI.
+- **At exit:** the next year's NOI ÷ exit cap (NOI grown at next year's income growth), less the selling costs on that price and the remaining loan balance.
 - **Property tax exemptions:** a pathway with a 15-year improvement exemption pays tax on land only for those years (see Property Tax).
 
 ## Revenue
@@ -629,7 +644,7 @@ Every rent in the model, affordable or market, is an AMI-based rent from the HHF
 
 - **Household size by unit type:** studio 1 person; one-bedroom the average of 1 and 2 persons; two-bedroom 3 persons.
 - **Unpublished AMI levels:** scale the 50% AMI row linearly. HHFDC publishes rents floored, so the model floors too.
-- **Data year:** the income limits are HHFDC's 2025 Honolulu County schedule (median $129,300). The [2026 schedule](https://dbedt.hawaii.gov/hhfdc/2026/06/23/honolulu-county-income-rent-sales-price-guidelines-2026/) (median $133,400) is published but not yet in the model.
+- **Data year:** the income limits and sale prices are HHFDC's [2026 Honolulu County schedule](https://dbedt.hawaii.gov/hhfdc/2026/06/23/honolulu-county-income-rent-sales-price-guidelines-2026/) (median $133,400, effective May 1, 2026).
 - **Unit mix:** the rent is the weighted average over the mix.
 - **Escalation:** Affordable and market rents both grow 4% a year from today through permitting, construction and lease-up, and through the hold (see [Rent growth](#rent-growth)).
 
@@ -647,6 +662,15 @@ Each pathway sets its affordable share of units, listed in the Affordability sec
 Affordable and market rents both grow 4% a year: Honolulu's HUD income limits, which set the affordable rent caps, grew 4.4% a year from 2015 to 2026, and market rents grew 3.6% to 4.3% a year. The constants are `FINANCING.ami_escalation` (to lease-up) and `HOLD.annual_rent_growth` (over the hold) in `src/calculations/calc-shared.ts`.
 
 Bill 7's affordable rent cap is tied to HUD's current limits, so it rises every year (see [Bill 7](pathways/bill7.md#affordability)).
+
+#### Aging
+
+Over the hold, a building's market rents fall behind those of new buildings. Market rent, parking and retail income grow 1% a year slower than rent growth, so 3% instead of 4% (`HOLD.age_rent_drag`, applied in `holdEgi`). Affordable rents keep the full 4%: they are set by HUD's limits, which bind whatever the building's age.
+
+- **Source:** Bokhari and Geltner find real depreciation of 1.5% a year across 107,805 US sales, from 1.82% a year for new buildings to 1.12% at 50 years, with apartments slightly faster. 92% of it, 1.38% a year, is "decline in current real income", and only 0.17% a year is cap rate creep. They conclude that pro formas growing cash flow at a standard 3% are "substantially biased on the high side, especially for newer buildings" ([Bokhari & Geltner, 2018](https://dspace.mit.edu/handle/1721.1/120153)).
+- **Why 1% of rent:** their 1.38% is a decline in NOI. Operating expenses and property tax grow on their own series, so a 1% drag on rent takes NOI growth down by 1.4% to 1.5% a year (EGI is about 1.45 times NOI).
+- **Oʻahu:** they also find less depreciation where land is physically scarce, so 1% may be on the high side for Oʻahu.
+- **Effect:** on a 20,000 sq ft BMX-3 lot under current zoning, levered IRR at a 20-year hold falls from 13.0% to 10.8%, and at a 1-year hold from 20.6% to 19.8%. Bill 7 moves least (0.5 points or less), since 80% of its units are affordable.
 
 **Affordable rents follow HUD income limits:** Honolulu's median family income grew 4.05% a year from 2015 ($86,900) to 2025 ($129,300), and the income limits that set rent caps grew 4.4% a year from 2015 to 2026. The 2026 increase of 1.3% followed a 9.2% year. HUD caps any single year's increase at 10%, and the limits used for these projects don't fall. Since 2020, growth has averaged 3.4% a year.
 
@@ -676,6 +700,42 @@ Real property tax is 0.35% a year of assessed value (land plus improvements, the
 
 Some pathways exempt the improvements for a period; each pathway page gives its treatment under Fees, waivers and taxes.
 
+## Selling Costs
+
+When the developer sells the finished building, it pays selling costs on the sale price: on GDV at a flip and in the residual land value, and on the exit price at the end of a hold. `sellingCosts` adds two parts:
+
+- **Disposition cost, 3.5%** (`FINANCING.disposition_cost`): the brokerage commission and marketing, the general excise tax (GET) on the commission, owner's title insurance, the seller's half of escrow, and etc.
+- **Conveyance tax:** see [below](#conveyance-tax).
+
+| Sale price | Disposition cost (3.5%) | Conveyance tax | Selling costs |
+| --- | --- | --- | --- |
+| $9 million | $315,000 | $81,000 | $396,000 (4.4%) |
+| $30 million | $1,050,000 | $300,000 | $1,350,000 (4.5%) |
+
+Hawaii feasibility studies put selling costs at 5.5% of sales ([Strategic Economics for HCDA, 2017](https://dbedt.hawaii.gov/hcda/files/2017/03/Final-Memo-HCDA-Kakaako-Reserved-Workforce-Housing-2017-06-02.pdf), Figure 2) and 4% ([Keyser Marston for the County of Hawaiʻi, 2024 draft](https://records.hawaiicounty.gov/WebLink/1/edoc/150133/2024%20Keyser%20Marston%20Associates%20-%20%20Analysis%20%20Recommendations%20in%20Support%20of%20Updates%20to%20Chapter%2011%20HCC.pdf), Appendix A Table 6). Those rates include the conveyance tax and GET. The model charges the conveyance tax separately, so it uses 3.5%. Neither study itemizes its rate.
+
+### Conveyance tax
+
+The seller pays Hawaii's conveyance tax on every transfer of real property (HRS § 247-1; [Form P-64A](https://files.hawaii.gov/tax/forms/current/p64ains.pdf)). It is charged on the full price, including any mortgage the buyer takes over (§ 247-2). The bracket's rate applies to the whole price, not marginally, so a $9.9 million sale pays $89,100 and a $10 million sale pays $100,000.
+
+| Sale price | General (§ 247-2(1)) | Condo or single-family home, buyer ineligible for a home exemption (§ 247-2(2)) |
+| --- | --- | --- |
+| Under $600,000 | 0.10% | 0.15% |
+| $600,000 to under $1 million | 0.20% | 0.25% |
+| $1 million to under $2 million | 0.30% | 0.40% |
+| $2 million to under $4 million | 0.50% | 0.60% |
+| $4 million to under $6 million | 0.70% | 0.85% |
+| $6 million to under $10 million | 0.90% | 1.10% |
+| $10 million or more | 1.00% | 1.25% |
+
+The rates were last changed by Act 59 (2009).
+
+The higher schedule applies only to "the sale of a condominium or single family residence for which the purchaser is ineligible for a county homeowner's exemption on property tax" (§ 247-2(2)). A buyer who will live in the unit as their primary home is eligible ([Honolulu home exemption](https://realproperty.honolulu.gov/tax-relief-and-forms/exemptions/home-exemption/)); an investor or landlord is not.
+
+A condominium is a form of ownership, not a type of building. Under [HRS § 514B-3](https://www.capitol.hawaii.gov/hrscurrent/Vol12_Ch0501-0588/HRS0514B/HRS_0514B-0003.htm), real estate is a condominium only if portions are "designated for separate ownership" and the common elements are "vested in the unit owners". A rental building with one owner has no separately owned units, so it is not a condominium, whatever its zoning, and always takes the general schedule. Selling it whole costs more: a $30 million building pays $300,000, while the same value sold as 100 condo units to investors pays $450 each, or $45,000.
+
+In the model, every sale is a whole rental building, so every pathway uses the general schedule. The tax's rounding to $0.10 and its $1 minimum are not modeled. Source: [HRS Chapter 247](https://data.capitol.hawaii.gov/sessions/session2017/HRS-Chapter-PDF's/HRS_0247.pdf).
+
 ## NOI and Gross Development Value
 
 Net operating income is effective gross income less operating expenses and property tax. Gross development value (GDV) capitalizes it at the market cap rate, with retail at a 150 basis point spread:
@@ -700,7 +760,7 @@ The residual land value is the most a developer could pay for the land and still
 \text{RLV} = \frac{\text{residual}}{(1 + \text{target return})^{\text{months}/12}} + \sum_{m} \frac{\text{grant}_m}{(1 + \text{target return})^{m/12}}
 ```
 
-- **Selling costs:** 3.5% of GDV.
+- **Selling costs:** 3.5% of GDV (the disposition cost) plus the conveyance tax on GDV (see [Selling Costs](#selling-costs)).
 - **Project cost:** development cost (1.1 × hard + soft) plus financing cost, with the loan sized on construction cost only.
 - **Profit:** 15% of project cost.
 - **Target return:** 11.5% a year, the carry on the land from purchase to stabilization.

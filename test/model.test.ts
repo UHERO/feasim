@@ -8,6 +8,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   BILL7_FAR,
+  conveyanceTax,
+  sellingCosts,
   BILL7_MAX_HEIGHT,
   DEFAULT_INPUTS,
   DEFAULT_TARGET_RETURN,
@@ -62,6 +64,7 @@ import {
   parcelInputs,
   pathwayEnvelope,
   type Parcel,
+  type ParcelOutput,
   type ProgramId,
   type SliderInputs,
   calcParkingIncome,
@@ -73,11 +76,16 @@ import {
   zoneStepBack,
 } from "../src";
 import {
+  calcParkArea,
   calcSoftCosts,
   mixPostGrant,
   postGrantPerUnit,
   PREVAILING_WAGE,
+  exitCapRate,
+  HOLD,
+  holdEgi,
   setbackFootprint,
+  solveIRR,
   UNIT_SIZE,
 } from "../src/calculations/calc-shared";
 import { calcbill6Single } from "../src/calculations/calc-bill6";
@@ -141,6 +149,7 @@ const SCENARIOS: Record<string, Partial<SliderInputs>> = {
   "impact fees on all units": { waivable_fee_basis: "all_units" },
   "25-year amortization": { amort_years: 25 },
   "5-year hold": { hold_years: 5 },
+  "flip at completion (0-year hold)": { hold_years: 0 },
   "FAR 2, 60 ft, 20 ft setbacks": { max_far: 2, height_limit: 60, setback: 20 },
 };
 
@@ -260,6 +269,105 @@ describe("DSCR-sized loans", () => {
       }
     }
     expect(sized).toBeGreaterThan(0);
+  });
+});
+
+describe("solveIRR", () => {
+  it("solves the monthly rate that zeroes a one-shot cash flow, then annualizes it", () => {
+    // $100 out at month 0, $110 back at month 12: the monthly rate compounds
+    // to exactly 10% over the year
+    const cashflows = new Array(13).fill(0);
+    cashflows[0] = -100;
+    cashflows[12] = 110;
+    expect(solveIRR(cashflows, true)).toBeCloseTo(0.1, 9);
+  });
+
+  it("returns the rate itself, unannualized, for a non-monthly cash flow", () => {
+    expect(solveIRR([-100, 110], false)).toBeCloseTo(0.1, 9);
+  });
+
+  it("solves a negative rate when less comes back than went in", () => {
+    expect(solveIRR([-100, 90], false)).toBeCloseTo(-0.1, 9);
+  });
+
+  it("can't solve a cash flow that never goes negative, or never goes positive", () => {
+    expect(solveIRR([100, 50], true)).toBeNaN();
+    expect(solveIRR([-100, -50], true)).toBeNaN();
+    expect(solveIRR([0, 0], true)).toBeNaN();
+  });
+
+  it("can't solve a cash flow with no root in the solver's own rate bracket (-95% to 100%/mo)", () => {
+    // mixed signs, but net present value stays negative at both ends of the
+    // bracket, so there's no rate in range where it crosses zero
+    expect(solveIRR([-1, 100, -1000], true)).toBeNaN();
+  });
+});
+
+// ── Flip exit (hold_years: 0): sell the building at completion instead of
+// holding it for rent ───────────────────────────────────────────────────────
+
+describe("dev flip strategy", () => {
+  const site: SliderInputs = { program: "bill6", lot_sqft: 20000, zone_class: "BMX-3", height_limit: 150 };
+  const flip = (program: ProgramId, extra: Partial<SliderInputs> = {}) =>
+    calcSingle({ ...site, ...extra, program, hold_years: 0 });
+
+  it("builds the same thing as holding it, just exits differently", () => {
+    for (const program of PROGRAMS) {
+      const held = calcSingle({ ...site, program });
+      const flipped = flip(program);
+      expect(flipped.max_units, program).toBe(held.max_units);
+      expect(flipped.hard_cost, program).toBe(held.hard_cost);
+      expect(flipped.soft_cost, program).toBe(held.soft_cost);
+    }
+  });
+
+  it.each(PROGRAMS)("%s: labels itself and skips the permanent loan", (program) => {
+    const r = flip(program);
+    expect(r.dev_strategy).toBe("dev_flip");
+    expect(r.dev_hold_years).toBe(0);
+    // nothing takes the construction loan out at a DSCR, so it never binds
+    expect(r.dev_dscr_binds).toBe(false);
+    for (const field of [
+      "dev_perm_principal",
+      "dev_perm_rate",
+      "dev_annual_debt_svc",
+      "dev_dscr",
+      "dev_is_bankable",
+      "dev_cash_on_cash",
+      "dev_entry_cap",
+      "dev_exit_cap",
+      "dev_yr1_prop_tax",
+    ] as const) {
+      expect(r[field], field).toBeNull();
+    }
+  });
+
+  it.each(PROGRAMS)("%s: the sale pays selling costs and the loan, grants and the rest go to equity", (program) => {
+    const r = flip(program);
+    const grants = (r.pre_construction_subsidy ?? 0) + (r.dev_post_grant ?? 0);
+    // disposition cost plus the conveyance tax
+    expect(r.dev_selling_costs).toBeCloseTo(sellingCosts(r.dev_gdv!), 0);
+    // conservation of value: what the sale raises either pays off the
+    // construction loan, covers selling costs, or (with any grant) comes
+    // back to the developer as equity. Equity out, selling costs and the
+    // loan payoff are each rounded to the dollar, so allow $1.50
+    const unrounded = r.dev_gdv! - r.dev_selling_costs! - r.dev_loan_payoff!;
+    expect(Math.abs(r.dev_equity_out! - grants - unrounded)).toBeLessThanOrEqual(1.5);
+  });
+
+  it.each(PROGRAMS)("%s: the equity multiple is what came out over what went in", (program) => {
+    const r = flip(program);
+    expect(Number.isFinite(r.dev_levered_irr)).toBe(true);
+    expect(Number.isFinite(r.dev_profit)).toBe(true);
+    expect(r.dev_equity_multiple).toBeCloseTo(r.dev_equity_out! / r.dev_equity_invested!, 2);
+  });
+
+  it("bill7's grant pays out on the flip the same as it would on a hold", () => {
+    const flipped = flip("bill7");
+    const held = calcSingle({ ...site, program: "bill7" });
+    expect(flipped.dev_post_grant).toBeGreaterThan(0); // post_construct is bill7's default
+    expect(flipped.dev_post_grant).toBe(held.dev_post_grant);
+    expect(flipped.pre_construction_subsidy).toBe(0);
   });
 });
 
@@ -1001,9 +1109,9 @@ describe("parking", () => {
   it("defaults to a flat ratio by pathway", () => {
     expect(DEFAULT_INPUTS.bill6.parking_ratio).toBe(0.95);
     expect(DEFAULT_INPUTS.standard.parking_ratio).toBe(0.95);
-    expect(DEFAULT_INPUTS.h201.parking_ratio).toBe(0.95);
-    expect(DEFAULT_INPUTS.bill7.parking_ratio).toBe(0.5);
-    expect(DEFAULT_INPUTS.tod.parking_ratio).toBe(0.85);
+    expect(DEFAULT_INPUTS.h201.parking_ratio).toBe(0.9);
+    expect(DEFAULT_INPUTS.bill7.parking_ratio).toBe(0.35);
+    expect(DEFAULT_INPUTS.tod.parking_ratio).toBe(0.9);
   });
 
   it("defaults every pathway to half studio, half one-bedroom", () => {
@@ -1253,9 +1361,10 @@ describe("open-space bonus", () => {
   });
 
   it("keeps the bigger building where neither version pencils", () => {
-    // 10,000 sqft BMX-4 at 60 ft loses money either way; the bonus would give
-    // up 70% of the lot to open space for floor area the height can't hold
-    const levers = { unit_type: "one_bb_100", parking_ratio: 0.5 };
+    // 10,000 sqft BMX-4 at 60 ft loses money either way at $475/sqft; the bonus
+    // would give up 70% of the lot to open space for floor area the height
+    // can't hold
+    const levers = { unit_type: "one_bb_100", parking_ratio: 0.5, hard_cost_per_sqft: 475 };
     const r = calcParcel("bill6", { lot_sqft: 10000, zone_class: "BMX-4", height: 60 }, levers);
     expect(r.rlv).toBeLessThan(0);
     expect(r.open_space_bonus).toBe(0);
@@ -1283,5 +1392,270 @@ describe("open-space bonus", () => {
   it("reports no bonus where none is offered", () => {
     expect(calcParcel("bill6", site("A-2", 60)).open_space_bonus).toBe(0);
     expect(calcParcel("bill7", site("BMX-4", 60)).open_space_bonus).toBe(0);
+  });
+
+  describe("open_space_bonus_mode", () => {
+    const levers = { unit_type: "one_bb_100", parking_ratio: 0.5 };
+
+    it.each(cases)("%s %s at %i ft: on takes it, off doesn't, auto picks", (program, zone, height) => {
+      const inputs = parcelInputs(program, site(zone, height), levers, { tier: "with_benefits" });
+      const bonus = inputs.open_space_bonus ?? 0;
+      const withBonus = RUN[program](inputs);
+      const without = RUN[program]({
+        ...inputs,
+        open_space_bonus: 0,
+        max_far: inputs.far_without_bonus ?? inputs.max_far! - bonus,
+      });
+      const on = calcSingle({ ...inputs, open_space_bonus_mode: "on" });
+      const off = calcSingle({ ...inputs, open_space_bonus_mode: "off" });
+      expect(on.rlv).toBe(withBonus.rlv);
+      expect(on.open_space_bonus).toBe(bonus);
+      expect(off.rlv).toBe(without.rlv);
+      expect(off.open_space_bonus).toBe(0);
+      // "auto" is the default
+      expect(calcSingle({ ...inputs, open_space_bonus_mode: "auto" })).toEqual(calcSingle(inputs));
+    });
+
+    it("forces the bonus a 60 ft BMX-4 building would skip", () => {
+      const p = site("BMX-4", 60);
+      expect(calcParcel("bill6", p, levers).open_space_bonus).toBe(0);
+      const on = calcParcel("bill6", p, { ...levers, open_space_bonus_mode: "on" });
+      expect(on.open_space_bonus).toBe(3.5);
+    });
+
+    it("forgoes the bonus a 350 ft BMX-4 building would take", () => {
+      const off = calcParcel("bill6", site("BMX-4", 350), { open_space_bonus_mode: "off" });
+      expect(off.open_space_bonus).toBe(0);
+      expect(off.buildable_sqft).toBeLessThanOrEqual(4.0 * 20000);
+    });
+
+    it("builds an overridden FAR as given when off", () => {
+      // BMX-3 at a proposed 4.0 FAR: no plaza, the full 4.0, not 4.0 - 1.0
+      const p: Parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 350 };
+      for (const program of ["bill6", "standard", "h201"] as const) {
+        const inputs = parcelInputs(program, p, { max_far: 4.0, open_space_bonus_mode: "off" });
+        expect(inputs.open_space_bonus, program).toBe(0);
+        expect(inputs.max_far, program).toBe(4.0);
+        const r = calcSingle(inputs);
+        expect(r.open_space_bonus, program).toBe(0);
+        // 350 ft doesn't bind, so the building is the full 4.0 x 20,000 sqft
+        expect(r.buildable_sqft, program).toBe(4.0 * 20000);
+      }
+      // auto keeps today's rule: the override counts the bonus in it
+      expect(parcelInputs("bill6", p, { max_far: 4.0 }).open_space_bonus).toBe(1.0);
+    });
+
+    it("is ignored where no bonus is offered", () => {
+      for (const mode of ["on", "off"] as const) {
+        expect(calcParcel("bill6", site("A-2", 60), { open_space_bonus_mode: mode })).toEqual(
+          calcParcel("bill6", site("A-2", 60))
+        );
+        expect(calcParcel("bill7", site("BMX-4", 60), { open_space_bonus_mode: mode })).toEqual(
+          calcParcel("bill7", site("BMX-4", 60))
+        );
+      }
+    });
+  });
+});
+
+describe("conveyance tax", () => {
+  it("taxes the whole price at its bracket's rate, not marginally", () => {
+    expect(conveyanceTax(500_000)).toBeCloseTo(500);
+    expect(conveyanceTax(600_000)).toBeCloseTo(1_200);
+    expect(conveyanceTax(9_999_999)).toBeCloseTo(89_999.991);
+    expect(conveyanceTax(10_000_000)).toBeCloseTo(100_000);
+    expect(conveyanceTax(12_000_000)).toBeCloseTo(120_000);
+  });
+
+  it("uses the higher § 247-2(2) rates for condos and homes without a home exemption", () => {
+    expect(conveyanceTax(500_000, "condo_sfr")).toBeCloseTo(750);
+    expect(conveyanceTax(12_000_000, "condo_sfr")).toBeCloseTo(150_000);
+  });
+
+  it("charges nothing when nothing is sold", () => {
+    expect(conveyanceTax(0)).toBe(0);
+  });
+
+  it("adds the 3.5% disposition cost on top of the tax", () => {
+    expect(sellingCosts(12_000_000)).toBeCloseTo(420_000 + 120_000);
+    expect(sellingCosts(0)).toBe(0);
+  });
+
+  it("charges both on the stabilized sale", () => {
+    const r = calcParcel("bill6", { lot_sqft: 20000, zone_class: "BMX-3", height: 150 });
+    expect(r.rlv_selling_costs).toBe(Math.round(0.035 * r.gdv + conveyanceTax(r.gdv)));
+  });
+});
+
+describe("solveIRR", () => {
+  // n periods of zeros between one outflow and one inflow
+  const flows = (out: number, n: number, inflow: number) => {
+    const cf = new Array(n + 1).fill(0);
+    cf[0] = -out;
+    cf[n] = inflow;
+    return cf;
+  };
+  const annual = (monthly: number) => Math.pow(1 + monthly, 12) - 1;
+
+  it("solves simple annual flows", () => {
+    expect(solveIRR([-100, 110], false)).toBeCloseTo(0.1, 9);
+    expect(solveIRR([-1000, ...new Array(9).fill(100), 1100], false)).toBeCloseTo(0.1, 9);
+    expect(solveIRR([-100, 50], false)).toBeCloseTo(-0.5, 9);
+  });
+
+  it("annualizes monthly flows", () => {
+    expect(solveIRR(flows(1000, 12, 1000 * 1.01 ** 12), true)).toBeCloseTo(annual(0.01), 9);
+  });
+
+  it("solves a 30-year hold (about 400 months), where the old solver returned NaN", () => {
+    const n = 39 + 30 * 12;
+    expect(solveIRR(flows(1000, n, 1000 * 1.01 ** n), true)).toBeCloseTo(annual(0.01), 9);
+    // a negative rate on a long schedule: the case that overflowed
+    expect(solveIRR(flows(1000, n, 500), true)).toBeCloseTo(annual(0.5 ** (1 / n) - 1), 9);
+  });
+
+  it("handles very long schedules and very large flows", () => {
+    // the 377-acre parcel's schedule: 3,110 months, flows near $5e14
+    const n = 3109;
+    expect(solveIRR(flows(5e14, n, 1e15), true)).toBeCloseTo(annual(2 ** (1 / n) - 1), 9);
+    expect(solveIRR(flows(5e14, n, 2.5e14), true)).toBeCloseTo(annual(0.5 ** (1 / n) - 1), 9);
+  });
+
+  it("ignores leading and trailing zeros that do not move the flows", () => {
+    expect(solveIRR([-100, 110, 0, 0], false)).toBeCloseTo(0.1, 9);
+    expect(solveIRR([0, -100, 110], false)).toBeCloseTo(0.1, 9);
+  });
+
+  it("returns 0 when money comes back unchanged", () => {
+    expect(solveIRR([-100, 100], false)).toBeCloseTo(0, 9);
+    expect(solveIRR(flows(100, 400, 100), true)).toBeCloseTo(0, 9);
+  });
+
+  it("returns NaN without both an outflow and an inflow", () => {
+    expect(solveIRR([], true)).toBeNaN();
+    expect(solveIRR([0, 0, 0], true)).toBeNaN();
+    expect(solveIRR([100, 50], false)).toBeNaN();
+    expect(solveIRR([-100, -50], false)).toBeNaN();
+  });
+
+  it("returns NaN outside the search range (-95% to 100%/month, 1,000%/year)", () => {
+    expect(solveIRR([-1, 1000], false)).toBeNaN();
+    expect(solveIRR([-1, 0.01], false)).toBeNaN();
+    expect(solveIRR([-1, 3], true)).toBeNaN();
+  });
+
+  it("returns a finite IRR for every pathway at every hold length", () => {
+    const parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 150 };
+    for (const program of ["bill6", "standard", "tod", "h201", "bill7"] as const)
+      for (let hold_years = 1; hold_years <= 30; hold_years++) {
+        const irr = calcParcel(program, parcel, { hold_years }).dev_levered_irr!;
+        expect(Number.isFinite(irr), `${program} ${hold_years}y`).toBe(true);
+      }
+  });
+});
+
+describe("exit cap", () => {
+  const parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 150 };
+
+  it("widens 7.5 bps per year held, up to 75 bps", () => {
+    expect(exitCapRate(0.051, 0)).toBeCloseTo(0.051, 12);
+    expect(exitCapRate(0.051, 1)).toBeCloseTo(0.05175, 12);
+    expect(exitCapRate(0.051, 5)).toBeCloseTo(0.05475, 12);
+    expect(exitCapRate(0.051, 10)).toBeCloseTo(0.0585, 12);
+    expect(exitCapRate(0.051, 30)).toBeCloseTo(0.0585, 12);
+    expect(exitCapRate(0.051, -1)).toBeCloseTo(0.051, 12);
+    expect(HOLD.exit_cap_spread_max / HOLD.exit_cap_spread_per_year).toBeCloseTo(10, 9);
+  });
+
+  it("reports the exit cap each hold uses", () => {
+    for (const hold_years of [1, 5, 10, 20]) {
+      const r = calcParcel("bill6", parcel, { hold_years });
+      // reported to 4 decimals
+      expect(r.dev_exit_cap, `${hold_years}y`).toBe(Math.round(exitCapRate(r.dev_entry_cap!, hold_years) * 10000) / 10000);
+    }
+  });
+
+  it("gives higher IRRs on shorter holds, from the flip down to 30 years", () => {
+    for (const program of ["bill6", "standard", "tod", "h201", "bill7"] as const) {
+      let last = calcParcel(program, parcel, { hold_years: 0 }).dev_levered_irr!;
+      for (let hold_years = 1; hold_years <= 30; hold_years++) {
+        const irr = calcParcel(program, parcel, { hold_years }).dev_levered_irr!;
+        // flat past the 10-year cap, within rounding
+        expect(irr, `${program} ${hold_years}y`).toBeLessThanOrEqual(last + 0.0005);
+        last = irr;
+      }
+      const at = (hold_years: number) => calcParcel(program, parcel, { hold_years }).dev_levered_irr!;
+      expect(at(1), program).toBeGreaterThan(at(10) + 0.03);
+    }
+  });
+});
+
+describe("aging drag", () => {
+  const g = HOLD.annual_rent_growth;
+  const d = HOLD.age_rent_drag;
+
+  it("grows affordable rent with ami and the rest at rent growth less the drag", () => {
+    expect(holdEgi(100, 0, 0)).toBeCloseTo(100, 9);
+    expect(holdEgi(100, 0, 10)).toBeCloseTo(100 * (1 + g - d) ** 10, 9);
+    expect(holdEgi(100, 100, 10)).toBeCloseTo(100 * (1 + g) ** 10, 9);
+    expect(holdEgi(100, 60, 10)).toBeCloseTo(60 * (1 + g) ** 10 + 40 * (1 + g - d) ** 10, 9);
+    // an affordable share outside 0 to egi is clamped
+    expect(holdEgi(100, 150, 10)).toBeCloseTo(100 * (1 + g) ** 10, 9);
+    expect(holdEgi(100, -5, 10)).toBeCloseTo(100 * (1 + g - d) ** 10, 9);
+  });
+
+  it("lowers long-hold IRRs, and lowers them least where most units are affordable", () => {
+    const parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 60 };
+    const cut = (program: ProgramId) => {
+      const saved = HOLD.age_rent_drag;
+      const irr = () => calcParcel(program, parcel, { hold_years: 20 }).dev_levered_irr!;
+      const withDrag = irr();
+      (HOLD as { age_rent_drag: number }).age_rent_drag = 0;
+      const without = irr();
+      (HOLD as { age_rent_drag: number }).age_rent_drag = saved;
+      return without - withDrag;
+    };
+    const bill6 = cut("bill6");
+    const bill7 = cut("bill7");
+    expect(bill6).toBeGreaterThan(0.01);
+    expect(bill7).toBeGreaterThan(0);
+    expect(bill7).toBeLessThan(bill6);
+  });
+
+  it("leaves the flip alone", () => {
+    const parcel = { lot_sqft: 20000, zone_class: "BMX-3", height: 150 };
+    const flip = () => calcParcel("bill6", parcel, { hold_years: 0 });
+    const saved = HOLD.age_rent_drag;
+    const a = flip();
+    (HOLD as { age_rent_drag: number }).age_rent_drag = 0;
+    const b = flip();
+    (HOLD as { age_rent_drag: number }).age_rent_drag = saved;
+    expect(a.dev_levered_irr).toBe(b.dev_levered_irr);
+    expect(a.rlv).toBe(b.rlv);
+  });
+});
+
+describe("park dedication toggle", () => {
+  const site = { lot_sqft: 20000, zone_class: "BMX-3", height: 60 };
+  const fee = (r: ParcelOutput) => r.soft_cost_breakdown!.park_dedication;
+  // $200 application fee plus the park land at the land cost ($130/sq ft by default)
+  const inLieu = (r: ParcelOutput) =>
+    200 + calcParkArea(r.max_units - r.affordable_units, r.buildable_sqft) * 130;
+
+  it("charges nothing when exempt, Bill 7's default", () => {
+    expect(fee(calcParcel("bill7", site))).toBe(0);
+    for (const program of PROGRAMS)
+      expect(fee(calcParcel(program, site, { park: "exempt" })), program).toBe(0);
+  });
+
+  it("charges market units only in lieu, in every pathway", () => {
+    for (const program of PROGRAMS) {
+      const r = calcParcel(program, site, { park: "in_lieu" });
+      expect(fee(r), program).toBeCloseTo(inLieu(r), 2);
+    }
+    // bill 7 has affordable units, so its fee is below the all-units figure
+    const b7 = calcParcel("bill7", site, { park: "in_lieu" });
+    expect(b7.affordable_units).toBeGreaterThan(0);
+    expect(fee(b7)).toBeLessThan(200 + calcParkArea(b7.max_units, b7.buildable_sqft) * 130);
   });
 });

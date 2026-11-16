@@ -379,7 +379,8 @@ export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
   return {
     standard,
     bill6: { ...standard, program: "bill6" },
-    tod: { ...standard, program: "tod", floor_height: 10, parking_ratio: 0.85 },
+    // stalled (hawaii appleseed 2025): discretionary rentals average 0.90
+    tod: { ...standard, program: "tod", floor_height: 10, parking_ratio: 0.9 },
     h201: {
       ...standard,
       program: "h201",
@@ -388,6 +389,8 @@ export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
       affordability: 0.51,
       // GET-exempt, so opex matches Bill 7
       opex_ratio: 0.19,
+      // stalled (hawaii appleseed 2025): discretionary rentals average 0.90
+      parking_ratio: 0.9,
     },
     bill7: {
       program: "bill7",
@@ -408,7 +411,8 @@ export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
       waivable_fee_basis: "none",
       park: "exempt",
       setback: 10,
-      parking_ratio: 0.5,
+      // stalled: bill 7 rentals average 0.27; 0.35 also from developer interviews
+      parking_ratio: 0.35,
       permitting_months: 18,
       const_months: 12,
       leaseup_months: 9,
@@ -425,7 +429,9 @@ export const DEFAULT_INPUTS: Record<ProgramId, SliderInputs> = (() => {
 /**
  * Model inputs for a parcel: pathway defaults, then `levers` (undefined = not
  * set), then the parcel's envelope. `levers.height_limit` / `max_far` override
- * the envelope, including Bill 7's 60 ft cap. `opts` is TOD only.
+ * the envelope, including Bill 7's 60 ft cap. An overridden `max_far` includes
+ * any open-space bonus, unless `open_space_bonus_mode` is "off": then it is
+ * the FAR built, with no plaza. `opts` is TOD only.
  */
 export function parcelInputs(
   program: ProgramId,
@@ -454,6 +460,12 @@ export function parcelInputs(
     inputs.front_no_parking_ft = envelope.front_no_parking_ft;
   } else if (envelope.open_space_bonus !== undefined) {
     inputs.open_space_bonus = envelope.open_space_bonus;
+  }
+  // a Max FAR override counts the bonus in it, and the plaza stays set aside;
+  // with the bonus off, the override is the FAR built, no plaza given up
+  if (set.open_space_bonus_mode === "off" && set.max_far != null) {
+    inputs.open_space_bonus = 0;
+    delete inputs.far_without_bonus;
   }
   // § 21-6.20(a) exemption
   if (program === "bill6" || program === "standard" || program === "h201")

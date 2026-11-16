@@ -7,7 +7,8 @@
 //   sqft), or a $50k pre-construction subsidy per unit with prevailing wages
 // - 15-year property tax exemption on improvements
 // - Height-based construction cost rate (not zone lookup)
-// - excavation and stepbacks follow the zone; timing is 18/12 months unless set
+// - no height step-backs (ROH Chp 32); excavation follows the zone; timing is
+//   18/12 months unless set
 
 import {
   allocatePropertyTax,
@@ -50,11 +51,13 @@ import {
   RETAIL_PREMIUM,
   sizeConstructionLoan,
   SliderInputs,
+  exitCapRate,
   solveIRR,
   stepBackOf,
   VACANCY,
   zeroOutput,
-  zoneStepBack,
+  holdEgi,
+  sellingCosts,
 } from "./calc-shared";
 
 // =========================================================
@@ -101,8 +104,8 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   const market_ami = sliders.market_ami ?? DEFAULT_MARKET_AMI;
   const construction_rate =
     sliders.construction_rate ?? FINANCING.construction_rate;
-  // bill 7 applies in A, AMX, BMX and waikiki districts; excavation and
-  // stepbacks follow the zone, or the height without one
+  // bill 7 applies in A, AMX, BMX and waikiki districts; excavation follows
+  // the zone, or the height without one
   const has_zone = sliders.zone_class != null;
   const zone_class =
     sliders.zone_class ?? (height_limit <= 30 ? "low_rise" : "mid_rise");
@@ -110,15 +113,14 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     sliders.permitting_months ?? DEFAULT_PERMITTING_MONTHS;
   const hard_cost_per_sqft = sliders.hard_cost_per_sqft ?? 450;
   // Bill 7 projects are exempt from off-street parking (ROH 32-2.3)
-  const parking_ratio = sliders.parking_ratio ?? 0.5;
+  const parking_ratio = sliders.parking_ratio ?? 0.35;
   const retail_share = sliders.retail_share ?? DEFAULT_RETAIL_SHARE;
   const setback = sliders.setback ?? 10;
   const building_area_per_unit = sliders.building_area_per_unit ?? 800;
   const max_far = sliders.max_far ?? 4.0;
   const waivable_fee_basis = sliders.waivable_fee_basis ?? "none";
-  // Bill 7 waives park dedication (ROH 43-10.8), so by default it costs
-  // nothing. Choosing the in-lieu fee charges it as the other pathways do, to
-  // show what the waiver is worth.
+  // bill 7 waives park dedication (roh 43-10.8), so exempt costs nothing.
+  // in_lieu charges market units, as in every pathway
   const park = sliders.park === "in_lieu" ? "in_lieu" : "none";
   // bill 7's own 80% lot-coverage cap (ROH Chp 32); overridable for testing
   const coverage = sliders.coverage ?? 0.8;
@@ -138,10 +140,8 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     lot_sqft,
     coverage_plate: envelopeCoverage(zone_class, max_far, coverage) * lot_sqft,
     setback,
-    stepback: stepBackOf(
-      sliders,
-      has_zone ? zoneStepBack(zone_class) : undefined
-    ),
+    // chapter 32 sets no height setbacks, so only a set lever steps back
+    stepback: stepBackOf(sliders),
   });
 
   // ground-floor retail is only permitted where the base zone allows it
@@ -242,8 +242,8 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
         ? 3
         : 5,
     park,
-    // Park land is charged on market units only; §22-7.3(j)(1) exempts
-    // affordable units, same rule as the other pathways.
+    // park land is charged on market units only; affordable units are exempt
+    // under § 22-7.3(j)(4), the same rule as the other pathways
     park_area:
       park === "in_lieu"
         ? calcParkArea(max_units - affordable_units, buildable_sqft)
@@ -360,6 +360,9 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     retail_egi = retail_pgi * (1 - VACANCY.default);
   }
   const egi = residential_egi + retail_egi;
+  // affordable rent income, which grows with ami in a hold
+  const affordable_egi =
+    pgi > 0 ? residential_egi * ((affordable_rent * afd_rent_units * 12) / pgi) : 0;
 
   // =========================================================
   // Step 5: Opex
@@ -369,7 +372,7 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   const operating_expenses = residential_opex + retail_opex;
 
   // =========================================================
-  // Step 6: NOI & GDV (gross, no disposition cost baked in)
+  // Step 6: NOI & GDV (gross, no conveyance tax baked in)
   // =========================================================
   const cap_rate = resolveCapRate(sliders.cap_rate);
   // NOI is after property tax (bill 7: improvements exempt, land-only tax)
@@ -388,7 +391,7 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
   const noi = residential_noi + retail_noi;
 
   // GDV is gross capitalized value (NOI / cap rate)
-  // disposition cost is applied at point of sale only, not here
+  // conveyance tax is applied at point of sale only, not here
   const rental_gdv = residential_noi / cap_rate;
   let retail_gdv_val = 0;
   if (include_retail && retail_egi > 0) {
@@ -466,7 +469,7 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
 
   if (hold_years === 0) {
     // DEV FLIP
-    const selling_costs = gdv * FINANCING.disposition_cost;
+    const selling_costs = sellingCosts(gdv);
     const post_grant = post_construction_grant;
     const equity_out = gdv - selling_costs - leaseup.final_principal;
 
@@ -556,7 +559,7 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
     );
 
     const entry_cap = cap_rate;
-    const exit_cap = entry_cap + HOLD.exit_cap_spread;
+    const exit_cap = exitCapRate(entry_cap, hold_years);
 
     const hold_months = hold_years * 12;
     const total_with_hold = total_months + hold_months;
@@ -582,7 +585,7 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
 
     for (let yr = 1; yr <= hold_years; yr++) {
       if (yr > 1) {
-        current_egi *= 1 + HOLD.annual_rent_growth;
+        current_egi = holdEgi(egi, affordable_egi, yr - 1);
         // expenses run on their own inflation series, not as a fixed share of EGI
         current_opex *= 1 + HOLD.annual_opex_growth;
         assessed_value *= 1 + HOLD.annual_assessment_growth;
@@ -602,9 +605,12 @@ export function calcBill7Single(sliders: SliderInputs): ParcelOutput {
       }
 
       if (yr === hold_years) {
-        const forward_noi = current_noi * (1 + HOLD.annual_rent_growth);
+        // next year's noi, at next year's egi growth
+        const forward_noi =
+          current_noi *
+          (holdEgi(egi, affordable_egi, yr) / holdEgi(egi, affordable_egi, yr - 1));
         const gross_sale = forward_noi / exit_cap;
-        stored_selling_costs = gross_sale * FINANCING.disposition_cost;
+        stored_selling_costs = sellingCosts(gross_sale);
         const net_reversion =
           gross_sale - stored_selling_costs - perm.remaining_bal;
         cf[total_with_hold] += net_reversion;

@@ -123,7 +123,7 @@ The underlying zone's step-back rule, as in [Standard](bill6.md#height-setbacks)
 
 ## Parking and loading
 
-TOD parking defaults to 0.85 stalls per unit. The legal minimum is 0: § 21-6.20(a) requires no off-street parking within 0.5 miles of a rail station or in a TOD special district, which covers every TOD parcel. Loading is not exempted: lots over 7,500 sq ft reserve ground for the loading spaces Table 21-6.5 requires (1 for 20 to 150 units, more for larger buildings and retail). The user can change parking with the Parking slider. Bicycle parking is required (§ 21-6.40) except on industrial-zoned parcels. How stalls are counted, placed and priced is in [Parking and loading](../simulator-logic.md#parking-and-loading).
+TOD parking defaults to 0.9 stalls per unit: 0.90 is the average for discretionary rental projects approved since 2021, which include 201H and IPD-T ([Stalled](https://static1.squarespace.com/static/601374ae84e51e430a1829d8/t/68f15c7cbf563d6a7080bf8f/1760648316670/Stalled_FINAL.pdf) (Hawaiʻi Appleseed, 2025), Table 4). The legal minimum is 0: § 21-6.20(a) requires no off-street parking within 0.5 miles of a rail station or in a TOD special district, which covers every TOD parcel. Loading is not exempted: lots over 7,500 sq ft reserve ground for the loading spaces Table 21-6.5 requires (1 for 20 to 150 units, more for larger buildings and retail). The user can change parking with the Parking slider. Bicycle parking is required (§ 21-6.40) except on industrial-zoned parcels. How stalls are counted, placed and priced is in [Parking and loading](../simulator-logic.md#parking-and-loading).
 
 ### Ground floor and parking placement (PD-T)
 
@@ -156,6 +156,8 @@ Table 29-1.4 (see [Standard](bill6.md#affordability)) requires IPD-T, PD-T and T
 
 **Building permit, plan review and BWS water charges:** charged on market units under the default Impact Fees toggle (Market Units Only).
 
+**Park dedication:** charged on every unit. § 22-7.3(j)(2) exempts affordable units under a PD-T or IPD-T permit, but the TOD pathway has no affordable units for now: its affordable requirement applies to for-sale units, and for-sale units are not modeled (see [Affordability](#affordability)). So no park dedication exemption applies for now.
+
 **Property tax:** improvements are exempt from real property tax for 15 years (land-only tax).
 
 ## Default assumptions
@@ -167,8 +169,8 @@ Table 29-1.4 (see [Standard](bill6.md#affordability)) requires IPD-T, PD-T and T
 | Affordable / market rent | 80% / 120% AMI |
 | Hard cost | $450 per sq ft |
 | Operating expense ratio | 30% of EGI |
-| Parking | 0.85 stalls per unit |
-| Park dedication | In-lieu fee |
+| Parking | 0.9 stalls per unit ([Stalled](https://static1.squarespace.com/static/601374ae84e51e430a1829d8/t/68f15c7cbf563d6a7080bf8f/1760648316670/Stalled_FINAL.pdf) (Hawaiʻi Appleseed, 2025), Table 4) |
+| Park dedication | In-lieu fee, on every unit and on the bonused floor area (see [Park dedication](../simulator-logic.md#park-dedication)) |
 | Impact Fees toggle | Market Units Only |
 | Permanent rate / minimum DSCR | 6.75% / 1.20 |
 | Hold period | 8 years |

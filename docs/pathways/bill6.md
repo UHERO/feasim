@@ -69,7 +69,7 @@ The model builds no affordable units in this pathway: it is rental only, and the
 
 **Building permit and plan review fees:** waived in proportion to the affordable share (Ord. 19-8 § 4, adding ROH 18-6.5(i)). The building official waives these fees for "the portion of an affordable rental housing project equal to the percentage of affordable rental housing units."
 
-**Park dedication:** affordable units exempt (Ord. 19-8 § 5, amending ROH 22-7.3(j)). The subdivision article's park-dedication requirement does not apply to affordable rental dwelling units. In the model, the park requirement is sized on chargeable (market) units only, so affordable units contribute no park-dedication cost or in-lieu fee.
+**Park dedication:** charged on every unit. § 22-7.3(j) exempts only Chapter 29 units, PD-T and IPD-T affordable units, HRS § 201H-36(a)(5) rentals and Chapter 32 rentals at or below 100% AMI (Ord. 19-8 § 5), and this pathway has no affordable units. The exemption sunsets on June 30, 2027 (see [Park dedication](../simulator-logic.md#park-dedication)).
 
 **BWS water charges:** charged on market units under the default Impact Fees toggle (Market Units Only).
 

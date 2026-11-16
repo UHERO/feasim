@@ -9,6 +9,7 @@ export * from "./calculations";
 // constants and helpers the gauge and calculator use directly
 export {
   DEFAULT_TARGET_RETURN,
+  exitCapRate,
   GRANT,
   zoneName,
   type SoftCostBreakdown,
@@ -57,6 +58,9 @@ export {
   WSFC_WAIVER_UNIT_CAP,
   wsfcCategory,
 } from "./calculations/calc-shared";
+
+// selling costs: the 3.5% disposition cost plus the conveyance tax (HRS § 247-2)
+export { CONVEYANCE_TAX, conveyanceTax, sellingCosts } from "./calculations/calc-shared";
 
 // parking (surface lot, ground floor, podium) and height step-backs; the
 // Article 6 minimums (§ 21-6.20), joint use, loading (§ 21-6.110) and bicycle
