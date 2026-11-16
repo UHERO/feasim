@@ -260,8 +260,11 @@ function farPathwayRental(
   const residential_egi = pgi - vacancy_loss;
   const retail_egi = retail_pgi - retail_vacancy_loss;
   const egi = residential_egi + retail_egi;
+  // affordable rent income, which grows with ami in a hold
+  const affordable_egi =
+    pgi > 0 ? residential_egi * ((affordable_rent * afd_rent_units * 12) / pgi) : 0;
 
-  return { pri, pgi, egi, retail_pgi, retail_egi, residential_egi };
+  return { pri, pgi, egi, retail_pgi, retail_egi, residential_egi, affordable_egi };
 }
 
 // =========================================================
@@ -319,7 +322,7 @@ function farPathwayOpex(
 }
 
 // =========================================================
-// STEP 7: NOI & GDV (gross, no disposition cost)
+// STEP 7: NOI & GDV (gross, before the conveyance tax)
 // =========================================================
 
 function farPathwayNoi(
@@ -627,6 +630,7 @@ export function runFarPathwaySingle(
           min_dscr,
           cap_rate: noi_result.cap_rate,
           gross_sales: sale.gross_sales,
+          affordable_egi: rev.affordable_egi,
         });
 
   const _roc = dev.dev_roc ?? 0;

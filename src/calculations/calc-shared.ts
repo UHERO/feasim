@@ -3288,8 +3288,8 @@ export function runDevFlipStrategy(args: {
     round_totals = false,
   } = args;
 
-  // disposition cost at sale only
-  const selling_costs = gdv * FINANCING.disposition_cost;
+  // disposition cost and conveyance tax at sale only
+  const selling_costs = sellingCosts(gdv);
   const equity_out = gdv - selling_costs - loan_balance;
 
   // monthly cashflow: predev spread across permitting, construction equity at close, exit at end
@@ -3369,6 +3369,8 @@ export function runHoldStrategy(args: {
   min_dscr: number;
   cap_rate: number;
   gross_sales: number;
+  // affordable rent income, which grows with ami in a hold (holdEgi)
+  affordable_egi: number;
   // see runDevFlipStrategy
   round_totals?: boolean;
   // defaults to full tax every year (bill6, standard, h201); tod passes its
@@ -3396,6 +3398,7 @@ export function runHoldStrategy(args: {
     min_dscr,
     cap_rate,
     gross_sales,
+    affordable_egi,
     round_totals = false,
     taxRule = fullHoldTax,
   } = args;
@@ -3409,7 +3412,9 @@ export function runHoldStrategy(args: {
   const total_equity_invested = equity_amount;
 
   // Sale units sold at stabilization, pay down construction loan first
-  const sale_selling_costs = gross_sales * FINANCING.disposition_cost;
+  // sale units are off (gross_sales is 0); if they return, charge each
+  // unit's price
+  const sale_selling_costs = sellingCosts(gross_sales);
   const net_sale_proceeds = gross_sales - sale_selling_costs;
   const perm_loan_balance = Math.max(0, loan_balance - net_sale_proceeds);
   const excess_sale_cash = Math.max(0, net_sale_proceeds - loan_balance);
@@ -3432,7 +3437,7 @@ export function runHoldStrategy(args: {
   const is_bankable_display = perm_loan_balance === 0 ? null : perm.is_bankable;
 
   const entry_cap = cap_rate;
-  const exit_cap = entry_cap + HOLD.exit_cap_spread;
+  const exit_cap = exitCapRate(entry_cap, hold_years);
 
   const hold_months = hold_years * 12;
   const total_with_hold = total_months + hold_months;
@@ -3458,7 +3463,7 @@ export function runHoldStrategy(args: {
 
   for (let yr = 1; yr <= hold_years; yr++) {
     if (yr > 1) {
-      current_egi *= 1 + HOLD.annual_rent_growth;
+      current_egi = holdEgi(egi, affordable_egi, yr - 1);
       // expenses run on their own inflation series, not as a fixed share of EGI
       current_opex *= 1 + HOLD.annual_opex_growth;
       assessed_value *= 1 + HOLD.annual_assessment_growth;
@@ -3473,9 +3478,12 @@ export function runHoldStrategy(args: {
     }
 
     if (yr === hold_years) {
-      const forward_noi = current_noi * (1 + HOLD.annual_rent_growth);
+      // next year's noi, at next year's egi growth
+      const forward_noi =
+        current_noi *
+        (holdEgi(egi, affordable_egi, yr) / holdEgi(egi, affordable_egi, yr - 1));
       const gross_sale = forward_noi / exit_cap;
-      stored_selling_costs = gross_sale * FINANCING.disposition_cost;
+      stored_selling_costs = sellingCosts(gross_sale);
       const net_reversion =
         gross_sale - stored_selling_costs - perm.remaining_bal;
       cf[total_with_hold] += net_reversion;

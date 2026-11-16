@@ -56,8 +56,6 @@ import {
   VACANCY,
   zeroOutput,
   zoneStepBack,
-  holdEgi,
-  sellingCosts,
 } from "./calc-shared";
 
 // =========================================================
@@ -437,6 +435,7 @@ export function calcH201Single(sliders: SliderInputs): ParcelOutput {
           min_dscr,
           cap_rate,
           gross_sales,
+          affordable_egi,
           round_totals: true,
         });
 

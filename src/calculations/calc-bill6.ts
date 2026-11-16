@@ -1,10 +1,10 @@
 // Bill 6 Development calculator:
 //
 // Key Bill 6 rules:
-// - Same Sttandard Development rules except:
+// - Same Standard Development rules except:
 // - AMI is now zone-based, with user-selectable AMI levels for affordable units (still 5% rental, 15% sale)
 // - Minimum lot area is 5,000 sqft for all zoning values
-// - Maximum building are is 60% for all zoning values
+// - Maximum building area is 60% for all zoning values
 //
 // Runs on the shared FAR-pathway pipeline (calc-far-pathway.ts) — Bill 6 and
 // Standard Development differ only in which FAR and lot-coverage rule applies.

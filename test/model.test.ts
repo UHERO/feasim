@@ -78,7 +78,6 @@ import {
 import {
   calcParkArea,
   calcSoftCosts,
-  FINANCING,
   mixPostGrant,
   postGrantPerUnit,
   PREVAILING_WAGE,
@@ -346,11 +345,14 @@ describe("dev flip strategy", () => {
   it.each(PROGRAMS)("%s: the sale pays selling costs and the loan, grants and the rest go to equity", (program) => {
     const r = flip(program);
     const grants = (r.pre_construction_subsidy ?? 0) + (r.dev_post_grant ?? 0);
-    expect(r.dev_selling_costs).toBeCloseTo(r.dev_gdv! * FINANCING.disposition_cost, 0);
+    // disposition cost plus the conveyance tax
+    expect(r.dev_selling_costs).toBeCloseTo(sellingCosts(r.dev_gdv!), 0);
     // conservation of value: what the sale raises either pays off the
     // construction loan, covers selling costs, or (with any grant) comes
-    // back to the developer as equity
-    expect(r.dev_equity_out! - grants).toBeCloseTo(r.dev_gdv! - r.dev_selling_costs! - r.dev_loan_payoff!, 0);
+    // back to the developer as equity. Equity out, selling costs and the
+    // loan payoff are each rounded to the dollar, so allow $1.50
+    const unrounded = r.dev_gdv! - r.dev_selling_costs! - r.dev_loan_payoff!;
+    expect(Math.abs(r.dev_equity_out! - grants - unrounded)).toBeLessThanOrEqual(1.5);
   });
 
   it.each(PROGRAMS)("%s: the equity multiple is what came out over what went in", (program) => {

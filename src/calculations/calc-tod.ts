@@ -66,8 +66,6 @@ import {
   zoneStepBack,
   type ParcelOutput,
   type SliderInputs,
-  holdEgi,
-  sellingCosts,
 } from "./calc-shared";
 
 // =========================================================
@@ -447,6 +445,7 @@ export function calcTodSingle(sliders: SliderInputs): ParcelOutput {
           min_dscr,
           cap_rate,
           gross_sales,
+          affordable_egi,
           round_totals: true,
           taxRule: TOD_HOLD_TAX_RULE,
         });
